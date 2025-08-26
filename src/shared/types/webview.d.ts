@@ -15,6 +15,15 @@ interface HTMLWebViewElement extends HTMLElement {
   goForward(): void;
   addEventListener(type: string, listener: EventListener): void;
   removeEventListener(type: string, listener: EventListener): void;
+  sendInputEvent(event: {
+    type: 'mouseDown' | 'mouseUp' | 'scrollWheel';
+    x: number;
+    y: number;
+    button?: 'left' | 'right';
+    clickCount?: number;
+    deltaX?: number;
+    deltaY?: number;
+  }): void;
 }
 
 declare var HTMLWebViewElement: {

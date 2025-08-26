@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { WebViewProps } from '../types';
+import { useBrowserExtension } from '../../browser-extension/hooks/useBrowserExtension';
+import BrowserExtensionControls from '../../browser-extension/components/BrowserExtensionControls';
+import { cursorAnimations } from '../../browser-extension/utils/cursorStyles';
 
 const FullScreenWebView: React.FC<WebViewProps> = ({
   url = 'https://www.instagram.com',
@@ -9,29 +12,29 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const webviewRef = useRef<HTMLWebViewElement>(null);
 
-  useEffect(() => {
-    const handleLoad = () => {
+  // 브라우저 익스텐션 훅 사용
+  const { state: extensionState, toggleExtension, isWebViewLoaded } = useBrowserExtension({
+    webviewRef,
+    onWebViewLoad: () => {
       setIsLoading(false);
       console.log('WebView loaded successfully');
-    };
-
-    const handleError = (event: any) => {
-      const errorMessage = 'Failed to load page';
+    },
+    onWebViewError: (errorMessage) => {
       setError(errorMessage);
       setIsLoading(false);
       console.error('WebView error:', errorMessage);
-    };
-
-    const webview = webviewRef.current;
-    if (webview) {
-      webview.addEventListener('did-finish-load', handleLoad);
-      webview.addEventListener('did-fail-load', handleError);
-
-      return () => {
-        webview.removeEventListener('did-finish-load', handleLoad);
-        webview.removeEventListener('did-fail-load', handleError);
-      };
     }
+  });
+
+  // 커서 애니메이션 스타일 추가
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = cursorAnimations;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
 
   const handleClose = () => {
@@ -127,7 +130,7 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         </div>
         
         <div style={{ fontSize: '14px', color: '#ccc' }}>
-          WebView
+          WebView {extensionState.isActive && '(Extension Active)'}
         </div>
         
         <button
@@ -164,7 +167,9 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ marginBottom: '10px' }}>Loading...</div>
-            <div style={{ fontSize: '14px', color: '#ccc' }}>Please wait</div>
+            <div style={{ fontSize: '14px', color: '#ccc' }}>
+              {isWebViewLoaded ? 'Extension will be activated automatically' : 'Please wait'}
+            </div>
           </div>
         </div>
       )}
@@ -216,6 +221,12 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         }}
         webpreferences="nodeIntegration=no, contextIsolation=yes"
         allowpopups="true"
+      />
+
+      {/* Browser Extension Controls */}
+      <BrowserExtensionControls
+        state={extensionState}
+        onToggle={toggleExtension}
       />
     </div>
   );
