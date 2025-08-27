@@ -33,3 +33,8 @@ export const OpenAPI: OpenAPIConfig = {
     HEADERS: undefined,
     ENCODE_PATH: undefined,
 };
+
+// 토큰을 동적으로 업데이트하는 함수
+export const updateToken = (newToken: string) => {
+    OpenAPI.TOKEN = newToken;
+};

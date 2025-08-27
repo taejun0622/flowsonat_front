@@ -132,9 +132,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('refresh_token', tokenData.refresh_token);
       
       setToken(tokenData.access_token);
+      
+      // OpenAPI 설정 업데이트
+      const { updateToken } = await import('@/api/core/OpenAPI');
+      updateToken(tokenData.access_token);
+      
+      return tokenData;
     } catch (error) {
       console.error('Token refresh error:', error);
       logout();
+      
+      // 로그인 페이지로 리다이렉트
+      window.location.href = '/login';
+      
       throw error;
     }
   };

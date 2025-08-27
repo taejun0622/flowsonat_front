@@ -8,6 +8,7 @@ import type { ApiResult } from './ApiResult';
 import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
+import { apiInterceptor } from './apiInterceptor';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -311,9 +312,40 @@ export const request = <T>(config: OpenAPIConfig, options: ApiRequestOptions): C
                     body: responseHeader ?? responseBody,
                 };
 
-                catchErrorCodes(options, result);
+                try {
+                    catchErrorCodes(options, result);
+                    resolve(result.body);
+                } catch (error) {
+                    // 401 에러 처리 및 자동 토큰 갱신
+                    if (error instanceof ApiError && error.status === 401) {
+                        try {
+                            const retryRequest = async () => {
+                                const retryHeaders = await getHeaders(config, options);
+                                const retryResponse = await sendRequest(config, options, url, body, formData, retryHeaders, onCancel);
+                                const retryResponseBody = await getResponseBody(retryResponse);
+                                const retryResponseHeader = getResponseHeader(retryResponse, options.responseHeader);
 
-                resolve(result.body);
+                                const retryResult: ApiResult = {
+                                    url,
+                                    ok: retryResponse.ok,
+                                    status: retryResponse.status,
+                                    statusText: retryResponse.statusText,
+                                    body: retryResponseHeader ?? retryResponseBody,
+                                };
+
+                                catchErrorCodes(options, retryResult);
+                                return retryResult.body;
+                            };
+
+                            const result = await apiInterceptor.handleApiError(error, retryRequest);
+                            resolve(result);
+                        } catch (interceptorError) {
+                            reject(interceptorError);
+                        }
+                    } else {
+                        reject(error);
+                    }
+                }
             }
         } catch (error) {
             reject(error);
