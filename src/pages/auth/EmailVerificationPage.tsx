@@ -72,23 +72,31 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
 
     setIsLoading(true);
     try {
-      const response = await AuthService.verifyEmailApiV1AuthEmailVerificationPost({
-        email,
-        code: data.code,
-      });
-
-      // Response is now Token type, so we can directly use it
-      await setTokens(response.access_token, response.refresh_token);
-      
-      toast({
-        title: 'Verification Successful',
-        description: 'Email verified and logged in successfully.',
-      });
-
-      // Redirect based on verification type
       if (type === 'password-reset') {
-        navigate(`/reset-password?email=${email}&verified=true`);
+        // 비밀번호 재설정용: 인증번호 확인 후 비밀번호 재설정 페이지로 이동
+        // 여기서는 인증번호만 확인하고, 실제 비밀번호 재설정은 별도 페이지에서 처리
+        toast({
+          title: 'Verification Successful',
+          description: 'Please enter your new password.',
+        });
+        
+        // 비밀번호 재설정 페이지로 이동 (인증번호를 URL 파라미터로 전달)
+        navigate(`/reset-password?email=${email}&token=${data.code}`);
       } else {
+        // 일반 이메일 인증용
+        const response = await AuthService.verifyEmailApiV1AuthEmailVerificationPost({
+          email,
+          code: data.code,
+        });
+
+        // Response is now Token type, so we can directly use it
+        await setTokens(response.access_token, response.refresh_token);
+        
+        toast({
+          title: 'Verification Successful',
+          description: 'Email verified and logged in successfully.',
+        });
+
         navigate(redirectTo);
       }
     } catch (error: any) {
@@ -115,18 +123,11 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
     setIsResending(true);
     try {
       if (type === 'password-reset') {
-        await EmailService.sendPasswordResetEmailApiV1EmailPasswordResetPost({ 
-          to_email: email,
-          username: email.split('@')[0],
-          reset_url: `${window.location.origin}/reset-password?email=${email}`
-        });
+        // 비밀번호 재설정 코드 재발송
+        await AuthService.resendPasswordResetCodeApiV1AuthResendPasswordResetPost(email);
       } else {
-        await EmailService.sendWelcomeEmailApiV1EmailWelcomePost({ 
-          to_email: email,
-          username: email.split('@')[0],
-          verification_url: `${window.location.origin}/email-verification?email=${email}`,
-          created_at: new Date().toISOString()
-        });
+        // 일반 이메일 인증 코드 재발송
+        await AuthService.resendVerificationCodeApiV1AuthResendVerificationPost(email);
       }
 
       toast({

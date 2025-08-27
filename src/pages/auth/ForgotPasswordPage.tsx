@@ -37,7 +37,13 @@ export const ForgotPasswordPage: React.FC = () => {
       await AuthService.requestPasswordResetApiV1AuthPasswordResetPost({
         email: data.email,
       });
-      // 이메일 인증 페이지로 리다이렉트
+      
+      toast({
+        title: "Verification code sent",
+        description: "Please check your email for the verification code.",
+      });
+      
+      // 인증번호 입력 페이지로 이동
       navigate(`/email-verification?email=${encodeURIComponent(data.email)}&type=password-reset`);
     } catch (error: any) {
       console.error('Password reset error:', error);

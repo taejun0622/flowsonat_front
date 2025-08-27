@@ -98,7 +98,7 @@ export class AuthService {
      * Confirm Password Reset
      * Confirm password reset with verification code
      * @param requestBody
-     * @returns any Successful Response
+     * @returns Token Successful Response
      * @throws ApiError
      */
     public static confirmPasswordResetApiV1AuthPasswordResetConfirmPost(
@@ -118,7 +118,7 @@ export class AuthService {
      * Verify Email
      * Verify email with verification code
      * @param requestBody
-     * @returns any Successful Response
+     * @returns Token Successful Response
      * @throws ApiError
      */
     public static verifyEmailApiV1AuthEmailVerificationPost(

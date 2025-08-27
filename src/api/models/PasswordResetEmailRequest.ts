@@ -5,6 +5,6 @@
 export type PasswordResetEmailRequest = {
     to_email: string;
     username: string;
-    reset_url: string;
+    reset_code: string;
 };
 
