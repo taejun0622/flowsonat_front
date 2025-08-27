@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthService } from '@/api/services/AuthService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters long.'),
@@ -29,6 +30,7 @@ export const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setTokens } = useAuth();
 
   const token = searchParams.get('token');
 
@@ -52,17 +54,20 @@ export const ResetPasswordPage: React.FC = () => {
 
     try {
       setIsLoading(true);
-      await AuthService.confirmPasswordResetApiV1AuthPasswordResetConfirmPost({
+      const response = await AuthService.confirmPasswordResetApiV1AuthPasswordResetConfirmPost({
         token: token,
         new_password: data.password,
       });
       
+      // Response is now Token type, so we can directly use it
+      await setTokens(response.access_token, response.refresh_token);
+      
       toast({
         title: "Password reset successful",
-        description: "Your password has been successfully changed.",
+        description: "Password changed and logged in successfully.",
       });
       
-      navigate('/login');
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('Password reset error:', error);
       toast({

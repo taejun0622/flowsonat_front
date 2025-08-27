@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { EmailService } from '@/api/services/EmailService';
 import { AuthService } from '@/api/services/AuthService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const emailVerificationSchema = z.object({
   code: z.string().min(6, 'Verification code must be at least 6 characters.').max(10, 'Verification code must be 10 characters or less.'),
@@ -29,6 +30,7 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setTokens } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -70,14 +72,17 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
 
     setIsLoading(true);
     try {
-      await AuthService.verifyEmailApiV1AuthEmailVerificationPost({
+      const response = await AuthService.verifyEmailApiV1AuthEmailVerificationPost({
         email,
         code: data.code,
       });
 
+      // Response is now Token type, so we can directly use it
+      await setTokens(response.access_token, response.refresh_token);
+      
       toast({
         title: 'Verification Successful',
-        description: 'Email verification completed successfully.',
+        description: 'Email verified and logged in successfully.',
       });
 
       // Redirect based on verification type

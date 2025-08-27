@@ -103,7 +103,7 @@ export class AuthService {
      */
     public static confirmPasswordResetApiV1AuthPasswordResetConfirmPost(
         requestBody: PasswordResetConfirm,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<Token> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/auth/password-reset/confirm',
@@ -123,7 +123,7 @@ export class AuthService {
      */
     public static verifyEmailApiV1AuthEmailVerificationPost(
         requestBody: EmailVerification,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<Token> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/auth/email-verification',

@@ -11,6 +11,7 @@ interface AuthContextType {
   register: (userData: UserCreate) => Promise<void>;
   logout: () => void;
   refreshToken: () => Promise<void>;
+  setTokens: (accessToken: string, refreshToken: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -138,6 +139,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const setTokens = async (accessToken: string, refreshToken: string) => {
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+    setToken(accessToken);
+    
+    try {
+      const userInfo = await AuthService.getCurrentUserInfoApiV1AuthMeGet();
+      setUser(userInfo);
+    } catch (error) {
+      console.error('Failed to get user info after setting tokens:', error);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -146,6 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     refreshToken,
+    setTokens,
   };
 
   return (
