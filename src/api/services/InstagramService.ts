@@ -10,6 +10,9 @@ import type { HealthEnum } from '../models/HealthEnum';
 import type { IGHistoryCreate } from '../models/IGHistoryCreate';
 import type { IGHistoryListResponse } from '../models/IGHistoryListResponse';
 import type { IGHistoryResponse } from '../models/IGHistoryResponse';
+import type { InstagramConnectRequest } from '../models/InstagramConnectRequest';
+import type { InstagramConnectResponse } from '../models/InstagramConnectResponse';
+import type { InstagramDisconnectResponse } from '../models/InstagramDisconnectResponse';
 import type { StageEnum } from '../models/StageEnum';
 import type { StatusEnum } from '../models/StatusEnum';
 import type { SuggestionCreate } from '../models/SuggestionCreate';
@@ -23,6 +26,70 @@ import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class InstagramService {
+    /**
+     * Get My Instagram Account
+     * Get user's connected Instagram account
+     * @returns InstagramConnectResponse Successful Response
+     * @throws ApiError
+     */
+    public static getMyInstagramAccountApiV1InstagramMeGet(): CancelablePromise<InstagramConnectResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/me',
+        });
+    }
+    /**
+     * Update Instagram Account
+     * Update user's Instagram account connection
+     * @param requestBody
+     * @returns InstagramConnectResponse Successful Response
+     * @throws ApiError
+     */
+    public static updateInstagramAccountApiV1InstagramMePut(
+        requestBody: InstagramConnectRequest,
+    ): CancelablePromise<InstagramConnectResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/instagram/me',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Connect Instagram Account
+     * Connect user's Instagram account
+     * @param requestBody
+     * @returns InstagramConnectResponse Successful Response
+     * @throws ApiError
+     */
+    public static connectInstagramAccountApiV1InstagramMePost(
+        requestBody: InstagramConnectRequest,
+    ): CancelablePromise<InstagramConnectResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/me',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Disconnect Instagram Account
+     * Disconnect user's Instagram account
+     * @returns InstagramDisconnectResponse Successful Response
+     * @throws ApiError
+     */
+    public static disconnectInstagramAccountApiV1InstagramMeDelete(): CancelablePromise<InstagramDisconnectResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/instagram/me',
+        });
+    }
     /**
      * Create Benchmark
      * Create a new benchmark
