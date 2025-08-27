@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -10,6 +10,7 @@ const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
+let instagramAuthWindow;
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
@@ -41,6 +42,47 @@ app.on("window-all-closed", () => {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+ipcMain.handle("open-instagram-login", async (event, url) => {
+  if (instagramAuthWindow) {
+    instagramAuthWindow.focus();
+    return;
+  }
+  instagramAuthWindow = new BrowserWindow({
+    width: 600,
+    height: 700,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
+    },
+    parent: win,
+    modal: true,
+    show: false
+  });
+  instagramAuthWindow.once("ready-to-show", () => {
+    instagramAuthWindow?.show();
+  });
+  instagramAuthWindow.on("closed", () => {
+    instagramAuthWindow = null;
+  });
+  instagramAuthWindow.webContents.on("did-navigate", (event2, navigationUrl) => {
+    if (navigationUrl.includes("instagram.com") && !navigationUrl.includes("login")) {
+      win?.webContents.send("instagram-login-success", {
+        url: navigationUrl,
+        cookies: instagramAuthWindow?.webContents.session.cookies.get({})
+      });
+      instagramAuthWindow?.close();
+    }
+  });
+  await instagramAuthWindow.loadURL(url);
+});
+ipcMain.handle("close-instagram-login", () => {
+  if (instagramAuthWindow) {
+    instagramAuthWindow.close();
+    instagramAuthWindow = null;
   }
 });
 app.whenReady().then(createWindow);

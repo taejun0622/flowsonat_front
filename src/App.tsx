@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import { AuthProvider } from '@/contexts/AuthContext';
+import { InstagramProvider } from '@/contexts/InstagramContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Toaster } from '@/components/ui/toaster';
 import { DynamicBackground } from '@/components/ui/background';
@@ -19,7 +20,8 @@ import { DashboardPage } from '@/pages/DashboardPage';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <InstagramProvider>
+        <Router>
         <DynamicBackground
           type="blur-dot"
           colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
@@ -52,7 +54,8 @@ function App() {
           
           <Toaster />
         </DynamicBackground>
-      </Router>
+        </Router>
+      </InstagramProvider>
     </AuthProvider>
   );
 }

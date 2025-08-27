@@ -6,7 +6,8 @@ import { cursorAnimations } from '../../browser-extension/utils/cursorStyles';
 
 const FullScreenWebView: React.FC<WebViewProps> = ({
   url = 'https://www.instagram.com',
-  onClose
+  onClose,
+  onLoginSuccess
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,41 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
       console.error('WebView error:', errorMessage);
     }
   });
+
+  // Instagram 로그인 성공 감지
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview) return;
+
+    const handleNavigation = (event: any) => {
+      const currentUrl = event.url;
+      console.log('WebView navigation:', currentUrl);
+      
+      // Instagram 로그인 성공 후 리다이렉트되는 URL 패턴을 확인
+      if (currentUrl.includes('instagram.com') && 
+          !currentUrl.includes('login') && 
+          !currentUrl.includes('accounts/login')) {
+        console.log('Instagram login successful detected');
+        
+        // 세션 데이터 수집 (쿠키, 로컬 스토리지 등)
+        const sessionData = {
+          url: currentUrl,
+          timestamp: new Date().toISOString(),
+          // TODO: 실제 세션 데이터 수집 로직 추가
+        };
+        
+        onLoginSuccess?.(sessionData);
+      }
+    };
+
+    webview.addEventListener('did-navigate', handleNavigation);
+    webview.addEventListener('did-navigate-in-page', handleNavigation);
+
+    return () => {
+      webview.removeEventListener('did-navigate', handleNavigation);
+      webview.removeEventListener('did-navigate-in-page', handleNavigation);
+    };
+  }, [onLoginSuccess]);
 
   // 커서 애니메이션 스타일 추가
   useEffect(() => {
@@ -220,7 +256,7 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
           height: '100%'
         }}
         webpreferences="nodeIntegration=no, contextIsolation=yes"
-        allowpopups="true"
+        allowpopups={true}
       />
 
       {/* Browser Extension Controls */}

@@ -1,6 +1,7 @@
 export interface WebViewProps {
   url?: string;
   onClose?: () => void;
+  onLoginSuccess?: (sessionData: any) => void;
 }
 
 export interface WebViewManagerProps {

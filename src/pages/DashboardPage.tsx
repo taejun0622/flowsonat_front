@@ -4,6 +4,7 @@ import { LogOut, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { InstagramConnectionManager } from '@/components/InstagramConnectionManager';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -68,6 +69,9 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Instagram Connection Card */}
+            <InstagramConnectionManager />
 
             {/* Quick Actions Card */}
             <Card>

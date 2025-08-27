@@ -22,3 +22,15 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // You can expose other APTs you need here.
   // ...
 })
+
+// Instagram API
+contextBridge.exposeInMainWorld('electronAPI', {
+  openInstagramLogin: (url: string) => ipcRenderer.invoke('open-instagram-login', url),
+  closeInstagramLogin: () => ipcRenderer.invoke('close-instagram-login'),
+  onInstagramLoginSuccess: (callback: (data: any) => void) => {
+    ipcRenderer.on('instagram-login-success', (event, data) => callback(data))
+  },
+  onInstagramLoginError: (callback: (error: string) => void) => {
+    ipcRenderer.on('instagram-login-error', (event, error) => callback(error))
+  }
+})
