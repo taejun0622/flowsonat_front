@@ -1,87 +1,135 @@
-# WebView Manager
+# Flowsonat Frontend
 
-Electron 기반의 웹뷰 관리 애플리케이션입니다. X-Frame-Options 차단을 우회하여 웹사이트를 전체 화면으로 볼 수 있습니다.
-
-## 🏗️ 프로젝트 구조 (Clean Architecture)
-
-```
-src/
-├── features/           # 기능별 모듈
-│   └── webview/       # 웹뷰 기능
-│       ├── components/ # 웹뷰 관련 컴포넌트
-│       ├── hooks/     # 웹뷰 관련 훅
-│       ├── types/     # 웹뷰 타입 정의
-│       └── index.ts   # 웹뷰 모듈 export
-├── shared/            # 공통 모듈
-│   ├── components/    # 공통 컴포넌트
-│   ├── types/         # 공통 타입 정의
-│   ├── utils/         # 유틸리티 함수
-│   └── index.ts       # 공통 모듈 export
-└── App.tsx           # 메인 앱 컴포넌트
-```
+현대적인 디자인 시스템과 인증 기능을 갖춘 React + TypeScript + Electron 애플리케이션입니다.
 
 ## 🚀 주요 기능
 
-### ✅ 웹뷰 기능
-- **전체 화면 웹뷰**: Electron webview 태그를 사용한 전체 화면 모드
-- **X-Frame-Options 우회**: iframe 차단 문제 해결
-- **네비게이션 컨트롤**: 뒤로가기, 앞으로가기, 새로고침
-- **로딩 상태 표시**: 웹뷰 로딩 중 상태 표시
-- **에러 처리**: 로딩 실패 시 재시도 기능
+- **현대적인 디자인 시스템**: Tailwind CSS와 Radix UI를 기반으로 한 일관된 디자인
+- **완전한 인증 시스템**: 로그인, 회원가입, 비밀번호 재설정 기능
+- **타입 안전성**: TypeScript로 작성된 타입 안전한 코드
+- **반응형 디자인**: 모든 디바이스에서 최적화된 사용자 경험
+- **토스트 알림**: 사용자 친화적인 알림 시스템
 
-### ✅ 사용자 인터페이스
-- **URL 입력**: 직접 URL 입력 가능
-- **Quick Access**: 자주 사용하는 페이지 빠른 접근
-- **반응형 디자인**: 다양한 화면 크기 지원
-- **직관적인 UI**: 사용하기 쉬운 인터페이스
-
-## 🛠️ 기술 스택
+## 🛠 기술 스택
 
 - **Frontend**: React 18, TypeScript
-- **Desktop**: Electron 30
-- **Build Tool**: Vite 7
-- **Package Manager**: npm
+- **Styling**: Tailwind CSS
+- **UI Components**: Radix UI, shadcn/ui
+- **Forms**: React Hook Form, Zod
+- **Routing**: React Router DOM
+- **Desktop**: Electron
+- **Build Tool**: Vite
 
 ## 📦 설치 및 실행
 
-### 개발 환경 설정
+### 필수 요구사항
+- Node.js 18+ 
+- npm 또는 yarn
+
+### 설치
 ```bash
 # 의존성 설치
 npm install
 
 # 개발 서버 실행
 npm run dev
-```
 
-### 빌드
-```bash
 # 프로덕션 빌드
 npm run build
+
+# Electron 빌드
+npm run build && electron-builder
 ```
 
-## 🎯 사용 방법
+## 🏗 프로젝트 구조
 
-1. **URL 입력**: 원하는 웹사이트 URL을 입력
-2. **Quick Access**: 미리 정의된 버튼들로 빠른 접근
-3. **전체 화면 실행**: "Open in Full Screen" 버튼 클릭
-4. **네비게이션**: 헤더의 컨트롤 버튼 사용
-5. **종료**: "Close" 버튼으로 전체 화면 모드 종료
+```
+src/
+├── api/                    # API 관련 코드
+│   ├── core/              # API 핵심 설정
+│   ├── models/            # API 모델 타입
+│   └── services/          # API 서비스
+├── components/            # 재사용 가능한 컴포넌트
+│   ├── ui/               # 기본 UI 컴포넌트
+│   └── ProtectedRoute.tsx # 보호된 라우트
+├── contexts/             # React Context
+│   └── AuthContext.tsx   # 인증 컨텍스트
+├── hooks/                # 커스텀 훅
+│   └── use-toast.ts      # 토스트 훅
+├── lib/                  # 유틸리티 함수
+│   └── utils.ts          # 공통 유틸리티
+├── pages/                # 페이지 컴포넌트
+│   ├── auth/             # 인증 관련 페이지
+│   └── DashboardPage.tsx # 대시보드
+└── App.tsx               # 메인 앱 컴포넌트
+```
+
+## 🔐 인증 기능
+
+### 사용 가능한 페이지
+- **로그인** (`/login`): 기존 사용자 로그인
+- **회원가입** (`/register`): 새 사용자 등록
+- **비밀번호 찾기** (`/forgot-password`): 비밀번호 재설정 요청
+- **비밀번호 재설정** (`/reset-password`): 새 비밀번호 설정
+- **대시보드** (`/dashboard`): 인증된 사용자 전용 페이지
+
+### API 엔드포인트
+- `POST /api/v1/auth/register` - 회원가입
+- `POST /api/v1/auth/login` - 로그인
+- `POST /api/v1/auth/refresh` - 토큰 갱신
+- `POST /api/v1/auth/password-reset` - 비밀번호 재설정 요청
+- `POST /api/v1/auth/password-reset/confirm` - 비밀번호 재설정 확인
+- `GET /api/v1/auth/me` - 현재 사용자 정보
+- `POST /api/v1/auth/logout` - 로그아웃
+
+## 🎨 디자인 시스템
+
+### 색상 팔레트
+- **Primary**: 파란색 계열 (#3B82F6)
+- **Secondary**: 회색 계열
+- **Destructive**: 빨간색 계열 (#EF4444)
+- **Muted**: 연한 회색 계열
+
+### 컴포넌트
+- Button (다양한 variant 지원)
+- Input (아이콘 포함)
+- Card (헤더, 콘텐츠, 푸터)
+- Toast (알림 시스템)
+- Label
 
 ## 🔧 개발 가이드
 
-### 새로운 기능 추가
-1. `src/features/` 폴더에 새로운 기능 모듈 생성
-2. 각 모듈은 `components/`, `hooks/`, `types/` 폴더 포함
-3. `index.ts` 파일로 모듈 export
+### 새로운 컴포넌트 추가
+1. `src/components/ui/` 디렉토리에 컴포넌트 생성
+2. TypeScript 타입 정의
+3. Tailwind CSS 스타일링
+4. 필요한 경우 Radix UI 프리미티브 사용
 
-### 공통 컴포넌트 추가
-1. `src/shared/components/` 폴더에 추가
-2. `src/shared/index.ts`에서 export
+### 새로운 페이지 추가
+1. `src/pages/` 디렉토리에 페이지 생성
+2. `src/App.tsx`에 라우트 추가
+3. 필요한 경우 `ProtectedRoute`로 보호
 
-### 스타일 관리
-- `src/shared/utils/styles.ts`에서 공통 스타일 정의
-- 컴포넌트별 인라인 스타일 사용
+### API 통합
+1. `src/api/services/`에 서비스 함수 추가
+2. `src/api/models/`에 타입 정의
+3. React Hook Form과 Zod로 폼 검증
 
-## 📝 라이선스
+## 📝 환경 변수
 
-MIT License
+```env
+# API 서버 URL (기본값: http://localhost:8000)
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## 🤝 기여하기
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
