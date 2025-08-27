@@ -5,6 +5,7 @@ declare global {
       onInstagramLoginSuccess: (callback: (sessionData: any) => void) => void;
       onInstagramLoginError: (callback: (error: string) => void) => void;
       closeInstagramLogin: () => void;
+      getInstagramCookies: () => Promise<any>;
     };
   }
 }

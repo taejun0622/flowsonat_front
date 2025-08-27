@@ -85,6 +85,24 @@ ipcMain.handle("close-instagram-login", () => {
     instagramAuthWindow = null;
   }
 });
+ipcMain.handle("get-instagram-cookies", async () => {
+  if (!instagramAuthWindow) {
+    throw new Error("Instagram window not found");
+  }
+  try {
+    const cookies = await instagramAuthWindow.webContents.session.cookies.get({
+      domain: ".instagram.com"
+    });
+    const cookieObject = {};
+    cookies.forEach((cookie) => {
+      cookieObject[cookie.name] = cookie.value;
+    });
+    return cookieObject;
+  } catch (error) {
+    console.error("Error getting Instagram cookies:", error);
+    throw error;
+  }
+});
 app.whenReady().then(createWindow);
 export {
   MAIN_DIST,

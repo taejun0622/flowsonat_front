@@ -1,13 +1,92 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { LogOut, User, Settings } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { InstagramConnectionManager } from '@/components/InstagramConnectionManager';
+import { useInstagram } from '@/contexts/InstagramContext';
+import { InstagramLoginOverlay } from '@/components/InstagramLoginOverlay';
+import { InstagramService } from '@/api/services/InstagramService';
+import { useToast } from '@/hooks/use-toast';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const { isConnected, checkConnection } = useInstagram();
+  const [showLoginOverlay, setShowLoginOverlay] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+  const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
+
+  // Dashboard 진입 시 Instagram 연결 상태 확인 (한 번만 실행)
+  useEffect(() => {
+    const checkInstagramConnection = async () => {
+      if (!user || hasCheckedConnection || isCheckingConnection) return;
+      
+      try {
+        setIsCheckingConnection(true);
+        await checkConnection();
+        setHasCheckedConnection(true);
+      } catch (error) {
+        console.error('Failed to check Instagram connection:', error);
+        setHasCheckedConnection(true);
+      } finally {
+        setIsCheckingConnection(false);
+      }
+    };
+
+    // 사용자가 로그인된 상태에서만 Instagram 연결 확인
+    if (user && !hasCheckedConnection && !isCheckingConnection) {
+      checkInstagramConnection();
+    }
+  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // 중복 실행 방지
+
+  // Instagram 연결되지 않은 경우 자동으로 로그인 오버레이 표시
+  useEffect(() => {
+    if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
+      console.log('Instagram not connected, showing login overlay');
+      setShowLoginOverlay(true);
+    }
+  }, [isCheckingConnection, isConnected, user, hasCheckedConnection]);
+
+  const handleLoginSuccess = async (sessionData: any) => {
+    try {
+      // Instagram 세션 정보를 서버에 저장
+      const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
+        username: 'instagram_user' // 임시 username
+      });
+      
+      // 연결 상태 업데이트
+      await checkConnection();
+      
+      toast({
+        title: "Instagram connected",
+        description: "Successfully connected to Instagram.",
+      });
+    } catch (error: any) {
+      console.error('Failed to save Instagram session:', error);
+      toast({
+        title: "Connection failed",
+        description: "Failed to save Instagram session.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseLoginOverlay = () => {
+    setShowLoginOverlay(false);
+  };
+
+  // 연결 상태 확인 중일 때 로딩 표시
+  if (isCheckingConnection) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking Instagram connection...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -70,9 +149,6 @@ export const DashboardPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Instagram Connection Card */}
-            <InstagramConnectionManager />
-
             {/* Quick Actions Card */}
             <Card>
               <CardHeader>
@@ -130,6 +206,14 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </div>
       </main>
+
+      {/* Instagram Login Overlay */}
+      {showLoginOverlay && (
+        <InstagramLoginOverlay
+          onClose={handleCloseLoginOverlay}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
     </div>
   );
 };

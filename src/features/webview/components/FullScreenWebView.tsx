@@ -7,15 +7,17 @@ import { cursorAnimations } from '../../browser-extension/utils/cursorStyles';
 const FullScreenWebView: React.FC<WebViewProps> = ({
   url = 'https://www.instagram.com',
   onClose,
-  onLoginSuccess
+  onLoginSuccess,
+  webviewRef: externalWebviewRef
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const webviewRef = useRef<HTMLWebViewElement>(null);
+  const internalWebviewRef = useRef<HTMLWebViewElement>(null);
+  const webviewRef = externalWebviewRef || internalWebviewRef;
 
-  // 브라우저 익스텐션 훅 사용
+  // 브라우저 익스텐션 훅 사용 (Instagram 로그인에서는 비활성화)
   const { state: extensionState, toggleExtension, isWebViewLoaded } = useBrowserExtension({
-    webviewRef,
+    webviewRef: webviewRef,
     onWebViewLoad: () => {
       setIsLoading(false);
       console.log('WebView loaded successfully');
@@ -27,40 +29,10 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
     }
   });
 
-  // Instagram 로그인 성공 감지
-  useEffect(() => {
-    const webview = webviewRef.current;
-    if (!webview) return;
+  // Instagram 로그인 페이지에서는 extension 비활성화
+  const isInstagramLogin = url.includes('instagram.com');
 
-    const handleNavigation = (event: any) => {
-      const currentUrl = event.url;
-      console.log('WebView navigation:', currentUrl);
-      
-      // Instagram 로그인 성공 후 리다이렉트되는 URL 패턴을 확인
-      if (currentUrl.includes('instagram.com') && 
-          !currentUrl.includes('login') && 
-          !currentUrl.includes('accounts/login')) {
-        console.log('Instagram login successful detected');
-        
-        // 세션 데이터 수집 (쿠키, 로컬 스토리지 등)
-        const sessionData = {
-          url: currentUrl,
-          timestamp: new Date().toISOString(),
-          // TODO: 실제 세션 데이터 수집 로직 추가
-        };
-        
-        onLoginSuccess?.(sessionData);
-      }
-    };
 
-    webview.addEventListener('did-navigate', handleNavigation);
-    webview.addEventListener('did-navigate-in-page', handleNavigation);
-
-    return () => {
-      webview.removeEventListener('did-navigate', handleNavigation);
-      webview.removeEventListener('did-navigate-in-page', handleNavigation);
-    };
-  }, [onLoginSuccess]);
 
   // 커서 애니메이션 스타일 추가
   useEffect(() => {
@@ -72,6 +44,37 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
       document.head.removeChild(style);
     };
   }, []);
+
+  // webview 로딩 상태 직접 감지
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview) return;
+
+    const handleLoadStop = () => {
+      console.log('WebView load stopped');
+      setIsLoading(false);
+    };
+
+    const handleDidFinishLoad = () => {
+      console.log('WebView did finish load');
+      setIsLoading(false);
+    };
+
+    const handleDomReady = () => {
+      console.log('WebView DOM ready');
+      setIsLoading(false);
+    };
+
+    webview.addEventListener('did-stop-loading', handleLoadStop);
+    webview.addEventListener('did-finish-load', handleDidFinishLoad);
+    webview.addEventListener('dom-ready', handleDomReady);
+
+    return () => {
+      webview.removeEventListener('did-stop-loading', handleLoadStop);
+      webview.removeEventListener('did-finish-load', handleDidFinishLoad);
+      webview.removeEventListener('dom-ready', handleDomReady);
+    };
+  }, [webviewRef]);
 
   const handleClose = () => {
     onClose?.();
@@ -204,7 +207,12 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
           <div style={{ textAlign: 'center' }}>
             <div style={{ marginBottom: '10px' }}>Loading...</div>
             <div style={{ fontSize: '14px', color: '#ccc' }}>
-              {isWebViewLoaded ? 'Extension will be activated automatically' : 'Please wait'}
+              {isInstagramLogin 
+                ? 'Loading Instagram login page...' 
+                : isWebViewLoaded 
+                  ? 'Extension will be activated automatically' 
+                  : 'Please wait'
+              }
             </div>
           </div>
         </div>
@@ -259,11 +267,13 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         allowpopups={true}
       />
 
-      {/* Browser Extension Controls */}
-      <BrowserExtensionControls
-        state={extensionState}
-        onToggle={toggleExtension}
-      />
+      {/* Browser Extension Controls - Instagram 로그인에서는 숨김 */}
+      {!url.includes('instagram.com') && (
+        <BrowserExtensionControls
+          state={extensionState}
+          onToggle={toggleExtension}
+        />
+      )}
     </div>
   );
 };

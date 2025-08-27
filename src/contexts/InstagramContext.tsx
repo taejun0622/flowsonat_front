@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { InstagramService } from '@/api/services/InstagramService';
 import { InstagramConnectResponse } from '@/api/models';
 import { useAuth } from './AuthContext';
@@ -34,7 +34,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
   const { user, token } = useAuth();
   const { toast } = useToast();
 
-  const checkConnection = async () => {
+  const checkConnection = useCallback(async () => {
     if (!token || !user) {
       setInstagramAccount(null);
       return;
@@ -45,21 +45,27 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
       const account = await InstagramService.getMyInstagramAccountApiV1InstagramMeGet();
       setInstagramAccount(account);
     } catch (error: any) {
-      console.error('Failed to check Instagram connection:', error);
-      setInstagramAccount(null);
-      
-      // 404 에러는 연결된 계정이 없다는 의미이므로 에러 토스트를 표시하지 않음
-      if (error.status !== 404) {
-        toast({
-          title: "Connection check failed",
-          description: "Failed to check Instagram connection status.",
-          variant: "destructive",
-        });
+      // 404 에러는 연결된 계정이 없다는 의미이므로 조용히 처리
+      if (error.status === 404) {
+        console.log('Instagram not connected (404)');
+        setInstagramAccount(null);
+      } else {
+        console.error('Failed to check Instagram connection:', error);
+        setInstagramAccount(null);
+        
+        // API 엔드포인트가 아직 구현되지 않았을 수도 있음
+        if (error.status !== 500) {
+          toast({
+            title: "Connection check failed",
+            description: "Failed to check Instagram connection status.",
+            variant: "destructive",
+          });
+        }
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, user, toast]);
 
   const connectAccount = () => {
     // Instagram 로그인은 InstagramConnectionManager에서 처리
@@ -113,16 +119,19 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
     }
   };
 
-  const refreshConnection = async () => {
+  const refreshConnection = useCallback(async () => {
     await checkConnection();
-  };
+  }, [checkConnection]);
 
   // 사용자가 로그인하면 Instagram 연결 상태를 확인
   useEffect(() => {
     if (user && token) {
-      checkConnection();
+      // 자동으로 연결 상태 확인하지 않음 - Dashboard에서 필요할 때만 확인
+      console.log('User logged in, Instagram connection check ready');
     } else {
       setInstagramAccount(null);
+      // 로그아웃 시 연결 상태 초기화
+      setIsLoading(false);
     }
   }, [user, token]);
 

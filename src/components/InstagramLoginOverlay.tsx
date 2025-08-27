@@ -3,6 +3,7 @@ import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Instagram, X } from 'lucide-react';
+import { useInstagramLoginDetector } from '@/hooks/useInstagramLoginDetector';
 
 interface InstagramLoginOverlayProps {
   onClose: () => void;
@@ -24,12 +25,20 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
     onClose();
   };
 
+  // Instagram 로그인 감지 훅 사용
+  const { webviewRef } = useInstagramLoginDetector({
+    onLoginSuccess: handleLoginSuccess,
+    onLoginError: (error) => {
+      console.error('Instagram login error:', error);
+    }
+  });
+
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       <FullScreenWebView
         url="https://www.instagram.com/accounts/login/"
         onClose={handleWebViewClose}
-        onLoginSuccess={handleLoginSuccess}
+        webviewRef={webviewRef}
       />
       
       {/* Instructions Card */}

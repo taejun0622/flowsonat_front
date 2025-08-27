@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onInstagramLoginError: (callback: (error: string) => void) => {
     ipcRenderer.on('instagram-login-error', (event, error) => callback(error))
-  }
+  },
+  getInstagramCookies: () => ipcRenderer.invoke('get-instagram-cookies')
 })

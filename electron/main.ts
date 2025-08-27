@@ -123,4 +123,28 @@ ipcMain.handle('close-instagram-login', () => {
   }
 })
 
+ipcMain.handle('get-instagram-cookies', async () => {
+  if (!instagramAuthWindow) {
+    throw new Error('Instagram window not found')
+  }
+
+  try {
+    // Instagram 창의 쿠키를 가져오기
+    const cookies = await instagramAuthWindow.webContents.session.cookies.get({
+      domain: '.instagram.com'
+    })
+    
+    // 쿠키를 객체로 변환
+    const cookieObject: { [key: string]: string } = {}
+    cookies.forEach(cookie => {
+      cookieObject[cookie.name] = cookie.value
+    })
+    
+    return cookieObject
+  } catch (error) {
+    console.error('Error getting Instagram cookies:', error)
+    throw error
+  }
+})
+
 app.whenReady().then(createWindow)
