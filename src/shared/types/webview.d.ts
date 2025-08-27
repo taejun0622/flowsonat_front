@@ -8,6 +8,8 @@ interface HTMLWebViewElement extends HTMLElement {
   src: string;
   webpreferences?: string;
   allowpopups?: string | boolean;
+  /** Custom user agent string that can include Accept-Language headers for language preference */
+  useragent?: string;
   reload(): void;
   canGoBack(): boolean;
   canGoForward(): boolean;

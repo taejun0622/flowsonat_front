@@ -255,6 +255,7 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
       )}
 
       {/* WebView */}
+      {/* Set useragent with English accept-language to ensure content is displayed in English */}
       <webview
         ref={webviewRef}
         src={url}
@@ -265,6 +266,7 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         }}
         webpreferences="nodeIntegration=no, contextIsolation=yes"
         allowpopups={true}
+        useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Accept-Language: en-US,en;q=0.9"
       />
 
       {/* Browser Extension Controls - Instagram 로그인에서는 숨김 */}
