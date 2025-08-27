@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,8 @@ type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export const ForgotPasswordPage: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isSubmitted, setIsSubmitted] = React.useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -37,11 +37,8 @@ export const ForgotPasswordPage: React.FC = () => {
       await AuthService.requestPasswordResetApiV1AuthPasswordResetPost({
         email: data.email,
       });
-      setIsSubmitted(true);
-      toast({
-        title: "Email sent successfully",
-        description: "Password reset link has been sent to your email.",
-      });
+      // 이메일 인증 페이지로 리다이렉트
+      navigate(`/email-verification?email=${encodeURIComponent(data.email)}&type=password-reset`);
     } catch (error: any) {
       console.error('Password reset error:', error);
       toast({
@@ -54,28 +51,7 @@ export const ForgotPasswordPage: React.FC = () => {
     }
   };
 
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Email sent successfully</CardTitle>
-            <CardDescription className="text-center">
-              Password reset link has been sent to your email.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              Please check your email to reset your password.
-            </p>
-            <Button asChild className="w-full">
-              <Link to="/login">Back to login</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

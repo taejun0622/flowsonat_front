@@ -96,7 +96,7 @@ export class AuthService {
     }
     /**
      * Confirm Password Reset
-     * Confirm password reset with token
+     * Confirm password reset with verification code
      * @param requestBody
      * @returns any Successful Response
      * @throws ApiError
@@ -116,7 +116,7 @@ export class AuthService {
     }
     /**
      * Verify Email
-     * Verify email with token
+     * Verify email with verification code
      * @param requestBody
      * @returns any Successful Response
      * @throws ApiError
@@ -129,6 +129,48 @@ export class AuthService {
             url: '/api/v1/auth/email-verification',
             body: requestBody,
             mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Resend Verification Code
+     * Resend email verification code
+     * @param email
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static resendVerificationCodeApiV1AuthResendVerificationPost(
+        email: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/resend-verification',
+            query: {
+                'email': email,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Resend Password Reset Code
+     * Resend password reset code
+     * @param email
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static resendPasswordResetCodeApiV1AuthResendPasswordResetPost(
+        email: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/auth/resend-password-reset',
+            query: {
+                'email': email,
+            },
             errors: {
                 422: `Validation Error`,
             },

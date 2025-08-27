@@ -26,7 +26,7 @@ export const OpenAPI: OpenAPIConfig = {
     CREDENTIALS: 'include',
     TOKEN: async () => {
         const token = localStorage.getItem('access_token');
-        return token ? `Bearer ${token}` : '';
+        return token || '';
     },
     USERNAME: undefined,
     PASSWORD: undefined,

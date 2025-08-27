@@ -42,7 +42,8 @@ export const RegisterPage: React.FC = () => {
         email: data.email,
         password: data.password,
       });
-      navigate('/login');
+      // 이메일 인증 페이지로 리다이렉트
+      navigate(`/email-verification?email=${encodeURIComponent(data.email)}`);
     } catch (error) {
       // Error is handled in AuthContext
     }

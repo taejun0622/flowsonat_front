@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export type EmailVerification = {
-    token: string;
+    email: string;
+    code: string;
 };
 

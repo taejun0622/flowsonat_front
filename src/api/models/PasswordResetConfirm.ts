@@ -3,7 +3,8 @@
 /* tslint:disable */
 /* eslint-disable */
 export type PasswordResetConfirm = {
-    token: string;
+    email: string;
+    code: string;
     new_password: string;
 };
 
