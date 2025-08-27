@@ -50,7 +50,7 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
           zIndex: 10000,
           maxWidth: '350px'
         }}>
-          <Card className="bg-white/95 backdrop-blur-sm border-2 border-purple-200 shadow-xl">
+          <Card className="bg-black/95 backdrop-blur-sm border-2 border-purple-200 shadow-xl">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg">

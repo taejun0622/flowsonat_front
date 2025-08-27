@@ -117,16 +117,16 @@ export const DashboardPage: React.FC = () => {
 
           {/* Tabs */}
           <Tabs defaultValue="benchmark" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-sm border border-white/20">
-              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+            <TabsList className="grid w-full grid-cols-3 bg-black/10 backdrop-blur-sm border border-black/20">
+                              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Benchmark
               </TabsTrigger>
-              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Billing
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </TabsTrigger>

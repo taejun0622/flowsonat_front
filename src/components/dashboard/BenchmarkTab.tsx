@@ -221,7 +221,7 @@ export const BenchmarkTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+              <Card className="bg-black/10 backdrop-blur-sm border-black/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -238,7 +238,7 @@ export const BenchmarkTab: React.FC = () => {
                 onClick={loadBenchmarks}
                 disabled={loading}
                 variant="outline" 
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-black/20 text-white hover:bg-black/10"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -250,7 +250,7 @@ export const BenchmarkTab: React.FC = () => {
                     Create Benchmark
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-gray-900 border-white/20 text-white">
+                <DialogContent className="bg-gray-900 border-black/20 text-white">
                   <DialogHeader>
                     <DialogTitle>Create New Benchmark</DialogTitle>
                     <DialogDescription>
@@ -265,7 +265,7 @@ export const BenchmarkTab: React.FC = () => {
                         value={formData.ig_username}
                         onChange={(e) => setFormData({ ...formData, ig_username: e.target.value })}
                         placeholder="Enter Instagram username"
-                        className="bg-gray-800 border-white/20 text-white placeholder:text-gray-400"
+                        className="bg-gray-800 border-black/20 text-white placeholder:text-gray-400"
                       />
                     </div>
                   </div>
@@ -273,7 +273,7 @@ export const BenchmarkTab: React.FC = () => {
                     <Button
                       variant="outline"
                       onClick={() => setCreateDialogOpen(false)}
-                      className="border-white/20 text-white hover:bg-white/10"
+                      className="border-black/20 text-white hover:bg-black/10"
                     >
                       Cancel
                     </Button>
@@ -315,8 +315,8 @@ export const BenchmarkTab: React.FC = () => {
                 {statusBenchmarks.map((benchmark, index) => (
                   <div
                     key={benchmark.id}
-                    className={`p-4 bg-white/5 hover:bg-white/10 transition-colors ${
-                      index !== statusBenchmarks.length - 1 ? 'border-b border-white/20' : ''
+                    className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
+                      index !== statusBenchmarks.length - 1 ? 'border-b border-black/20' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -351,7 +351,7 @@ export const BenchmarkTab: React.FC = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => openEditDialog(benchmark)}
-                          className="border-white/20 text-white hover:bg-white/10"
+                          className="border-black/20 text-white hover:bg-black/10"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -375,7 +375,7 @@ export const BenchmarkTab: React.FC = () => {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-gray-900 border-white/20 text-white">
+        <DialogContent className="bg-gray-900 border-black/20 text-white">
           <DialogHeader>
             <DialogTitle>Edit Benchmark</DialogTitle>
             <DialogDescription>
@@ -389,10 +389,10 @@ export const BenchmarkTab: React.FC = () => {
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as StatusEnum })}
               >
-                <SelectTrigger className="bg-gray-800 border-white/20 text-white">
+                <SelectTrigger className="bg-gray-800 border-black/20 text-white">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-white/20">
+                <SelectContent className="bg-gray-800 border-black/20">
                   <SelectItem value={StatusEnum.ACTIVE}>Active</SelectItem>
                   <SelectItem value={StatusEnum.DELETED}>Deleted</SelectItem>
                 </SelectContent>
@@ -400,7 +400,7 @@ export const BenchmarkTab: React.FC = () => {
             </div>
             <div>
               <Label className="text-white">Health Status (Read-only)</Label>
-              <div className="p-3 bg-gray-800 border border-white/20 rounded-md">
+              <div className="p-3 bg-gray-800 border border-black/20 rounded-md">
                 <span className={`font-medium ${getHealthColor(selectedBenchmark?.health)}`}>
                   {selectedBenchmark?.health || 'Unknown'}
                 </span>
@@ -411,7 +411,7 @@ export const BenchmarkTab: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => setEditDialogOpen(false)}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-black/20 text-white hover:bg-black/10"
             >
               Cancel
             </Button>

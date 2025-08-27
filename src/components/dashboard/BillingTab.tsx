@@ -80,7 +80,7 @@ export const BillingTab: React.FC = () => {
 
   if (isLoadingSubscription) {
     return (
-      <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+      <Card className="bg-black/10 backdrop-blur-sm border-black/20">
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-white" />
           <span className="ml-2 text-white">Loading billing information...</span>
@@ -93,7 +93,7 @@ export const BillingTab: React.FC = () => {
     <div className="space-y-6">
       {/* Current Plan Card - Only show if subscription exists */}
       {subscription && (
-        <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
           <CardHeader>
             <CardTitle className="flex items-center text-white">
               <CreditCard className="h-5 w-5 mr-2" />
@@ -149,7 +149,7 @@ export const BillingTab: React.FC = () => {
 
               {/* Payment Method */}
               {paymentMethod && (
-                <div className="p-4 border border-white/20 rounded-lg bg-white/5">
+                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
                   <h4 className="text-sm font-medium text-white mb-2">Payment Method</h4>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -167,7 +167,7 @@ export const BillingTab: React.FC = () => {
 
               {/* Usage Stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border border-white/20 rounded-lg bg-white/5">
+                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
                   <div className="text-sm text-gray-300">Usage</div>
                   <div className="text-lg font-semibold text-white">
                     {subscription.usage.percentage}%
@@ -176,13 +176,13 @@ export const BillingTab: React.FC = () => {
                     {subscription.usage.current} / {subscription.usage.limit}
                   </div>
                 </div>
-                <div className="p-4 border border-white/20 rounded-lg bg-white/5">
+                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
                   <div className="text-sm text-gray-300">Remaining Credits</div>
                   <div className="text-lg font-semibold text-white">
                     {subscription.usage.limit - subscription.usage.current}
                   </div>
                 </div>
-                <div className="p-4 border border-white/20 rounded-lg bg-white/5">
+                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
                   <div className="text-sm text-gray-300">This Month's Spend</div>
                   <div className="text-lg font-semibold text-white">
                     {formatCurrency(subscription.plan.price, subscription.plan.currency)}
@@ -196,7 +196,7 @@ export const BillingTab: React.FC = () => {
 
       {/* Basic Plan Card - Only show if no subscription */}
       {!subscription && (
-        <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
           <CardHeader>
             <CardTitle className="flex items-center text-white">
               <Zap className="h-5 w-5 mr-2" />
@@ -208,10 +208,10 @@ export const BillingTab: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="max-w-md mx-auto">
-              <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+              <Card className="bg-black/10 backdrop-blur-sm border-black/20">
                 <CardHeader className="text-center pb-4">
                   <div className="flex justify-center mb-2">
-                    <div className="p-2 rounded-full bg-white/10">
+                    <div className="p-2 rounded-full bg-black/10">
                       <Zap className="h-6 w-6 text-white" />
                     </div>
                   </div>

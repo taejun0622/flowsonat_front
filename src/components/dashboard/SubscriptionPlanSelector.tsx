@@ -57,7 +57,7 @@ export const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> =
         return (
           <Card
             key={plan.id}
-            className={`relative bg-white/10 backdrop-blur-sm border-white/20 transition-all duration-200 hover:scale-105 ${
+            className={`relative bg-black/10 backdrop-blur-sm border-black/20 transition-all duration-200 hover:scale-105 ${
               isCurrentPlan ? 'ring-2 ring-blue-500' : ''
             } ${isPopular ? 'ring-2 ring-yellow-500' : ''}`}
           >
@@ -79,7 +79,7 @@ export const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> =
 
             <CardHeader className="text-center pb-4">
               <div className="flex justify-center mb-2">
-                <div className="p-2 rounded-full bg-white/10">
+                <div className="p-2 rounded-full bg-black/10">
                   {getPlanIcon(plan.name)}
                 </div>
               </div>

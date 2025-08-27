@@ -150,7 +150,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   return (
-    <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <Card className="bg-black/10 backdrop-blur-sm border-black/20">
       <CardHeader>
         <CardTitle className="flex items-center text-white">
           <Settings className="h-5 w-5 mr-2" />
