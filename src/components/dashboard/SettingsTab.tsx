@@ -201,7 +201,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           Disconnect
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="bg-gray-900 border-gray-700">
+                      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
                         <DialogHeader>
                           <DialogTitle className="text-white">Disconnect Instagram</DialogTitle>
                           <DialogDescription className="text-gray-300">
@@ -213,7 +213,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           <Button 
                             variant="outline" 
                             onClick={() => setDisconnectDialogOpen(false)}
-                            className="border-gray-600 text-gray-300"
+                            className="border-black/30 text-white hover:bg-black/20"
                           >
                             Cancel
                           </Button>
@@ -251,7 +251,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       Edit
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="bg-gray-900 border-gray-700">
+                  <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
                     <DialogHeader>
                       <DialogTitle className="text-white">Edit Profile</DialogTitle>
                       <DialogDescription className="text-gray-300">
@@ -268,7 +268,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             type="email"
                             value={profileForm.email}
                             onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                            className="pl-10 bg-gray-800 border-gray-600 text-white"
+                            className="pl-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter your email"
                             required
                           />
@@ -279,7 +279,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           type="button" 
                           variant="outline" 
                           onClick={() => setProfileDialogOpen(false)}
-                          className="border-gray-600 text-gray-300"
+                          className="border-black/30 text-white hover:bg-black/20"
                         >
                           Cancel
                         </Button>
@@ -309,7 +309,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       Change
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="bg-gray-900 border-gray-700">
+                  <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
                     <DialogHeader>
                       <DialogTitle className="text-white">Change Password</DialogTitle>
                       <DialogDescription className="text-gray-300">
@@ -326,7 +326,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             type={showPasswords.new ? "text" : "password"}
                             value={passwordForm.newPassword}
                             onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                            className="pl-10 pr-10 bg-gray-800 border-gray-600 text-white"
+                            className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter new password"
                             required
                           />
@@ -354,7 +354,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             type={showPasswords.confirm ? "text" : "password"}
                             value={passwordForm.confirmPassword}
                             onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                            className="pl-10 pr-10 bg-gray-800 border-gray-600 text-white"
+                            className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Confirm new password"
                             required
                           />
@@ -378,7 +378,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           type="button" 
                           variant="outline" 
                           onClick={() => setPasswordDialogOpen(false)}
-                          className="border-gray-600 text-gray-300"
+                          className="border-black/30 text-white hover:bg-black/20"
                         >
                           Cancel
                         </Button>

@@ -170,17 +170,17 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-black/20 backdrop-blur-md border-black/30 shadow-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-gray-900">
+          <CardTitle className="text-2xl font-bold text-white">
             {getPageTitle()}
           </CardTitle>
-          <CardDescription className="text-gray-600">
+          <CardDescription className="text-gray-300">
             {getPageDescription()}
           </CardDescription>
           {email && (
-            <div className="text-sm text-gray-500 mt-2">
+            <div className="text-sm text-gray-400 mt-2">
               Verification code has been sent to {email}.
             </div>
           )}
@@ -188,23 +188,23 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="code">Verification Code</Label>
+              <Label htmlFor="code" className="text-white">Verification Code</Label>
               <Input
                 id="code"
                 type="text"
                 placeholder="Enter verification code"
                 {...register('code')}
-                className={errors.code ? 'border-red-500' : ''}
+                className={`bg-black/20 border-black/30 text-white placeholder:text-gray-400 focus:border-white/30 ${errors.code ? 'border-red-400' : ''}`}
                 maxLength={10}
               />
               {errors.code && (
-                <p className="text-sm text-red-500">{errors.code.message}</p>
+                <p className="text-sm text-red-400">{errors.code.message}</p>
               )}
             </div>
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full bg-white text-gray-900 hover:bg-gray-100"
               disabled={isLoading}
             >
               {isLoading ? 'Verifying...' : 'Verify Code'}
@@ -216,7 +216,7 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
                 variant="outline"
                 onClick={handleResendCode}
                 disabled={isResending || countdown > 0}
-                className="w-full"
+                className="w-full border-black/30 text-white hover:bg-black/20"
               >
                 {isResending
                   ? 'Resending...'
@@ -231,7 +231,7 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
                 type="button"
                 variant="ghost"
                 onClick={() => navigate(-1)}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-gray-400 hover:text-white"
               >
                 Go Back
               </Button>

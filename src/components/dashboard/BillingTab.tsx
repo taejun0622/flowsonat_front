@@ -343,7 +343,7 @@ export const BillingTab: React.FC = () => {
 
       {/* Cancel Subscription Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="bg-gray-900 border-white/20">
+        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-white">Cancel Subscription</DialogTitle>
             <DialogDescription className="text-gray-300">
@@ -354,7 +354,7 @@ export const BillingTab: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => setShowCancelDialog(false)}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-black/30 text-white hover:bg-black/20"
             >
               Keep Subscription
             </Button>
@@ -375,7 +375,7 @@ export const BillingTab: React.FC = () => {
 
       {/* Reactivate Subscription Dialog */}
       <Dialog open={showReactivateDialog} onOpenChange={setShowReactivateDialog}>
-        <DialogContent className="bg-gray-900 border-white/20">
+        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-white">Reactivate Subscription</DialogTitle>
             <DialogDescription className="text-gray-300">
@@ -386,7 +386,7 @@ export const BillingTab: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => setShowReactivateDialog(false)}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-black/30 text-white hover:bg-black/20"
             >
               Cancel
             </Button>

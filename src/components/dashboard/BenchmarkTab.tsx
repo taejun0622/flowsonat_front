@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw } from 'lucide-react';
+import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,25 +29,31 @@ import {
   BenchmarkResponse, 
   BenchmarkUpdate, 
   BenchmarkListResponse,
+  SuggestionResponse,
+  SuggestionListResponse,
   HealthEnum,
   StatusEnum 
 } from '@/api';
 
 export const BenchmarkTab: React.FC = () => {
   const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedBenchmark, setSelectedBenchmark] = useState<BenchmarkResponse | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     ig_username: '',
     status: '' as StatusEnum | ''
   });
   const { toast } = useToast();
 
-  // Load benchmarks on component mount
+  // Load data on component mount
   useEffect(() => {
     loadBenchmarks();
+    loadSuggestions();
   }, []);
 
   const loadBenchmarks = async () => {
@@ -64,6 +70,23 @@ export const BenchmarkTab: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSuggestions = async () => {
+    try {
+      setSuggestionsLoading(true);
+      const response: SuggestionListResponse = await InstagramService.getSuggestionsApiV1InstagramSuggestionsGet();
+      setSuggestions(response.suggestions);
+    } catch (error) {
+      console.error('Failed to load suggestions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load suggestions",
+        variant: "destructive",
+      });
+    } finally {
+      setSuggestionsLoading(false);
     }
   };
 
@@ -165,6 +188,62 @@ export const BenchmarkTab: React.FC = () => {
     }
   };
 
+  const handleDeleteSuggestion = async (suggestionId: string) => {
+    if (!confirm('Are you sure you want to delete this suggestion?')) return;
+
+    try {
+      setSuggestionsLoading(true);
+      await InstagramService.deleteSuggestionApiV1InstagramSuggestionsSuggestionIdDelete(suggestionId);
+      
+      toast({
+        title: "Success",
+        description: "Suggestion deleted successfully",
+      });
+      
+      loadSuggestions();
+    } catch (error) {
+      console.error('Failed to delete suggestion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete suggestion",
+        variant: "destructive",
+      });
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleConvertToBenchmark = async (suggestion: SuggestionResponse) => {
+    try {
+      setLoading(true);
+      const createData: BenchmarkCreate = {
+        ig_username: suggestion.ig.username || ''
+      };
+      
+      await InstagramService.createBenchmarkApiV1InstagramBenchmarksPost(createData);
+      
+      toast({
+        title: "Success",
+        description: "Suggestion converted to benchmark successfully",
+      });
+      
+      // Delete the suggestion after converting
+      await InstagramService.deleteSuggestionApiV1InstagramSuggestionsSuggestionIdDelete(suggestion.id);
+      
+      loadBenchmarks();
+      loadSuggestions();
+    } catch (error) {
+      console.error('Failed to convert suggestion to benchmark:', error);
+      toast({
+        title: "Error",
+        description: "Failed to convert suggestion to benchmark",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openEditDialog = (benchmark: BenchmarkResponse) => {
     setSelectedBenchmark(benchmark);
     setFormData({
@@ -218,29 +297,42 @@ export const BenchmarkTab: React.FC = () => {
     return groups;
   }, {} as Record<StatusEnum, BenchmarkResponse[]>);
 
+  // Group suggestions by status
+  const groupedSuggestions = suggestions.reduce((groups, suggestion) => {
+    const status = suggestion.status;
+    if (!groups[status]) {
+      groups[status] = [];
+    }
+    groups[status].push(suggestion);
+    return groups;
+  }, {} as Record<StatusEnum, SuggestionResponse[]>);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-              <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+      <Card className="bg-black/10 backdrop-blur-sm border-black/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center text-white">
                 <BarChart3 className="h-5 w-5 mr-2" />
-                Performance Benchmark
+                Performance Management
               </CardTitle>
               <CardDescription className="text-gray-300">
-                System performance analysis and monitoring
+                Manage benchmarks and suggestions for Instagram accounts
               </CardDescription>
             </div>
             <div className="flex space-x-2">
               <Button 
-                onClick={loadBenchmarks}
-                disabled={loading}
+                onClick={() => {
+                  loadBenchmarks();
+                  loadSuggestions();
+                }}
+                disabled={loading || suggestionsLoading}
                 variant="outline" 
                 className="border-black/20 text-white hover:bg-black/10"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading || suggestionsLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
               <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -250,10 +342,10 @@ export const BenchmarkTab: React.FC = () => {
                     Create Benchmark
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-gray-900 border-black/20 text-white">
+                <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
                   <DialogHeader>
-                    <DialogTitle>Create New Benchmark</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-white">Create New Benchmark</DialogTitle>
+                    <DialogDescription className="text-gray-300">
                       Create a new performance benchmark for an Instagram account.
                     </DialogDescription>
                   </DialogHeader>
@@ -265,7 +357,7 @@ export const BenchmarkTab: React.FC = () => {
                         value={formData.ig_username}
                         onChange={(e) => setFormData({ ...formData, ig_username: e.target.value })}
                         placeholder="Enter Instagram username"
-                        className="bg-gray-800 border-black/20 text-white placeholder:text-gray-400"
+                        className="bg-black/20 border-black/30 text-white placeholder:text-gray-400 focus:border-white/30"
                       />
                     </div>
                   </div>
@@ -273,7 +365,7 @@ export const BenchmarkTab: React.FC = () => {
                     <Button
                       variant="outline"
                       onClick={() => setCreateDialogOpen(false)}
-                      className="border-black/20 text-white hover:bg-black/10"
+                      className="border-black/30 text-white hover:bg-black/20"
                     >
                       Cancel
                     </Button>
@@ -292,93 +384,198 @@ export const BenchmarkTab: React.FC = () => {
         </CardHeader>
       </Card>
 
-      {/* Benchmarks List */}
+      {/* Suggestions Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button
+            variant={showSuggestions ? "default" : "outline"}
+            onClick={() => setShowSuggestions(true)}
+            className={showSuggestions 
+              ? "bg-white text-gray-900 hover:bg-gray-100" 
+              : "border-black/20 text-white hover:bg-black/10"
+            }
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Suggestions ({suggestions.length})
+          </Button>
+          <Button
+            variant={!showSuggestions ? "default" : "outline"}
+            onClick={() => setShowSuggestions(false)}
+            className={!showSuggestions 
+              ? "bg-white text-gray-900 hover:bg-gray-100" 
+              : "border-black/20 text-white hover:bg-black/10"
+            }
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Benchmarks ({benchmarks.length})
+          </Button>
+        </div>
+      </div>
+
+      {/* Content */}
       <div className="space-y-6">
-        {loading && benchmarks.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-6 w-6 animate-spin text-white" />
-            <span className="ml-2 text-white">Loading benchmarks...</span>
-          </div>
-        ) : benchmarks.length === 0 ? (
-          <div className="text-center py-8">
-            <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-300">No benchmarks found</p>
-            <p className="text-gray-400 text-sm">Create your first benchmark to get started</p>
-          </div>
-        ) : (
-          Object.entries(groupedBenchmarks).map(([status, statusBenchmarks]) => (
-            <div key={status} className="space-y-3">
-              <h3 className={`text-lg font-semibold ${getStatusColor(status as StatusEnum)}`}>
-                {status} ({statusBenchmarks.length})
-              </h3>
-              <div className="space-y-0">
-                {statusBenchmarks.map((benchmark, index) => (
-                  <div
-                    key={benchmark.id}
-                    className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
-                      index !== statusBenchmarks.length - 1 ? 'border-b border-black/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-1">
-                            <h3 className="text-white font-medium">
-                              @{benchmark.ig.username}
-                            </h3>
-                            <p className="text-gray-400 text-sm">
-                              Created: {formatDate(benchmark.created_at)}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <div className="text-center">
-                              <span className="text-xs text-gray-400">Status</span>
-                              <p className={`text-sm font-medium ${getStatusColor(benchmark.status)}`}>
-                                {benchmark.status}
+        {showSuggestions ? (
+          // Suggestions List
+          suggestionsLoading && suggestions.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-white" />
+              <span className="ml-2 text-white">Loading suggestions...</span>
+            </div>
+          ) : suggestions.length === 0 ? (
+            <div className="text-center py-8">
+              <Lightbulb className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-300">No suggestions found</p>
+              <p className="text-gray-400 text-sm">Suggestions will appear here when available</p>
+            </div>
+          ) : (
+            Object.entries(groupedSuggestions).map(([status, statusSuggestions]) => (
+              <div key={status} className="space-y-3">
+                <h3 className={`text-lg font-semibold ${getStatusColor(status as StatusEnum)}`}>
+                  {status} ({statusSuggestions.length})
+                </h3>
+                <div className="space-y-0">
+                  {statusSuggestions.map((suggestion, index) => (
+                    <div
+                      key={suggestion.id}
+                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
+                        index !== statusSuggestions.length - 1 ? 'border-b border-black/20' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-1">
+                              <h3 className="text-white font-medium">
+                                @{suggestion.ig.username}
+                              </h3>
+                              <p className="text-gray-400 text-sm">
+                                Created: {formatDate(suggestion.created_at)}
                               </p>
                             </div>
                             <div className="text-center">
-                              <span className="text-xs text-gray-400">Health</span>
-                              <p className={`text-sm font-medium ${getHealthColor(benchmark.health)}`}>
-                                {benchmark.health || 'Unknown'}
+                              <span className="text-xs text-gray-400">Status</span>
+                              <p className={`text-sm font-medium ${getStatusColor(suggestion.status)}`}>
+                                {suggestion.status}
                               </p>
                             </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditDialog(benchmark)}
-                          className="border-black/20 text-white hover:bg-black/10"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteBenchmark(benchmark.id)}
-                          className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleConvertToBenchmark(suggestion)}
+                            disabled={loading}
+                            className="border-green-500/20 text-green-400 hover:bg-green-500/10"
+                          >
+                            <ArrowRight className="h-4 w-4 mr-1" />
+                            Convert
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteSuggestion(suggestion.id)}
+                            disabled={suggestionsLoading}
+                            className="border-red-500/20 text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+            ))
+          )
+        ) : (
+          // Benchmarks List
+          loading && benchmarks.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-white" />
+              <span className="ml-2 text-white">Loading benchmarks...</span>
             </div>
-          ))
+          ) : benchmarks.length === 0 ? (
+            <div className="text-center py-8">
+              <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-300">No benchmarks found</p>
+              <p className="text-gray-400 text-sm">Create your first benchmark to get started</p>
+            </div>
+          ) : (
+            Object.entries(groupedBenchmarks).map(([status, statusBenchmarks]) => (
+              <div key={status} className="space-y-3">
+                <h3 className={`text-lg font-semibold ${getStatusColor(status as StatusEnum)}`}>
+                  {status} ({statusBenchmarks.length})
+                </h3>
+                <div className="space-y-0">
+                  {statusBenchmarks.map((benchmark, index) => (
+                    <div
+                      key={benchmark.id}
+                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
+                        index !== statusBenchmarks.length - 1 ? 'border-b border-black/20' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex-1">
+                              <h3 className="text-white font-medium">
+                                @{benchmark.ig.username}
+                              </h3>
+                              <p className="text-gray-400 text-sm">
+                                Created: {formatDate(benchmark.created_at)}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="text-center">
+                                <span className="text-xs text-gray-400">Status</span>
+                                <p className={`text-sm font-medium ${getStatusColor(benchmark.status)}`}>
+                                  {benchmark.status}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-xs text-gray-400">Health</span>
+                                <p className={`text-sm font-medium ${getHealthColor(benchmark.health)}`}>
+                                  {benchmark.health || 'Unknown'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(benchmark)}
+                            className="border-black/20 text-white hover:bg-black/10"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteBenchmark(benchmark.id)}
+                            className="border-red-500/20 text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )
         )}
       </div>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-gray-900 border-black/20 text-white">
+        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Benchmark</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Edit Benchmark</DialogTitle>
+            <DialogDescription className="text-gray-300">
               Update the status of this benchmark.
             </DialogDescription>
           </DialogHeader>
@@ -389,10 +586,10 @@ export const BenchmarkTab: React.FC = () => {
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as StatusEnum })}
               >
-                <SelectTrigger className="bg-gray-800 border-black/20 text-white">
+                <SelectTrigger className="bg-black/20 border-black/30 text-white focus:border-white/30">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-black/20">
+                <SelectContent className="bg-black/40 backdrop-blur-md border-black/30">
                   <SelectItem value={StatusEnum.ACTIVE}>Active</SelectItem>
                   <SelectItem value={StatusEnum.DELETED}>Deleted</SelectItem>
                 </SelectContent>
@@ -400,7 +597,7 @@ export const BenchmarkTab: React.FC = () => {
             </div>
             <div>
               <Label className="text-white">Health Status (Read-only)</Label>
-              <div className="p-3 bg-gray-800 border border-black/20 rounded-md">
+              <div className="p-3 bg-black/20 border border-black/30 rounded-md">
                 <span className={`font-medium ${getHealthColor(selectedBenchmark?.health)}`}>
                   {selectedBenchmark?.health || 'Unknown'}
                 </span>
@@ -411,7 +608,7 @@ export const BenchmarkTab: React.FC = () => {
             <Button
               variant="outline"
               onClick={() => setEditDialogOpen(false)}
-              className="border-black/20 text-white hover:bg-black/10"
+              className="border-black/30 text-white hover:bg-black/20"
             >
               Cancel
             </Button>
