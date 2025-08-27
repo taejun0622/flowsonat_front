@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, User, Settings } from 'lucide-react';
+import { LogOut, User, Settings, BarChart3, CreditCard } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { InstagramLoginOverlay } from '@/components/InstagramLoginOverlay';
@@ -17,7 +18,7 @@ export const DashboardPage: React.FC = () => {
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
 
-  // Dashboard 진입 시 Instagram 연결 상태 확인 (한 번만 실행)
+  // Check Instagram connection status when entering dashboard (run only once)
   useEffect(() => {
     const checkInstagramConnection = async () => {
       if (!user || hasCheckedConnection || isCheckingConnection) return;
@@ -34,13 +35,13 @@ export const DashboardPage: React.FC = () => {
       }
     };
 
-    // 사용자가 로그인된 상태에서만 Instagram 연결 확인
+    // Only check Instagram connection when user is logged in
     if (user && !hasCheckedConnection && !isCheckingConnection) {
       checkInstagramConnection();
     }
-  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // 중복 실행 방지
+  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
 
-  // Instagram 연결되지 않은 경우 자동으로 로그인 오버레이 표시
+  // Automatically show login overlay when Instagram is not connected
   useEffect(() => {
     if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
       console.log('Instagram not connected, showing login overlay');
@@ -50,12 +51,12 @@ export const DashboardPage: React.FC = () => {
 
   const handleLoginSuccess = async (sessionData: any) => {
     try {
-      // Instagram 세션 정보를 서버에 저장
+      // Save Instagram session information to server
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: 'instagram_user' // 임시 username
+        username: 'instagram_user' // temporary username
       });
       
-      // 연결 상태 업데이트
+      // Update connection status
       await checkConnection();
       
       toast({
@@ -76,134 +77,79 @@ export const DashboardPage: React.FC = () => {
     setShowLoginOverlay(false);
   };
 
-  // 연결 상태 확인 중일 때 로딩 표시
+  const handleConnectInstagram = () => {
+    setShowLoginOverlay(true);
+  };
+
+  // Show loading when checking connection status
   if (isCheckingConnection) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="w-full h-full flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking Instagram connection...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white">Checking Instagram connection...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">Flowsonat</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-gray-500" />
-                <span className="text-sm text-gray-700">{user?.email}</span>
-              </div>
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                설정
-              </Button>
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                로그아웃
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="w-full">
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">대시보드</h2>
-            <p className="text-gray-600">환영합니다! 서비스를 이용해보세요.</p>
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-2">Dashboard</h2>
+              <p className="text-gray-300">Service management and monitoring</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-gray-300" />
+                <span className="text-sm text-gray-300">{user?.email}</span>
+              </div>
+              <Button variant="outline" size="sm" onClick={logout} className="text-white border-white hover:bg-white hover:text-gray-900">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* User Info Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="h-5 w-5 mr-2" />
-                  사용자 정보
-                </CardTitle>
-                <CardDescription>현재 로그인된 사용자 정보</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">이메일:</span>
-                    <p className="text-sm text-gray-900">{user?.email}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">가입일:</span>
-                    <p className="text-sm text-gray-900">
-                      {user?.created_at ? new Date(user.created_at).toLocaleDateString('ko-KR') : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Tabs */}
+          <Tabs defaultValue="benchmark" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-white/10 backdrop-blur-sm border border-white/20">
+              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Benchmark
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Billing
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Quick Actions Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>빠른 작업</CardTitle>
-                <CardDescription>자주 사용하는 기능들</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Settings className="h-4 w-4 mr-2" />
-                    프로필 설정
-                  </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    <User className="h-4 w-4 mr-2" />
-                    계정 관리
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Benchmark Tab */}
+            <TabsContent value="benchmark" className="mt-6">
+              <BenchmarkTab />
+            </TabsContent>
 
-            {/* Statistics Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>통계</CardTitle>
-                <CardDescription>서비스 사용 현황</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">활성 상태</span>
-                    <span className="text-sm font-medium text-green-600">활성</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">마지막 로그인</span>
-                    <span className="text-sm text-gray-900">방금 전</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+            {/* Billing Tab */}
+            <TabsContent value="billing" className="mt-6">
+              <BillingTab />
+            </TabsContent>
 
-          {/* Welcome Message */}
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle>환영합니다! 🎉</CardTitle>
-              <CardDescription>
-                Flowsonat 서비스에 오신 것을 환영합니다. 이제 모든 기능을 이용하실 수 있습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                서비스를 더 효과적으로 이용하기 위해 프로필을 완성하고 설정을 확인해보세요.
-              </p>
-            </CardContent>
-          </Card>
+            {/* Settings Tab */}
+            <TabsContent value="settings" className="mt-6">
+              <SettingsTab 
+                isConnected={isConnected}
+                onConnectInstagram={handleConnectInstagram}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
