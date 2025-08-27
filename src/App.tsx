@@ -22,40 +22,39 @@ function App() {
     <AuthProvider>
       <InstagramProvider>
         <Router>
-        <DynamicBackground
-          type="blur-dot"
-          colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
-          loop={true}
-          seed={1000}
-          className="fixed inset-0 w-full h-full"
-        >
-          <div className="relative w-full h-full overflow-auto">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/email-verification" element={<EmailVerificationPage />} />
+          <DynamicBackground
+            type="blur-dot"
+            colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
+            loop={true}
+            seed={1000}
+          >
+            <div className="relative w-full h-full overflow-auto">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/email-verification" element={<EmailVerificationPage />} />
+                
+                {/* Protected Routes */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Default redirect */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
               
-              {/* Protected Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-            
-            <Toaster />
-          </div>
-        </DynamicBackground>
+              <Toaster />
+            </div>
+          </DynamicBackground>
         </Router>
       </InstagramProvider>
     </AuthProvider>

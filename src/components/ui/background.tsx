@@ -117,15 +117,24 @@ export const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
     <div 
       ref={containerRef} 
       id={containerId}
-      className={`relative w-full h-full ${className}`}
+      className={`fixed inset-0 w-screen h-screen ${className}`}
       style={{ 
-        position: 'relative', 
-        width: '100%', 
-        height: '100%',
-        zIndex: 0 
+        position: 'fixed', 
+        top: 0,
+        left: 0,
+        width: '100vw', 
+        height: '100vh',
+        zIndex: 0
       }}
     >
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
+      <div 
+        style={{ 
+          position: 'relative', 
+          zIndex: 1, 
+          width: '100%', 
+          height: '100%'
+        }}
+      >
         {children}
       </div>
     </div>
