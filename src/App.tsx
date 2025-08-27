@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Toaster } from '@/components/ui/toaster';
+import { DynamicBackground } from '@/components/ui/background';
 
 // Auth Pages
 import { LoginPage } from '@/pages/auth/LoginPage';
@@ -18,7 +19,13 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="App min-h-screen bg-blue-50">
+        <DynamicBackground
+          type="blur-dot"
+          colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
+          loop={true}
+          seed={1000}
+          className="min-h-screen"
+        >
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -42,7 +49,7 @@ function App() {
           </Routes>
           
           <Toaster />
-        </div>
+        </DynamicBackground>
       </Router>
     </AuthProvider>
   );

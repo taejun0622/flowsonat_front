@@ -41,7 +41,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       {/* CSS test element */}
       <div className="fixed top-4 left-4 bg-red-500 text-white p-2 rounded">
         CSS Test - If you see this text with red background, Tailwind is working
