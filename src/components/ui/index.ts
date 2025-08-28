@@ -5,6 +5,7 @@ export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export { Toast, ToastAction, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from './toast';
 export { Toaster } from './toaster';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
+export { Progress } from './progress';
 export { 
   DynamicBackground, 
   AIBackground, 

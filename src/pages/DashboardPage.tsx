@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, User, Settings, BarChart3, CreditCard } from 'lucide-react';
+import { LogOut, User, Settings, BarChart3, CreditCard, Bot } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -9,12 +9,14 @@ import { useInstagram } from '@/contexts/InstagramContext';
 import { InstagramLoginOverlay } from '@/components/InstagramLoginOverlay';
 import { InstagramService } from '@/api/services/InstagramService';
 import { useToast } from '@/hooks/use-toast';
+import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
 export const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { isConnected, checkConnection } = useInstagram();
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
+  const [showAutomationOverlay, setShowAutomationOverlay] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
 
@@ -81,6 +83,10 @@ export const DashboardPage: React.FC = () => {
     setShowLoginOverlay(true);
   };
 
+  const handleStartAutomation = () => {
+    setShowAutomationOverlay(true);
+  };
+
   // Show loading when checking connection status
   if (isCheckingConnection) {
     return (
@@ -108,6 +114,14 @@ export const DashboardPage: React.FC = () => {
                 <User className="h-5 w-5 text-gray-300" />
                 <span className="text-sm text-gray-300">{user?.email}</span>
               </div>
+              <Button 
+                onClick={handleStartAutomation}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                disabled={!isConnected}
+              >
+                <Bot className="h-4 w-4 mr-2" />
+                Instagram 자동화
+              </Button>
               <Button variant="outline" size="sm" onClick={logout} className="text-white border-white hover:bg-white hover:text-gray-900">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -158,6 +172,13 @@ export const DashboardPage: React.FC = () => {
         <InstagramLoginOverlay
           onClose={handleCloseLoginOverlay}
           onLoginSuccess={handleLoginSuccess}
+        />
+      )}
+
+      {/* Instagram Automation Overlay */}
+      {showAutomationOverlay && (
+        <InstagramAutomationOverlay
+          onClose={() => setShowAutomationOverlay(false)}
         />
       )}
     </div>
