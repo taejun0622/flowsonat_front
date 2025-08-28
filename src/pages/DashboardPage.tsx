@@ -120,7 +120,7 @@ export const DashboardPage: React.FC = () => {
                 disabled={!isConnected}
               >
                 <Bot className="h-4 w-4 mr-2" />
-                Instagram 자동화
+                Instagram Automation
               </Button>
               <Button variant="outline" size="sm" onClick={logout} className="text-white border-white hover:bg-white hover:text-gray-900">
                 <LogOut className="h-4 w-4 mr-2" />

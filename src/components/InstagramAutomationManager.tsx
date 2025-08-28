@@ -9,6 +9,11 @@ import { Label } from './ui/label';
 import { Progress } from './ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useToast } from '../hooks/use-toast';
+import { InstagramDOMHelper } from '../services/instagramDOMHelper';
+import { InstagramService } from '@/api/services/InstagramService';
+import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
+import { HealthEnum } from '@/api/models/HealthEnum';
+import { StatusEnum } from '@/api/models/StatusEnum';
 
 interface InstagramAutomationManagerProps {
   webviewRef: React.RefObject<HTMLWebViewElement>;
@@ -35,6 +40,8 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
   });
   const [logs, setLogs] = useState<string[]>([]);
   const [isWebViewReady, setIsWebViewReady] = useState(false);
+  const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
+  const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('');
   
   const { toast } = useToast();
   const logRef = useRef<HTMLDivElement>(null);
@@ -114,8 +121,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
     },
     hover: (x: number, y: number) => {
       if (webviewRef.current) {
-        // Note: webview doesn't support mouseMove events directly
-        // This would need to be implemented differently for hover functionality
+        // hover not supported by current typings; no-op
         console.log('Hover at:', x, y);
       }
     },
@@ -132,38 +138,56 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
     },
     drag: (startX: number, startY: number, endX: number, endY: number) => {
       if (webviewRef.current) {
-        // Drag implementation
-        webviewRef.current.sendInputEvent({
-          type: 'mouseDown',
-          x: startX,
-          y: startY,
-          button: 'left',
-          clickCount: 1
-        });
-        // Note: webview doesn't support mouseMove events directly
-        // This would need to be implemented differently for drag functionality
-        console.log('Drag to:', endX, endY);
-        webviewRef.current.sendInputEvent({
-          type: 'mouseUp',
-          x: endX,
-          y: endY,
-          button: 'left',
-          clickCount: 1
-        });
+        // Drag degraded: mousedown then mouseup (no mouseMove in typings)
+        webviewRef.current.sendInputEvent({ type: 'mouseDown', x: startX, y: startY, button: 'left', clickCount: 1 });
+        webviewRef.current.sendInputEvent({ type: 'mouseUp', x: endX, y: endY, button: 'left', clickCount: 1 });
       }
+    },
+    navigate: async (url: string) => {
+      if (!webviewRef.current) return;
+      (webviewRef.current as any).loadURL(url);
+      await new Promise<void>((resolve)=>{
+        const f = () => { webviewRef.current?.removeEventListener('did-finish-load', f as any); resolve(); };
+        webviewRef.current?.addEventListener('did-finish-load', f as any);
+      });
+    },
+    exec: async <T,>(fn: (...fnArgs: any[]) => T | Promise<T>, ...fnArgs: any[]): Promise<T> => {
+      // @ts-ignore executeJavaScript exists on Electron webview
+      const argsStr = JSON.stringify(fnArgs);
+      return await (webviewRef.current as any)!.executeJavaScript(`(${fn.toString()}).apply(null, ${argsStr})`, true);
+    },
+    getUrl: async () => {
+      // @ts-ignore getURL exists on Electron webview
+      return webviewRef.current?.getURL?.() || '';
+    },
+    reload: async () => {
+      webviewRef.current?.reload();
     }
   };
 
   // Service initialization
   useEffect(() => {
     if (isWebViewReady && !automationService) {
-      const automationServiceInstance = new InstagramAutomationService(config, webViewControl);
-      
+      const domHelper = new InstagramDOMHelper(webViewControl);
+      const automationServiceInstance = new InstagramAutomationService(webViewControl, config, domHelper);
       setAutomationService(automationServiceInstance);
-      
       addLog('Instagram automation service initialized');
     }
   }, [isWebViewReady, automationService, config, webViewControl]);
+
+  // Load benchmarks
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
+        setBenchmarks(res.benchmarks || []);
+        if ((res.benchmarks || []).length > 0) setSelectedBenchmarkId(res.benchmarks![0].id);
+      } catch (e) {
+        console.error('Failed to load benchmarks', e);
+      }
+    };
+    load();
+  }, []);
 
   // State monitoring
   useEffect(() => {
@@ -243,6 +267,23 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
     setConfig(prev => ({ ...prev, ...newConfig }));
   };
 
+  // Add my followers to selected benchmark
+  const addMyFollowersToBenchmark = async () => {
+    if (!automationService || !selectedBenchmarkId) {
+      toast({ title: 'Error', description: 'Please select a benchmark first.', variant: 'destructive' });
+      return;
+    }
+    try {
+      addLog(`Adding my followers to benchmark: ${selectedBenchmarkId}`);
+      const { added, total } = await automationService.addFollowersToBenchmark(selectedBenchmarkId);
+      addLog(`Added ${added}/${total} followers to benchmark`);
+      toast({ title: 'Completed', description: `Added ${added}/${total} followers.` });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: 'Failed', description: error?.message || 'Operation failed.', variant: 'destructive' });
+    }
+  };
+
   // Clear logs
   const clearLogs = () => {
     setLogs([]);
@@ -300,6 +341,23 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                   className="flex-1"
                 >
                   Stop
+                </Button>
+              </div>
+
+              {/* Add my followers to benchmark */}
+              <div className="space-y-2">
+                <Label>Select Benchmark</Label>
+                <select
+                  className="w-full border rounded px-2 py-2"
+                  value={selectedBenchmarkId}
+                  onChange={(e)=> setSelectedBenchmarkId(e.target.value)}
+                >
+                  {(benchmarks || []).map(b => (
+                    <option key={b.id} value={b.id}>{b.ig.username}</option>
+                  ))}
+                </select>
+                <Button onClick={addMyFollowersToBenchmark} disabled={!selectedBenchmarkId} className="w-full">
+                  Add My Followers to Benchmark
                 </Button>
               </div>
 

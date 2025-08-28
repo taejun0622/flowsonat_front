@@ -25,7 +25,7 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
     onClose();
   };
 
-  // Instagram 로그인 감지 훅 사용
+  // Instagram login detection hook
   const { webviewRef } = useInstagramLoginDetector({
     onLoginSuccess: handleLoginSuccess,
     onLoginError: (error) => {
@@ -55,7 +55,7 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Instagram className="h-5 w-5 text-purple-600" />
-                  Instagram 로그인
+                  Instagram Login
                 </CardTitle>
                 <Button
                   variant="ghost"
@@ -66,23 +66,21 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <CardDescription>
-                Instagram 계정에 로그인하여 연결을 완료하세요
-              </CardDescription>
+              <CardDescription>Sign in to your Instagram account to complete the connection</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p>Instagram 로그인 페이지에서 계정 정보를 입력하세요</p>
+                  <p>Enter your account on the Instagram login page</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p>로그인이 완료되면 자동으로 연결됩니다</p>
+                  <p>Once logged in, the connection will complete automatically</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <p>연결이 완료되면 이 창이 자동으로 닫힙니다</p>
+                  <p>This window will close automatically after connection</p>
                 </div>
               </div>
               
@@ -93,7 +91,7 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
                   onClick={onClose}
                   className="w-full"
                 >
-                  취소
+                  Cancel
                 </Button>
               </div>
             </CardContent>

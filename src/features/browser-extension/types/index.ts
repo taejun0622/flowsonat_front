@@ -23,9 +23,8 @@ export interface BrowserExtensionState {
 }
 
 export interface WebViewControl {
-export interface WebViewControl {
   navigate?: (url: string) => Promise<void>;
-  exec?: <T>(fn: () => T | Promise<T>) => Promise<T>;
+  exec?: <T>(fn: (...args: any[]) => T | Promise<T>, ...args: any[]) => Promise<T>;
   getUrl?: () => Promise<string>;
   reload?: () => Promise<void>;
   click: (x: number, y: number) => void;

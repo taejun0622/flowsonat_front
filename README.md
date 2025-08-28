@@ -139,6 +139,17 @@ src/
 2. `src/api/models/`에 타입 정의
 3. React Hook Form과 Zod로 폼 검증
 
+
+### Instagram 자동화 사용법
+- 경로: 대시보드 상단 버튼 “Instagram 자동화” 클릭 → 오버레이 열기.
+- 입력: 내 인스타그램 사용자명 입력 후 Start.
+- 동작: 프로필 정보 수집 → 팔로워/팔로잉 동기화 → 언팔로우 → 타깃 수집 → 팔로우.
+- 구성요소:
+  - `src/components/InstagramAutomationOverlay.tsx`: 실행 UI 및 WebView 제어 바인딩
+  - `src/services/instagramAutomationService.ts`: 워크플로우 상태 머신 및 API 호출
+  - `src/services/instagramDOMHelper.ts`: WebView DOM 조작 (executeJavaScript 기반)
+  - `src/features/browser-extension/*`: WebView 입력 이벤트/도움도구
+
 ## 📝 환경 변수
 
 ```env

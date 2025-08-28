@@ -10,6 +10,10 @@ import { InstagramAutomationService, InstagramAutomationConfig, AutomationState 
 import { InstagramDOMHelper } from '../services/instagramDOMHelper';
 import { WebViewControl } from '../features/browser-extension/types';
 import { useBrowserExtension } from '../features/browser-extension/hooks/useBrowserExtension';
+import { InstagramService } from '@/api/services/InstagramService';
+import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
+import { HealthEnum } from '@/api/models/HealthEnum';
+import { StatusEnum } from '@/api/models/StatusEnum';
 
 interface InstagramAutomationOverlayProps {
   onClose: () => void;
@@ -38,11 +42,13 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
   const [logs, setLogs] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [currentUrl, setCurrentUrl] = useState('https://www.instagram.com');
+  const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
+  const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('');
   
   const webviewRef = useRef<HTMLWebViewElement>(null);
   const { toast } = useToast();
 
-  // 브라우저 익스텐션 훅 사용
+  // Browser extension hook
   const { state: extensionState, toggleExtension } = useBrowserExtension({
     webviewRef: webviewRef,
     onWebViewLoad: () => {
@@ -58,7 +64,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
     }
   });
 
-  // WebView Control 구현
+  // WebView Control
   const webViewControl: WebViewControl = {
     click: (x: number, y: number) => {
       if (webviewRef.current) {
@@ -165,9 +171,11 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
         webviewRef.current?.addEventListener('did-finish-load', f as any, { once: true } as any);
       });
     },
-    exec: async <T>(fn: () => T | Promise<T>): Promise<T> => {
+    exec: async <T,>(fn: (...fnArgs: any[]) => T | Promise<T>, ...fnArgs: any[]): Promise<T> => {
       // @ts-ignore executeJavaScript exists on Electron webview
-      return await webviewRef.current!.executeJavaScript(`(${fn.toString()})()`, true);
+      const argsStr = JSON.stringify(fnArgs);
+      // Pass arguments via apply to the evaluated function in the webview context
+      return await webviewRef.current!.executeJavaScript(`(${fn.toString()}).apply(null, ${argsStr})`, true);
     },
     getUrl: async () => {
       // @ts-ignore getURL exists on Electron webview
@@ -178,7 +186,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
     }
   };
 
-  // 서비스 초기화
+  // Service initialization
   useEffect(() => {
     const domHelperInstance = new InstagramDOMHelper(webViewControl);
     const automationServiceInstance = new InstagramAutomationService(webViewControl, config, domHelperInstance);
@@ -186,10 +194,26 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
     setDomHelper(domHelperInstance);
     setAutomationService(automationServiceInstance);
     
-    addLog('Instagram 자동화 서비스 초기화 완료');
+    addLog('Instagram automation service ready');
   }, [config]);
 
-  // 상태 모니터링
+  // Load benchmarks
+  useEffect(() => {
+    const loadBenchmarks = async () => {
+      try {
+        const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
+        setBenchmarks(res.benchmarks || []);
+        if ((res.benchmarks || []).length > 0) {
+          setSelectedBenchmarkId(res.benchmarks![0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load benchmarks', e);
+      }
+    };
+    loadBenchmarks();
+  }, []);
+
+  // State monitoring
   useEffect(() => {
     if (!automationService) return;
 
@@ -201,57 +225,57 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
     return () => clearInterval(interval);
   }, [automationService]);
 
-  // 로그 추가
+  // Add log
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev.slice(-99), `[${timestamp}] ${message}`]); // 최대 100개 로그 유지
   };
 
-  // 워크플로우 시작
+  // Start workflow
   const startWorkflow = async () => {
     if (!automationService || !username.trim()) {
-      toast({
-        title: "Error",
-        description: "사용자명을 입력해주세요.",
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: 'Please enter a username.', variant: 'destructive' });
       return;
     }
 
     try {
-      addLog(`워크플로우 시작: ${username}`);
-      toast({
-        title: "워크플로우 시작",
-        description: `${username}에 대한 Instagram 자동화를 시작합니다.`
-      });
+      addLog(`Workflow started: ${username}`);
+      toast({ title: 'Workflow Started', description: `Starting Instagram automation for ${username}.` });
 
       await automationService.runWorkflow(username);
       
-      addLog('워크플로우 완료');
-      toast({
-        title: "워크플로우 완료",
-        description: "Instagram 자동화가 성공적으로 완료되었습니다."
-      });
+      addLog('Workflow completed');
+      toast({ title: 'Workflow Completed', description: 'Instagram automation completed successfully.' });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-      addLog(`워크플로우 실패: ${errorMessage}`);
-      toast({
-        title: "워크플로우 실패",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Workflow failed: ${errorMessage}`);
+      toast({ title: 'Workflow Failed', description: errorMessage, variant: 'destructive' });
     }
   };
 
-  // 워크플로우 중단
+  // Stop workflow
   const stopWorkflow = () => {
     if (automationService) {
       automationService.stopWorkflow();
-      addLog('워크플로우 중단됨');
-      toast({
-        title: "워크플로우 중단",
-        description: "Instagram 자동화가 중단되었습니다."
-      });
+      addLog('Workflow stopped');
+      toast({ title: 'Workflow Stopped', description: 'Instagram automation has been stopped.' });
+    }
+  };
+
+  // Add my followers to selected benchmark
+  const addMyFollowersToBenchmark = async () => {
+    if (!automationService || !selectedBenchmarkId) {
+      toast({ title: 'Error', description: 'Please select a benchmark.', variant: 'destructive' });
+      return;
+    }
+    try {
+      addLog(`Adding my followers to benchmark (benchmark=${selectedBenchmarkId})`);
+      const { added, total } = await automationService.addFollowersToBenchmark(selectedBenchmarkId);
+      addLog(`Completed: ${added}/${total}`);
+      toast({ title: 'Completed', description: `Added ${added}/${total}` });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: 'Failed', description: error?.message || 'Operation failed.', variant: 'destructive' });
     }
   };
 
@@ -270,12 +294,10 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-700 p-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold text-white">Instagram 자동화</h1>
+          <h1 className="text-xl font-bold text-white">Instagram Automation</h1>
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${extensionState.isActive ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-            <span className="text-sm text-gray-300">
-              {extensionState.isActive ? 'Extension 활성화' : 'Extension 비활성화'}
-            </span>
+            <span className="text-sm text-gray-300">{extensionState.isActive ? 'Extension Active' : 'Extension Inactive'}</span>
           </div>
         </div>
         
@@ -287,7 +309,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
             className="text-white border-gray-600 hover:bg-gray-700"
           >
             <Settings className="h-4 w-4 mr-2" />
-            설정
+            Settings
           </Button>
           <Button
             variant="outline"
@@ -306,16 +328,16 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
           {/* Control Panel */}
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle className="text-white">제어</CardTitle>
+              <CardTitle className="text-white">Control</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-white">Instagram 사용자명</Label>
+                <Label htmlFor="username" className="text-white">Instagram Username</Label>
                 <Input
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="사용자명을 입력하세요"
+                  placeholder="Enter username"
                   disabled={state.isRunning}
                   className="bg-gray-800 border-gray-600 text-white"
                 />
@@ -328,7 +350,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   <Play className="h-4 w-4 mr-2" />
-                  {state.isRunning ? '실행 중...' : '시작'}
+                  {state.isRunning ? 'Running...' : 'Start'}
                 </Button>
                 <Button
                   onClick={stopWorkflow}
@@ -337,14 +359,35 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                   className="flex-1"
                 >
                   <Square className="h-4 w-4 mr-2" />
-                  중단
+                  Stop
+                </Button>
+              </div>
+
+              {/* Add my followers → benchmark */}
+              <div className="space-y-2">
+                <Label className="text-white">Select Benchmark</Label>
+                <select
+                  className="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-2"
+                  value={selectedBenchmarkId}
+                  onChange={(e) => setSelectedBenchmarkId(e.target.value)}
+                >
+                  {(benchmarks || []).map((b) => (
+                    <option key={b.id} value={b.id}>{b.ig.username}</option>
+                  ))}
+                </select>
+                <Button
+                  onClick={addMyFollowersToBenchmark}
+                  disabled={!selectedBenchmarkId}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
+                  Add My Followers to Benchmark
                 </Button>
               </div>
 
               {state.isRunning && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-white">
-                    <span>진행률</span>
+                    <span>Progress</span>
                     <span>{Math.round(state.progress)}%</span>
                   </div>
                   <Progress value={state.progress} className="w-full" />
@@ -358,11 +401,11 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
           {showSettings && (
             <Card className="mb-4">
               <CardHeader>
-                <CardTitle className="text-white">설정</CardTitle>
+                <CardTitle className="text-white">Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="maxTargets" className="text-white">최대 Target 수</Label>
+                  <Label htmlFor="maxTargets" className="text-white">Max Targets</Label>
                   <Input
                     id="maxTargets"
                     type="number"
@@ -374,7 +417,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="maxUnfollows" className="text-white">최대 Unfollow 수</Label>
+                  <Label htmlFor="maxUnfollows" className="text-white">Max Unfollows</Label>
                   <Input
                     id="maxUnfollows"
                     type="number"
@@ -386,7 +429,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="clickDelay" className="text-white">클릭 지연 (ms)</Label>
+                  <Label htmlFor="clickDelay" className="text-white">Click Delay (ms)</Label>
                   <Input
                     id="clickDelay"
                     type="number"
@@ -405,21 +448,21 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
           <Card className="flex-1">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-white">로그</CardTitle>
+                <CardTitle className="text-white">Logs</CardTitle>
                 <Button
                   onClick={clearLogs}
                   variant="outline"
                   size="sm"
                   className="text-white border-gray-600 hover:bg-gray-700"
                 >
-                  클리어
+                  Clear
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="bg-gray-800 text-green-400 p-3 rounded-md h-64 overflow-y-auto font-mono text-xs">
                 {logs.length === 0 ? (
-                  <p className="text-gray-500">로그가 없습니다.</p>
+                  <p className="text-gray-500">No logs available.</p>
                 ) : (
                   logs.map((log, index) => (
                     <div key={index} className="mb-1">
@@ -465,7 +508,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
               onChange={(e) => setCurrentUrl(e.target.value)}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && webviewRef.current) {
-                  webviewRef.current.loadURL(currentUrl);
+                  (webviewRef.current as any).loadURL(currentUrl);
                 }
               }}
               className="flex-1 bg-gray-700 border-gray-600 text-white"

@@ -56,13 +56,12 @@ export class InstagramDOMHelper {
     if (!this.webViewControl.exec) return null;
     const start = Date.now();
     while (Date.now() - start < timeout) {
-      const info = await this.webViewControl.exec(() => {
-        const sel = arguments[0] as string;
+      const info = await this.webViewControl.exec((sel: string) => {
         const el = document.querySelector(sel) as HTMLElement | null;
         if (!el) return null;
         const r = el.getBoundingClientRect();
         return { rect: { left: r.left, top: r.top, width: r.width, height: r.height }, text: el.textContent || '' };
-      }.bind(null, selector));
+      }, selector);
       if (info) return info;
       await this.delay(100);
     }
@@ -72,14 +71,13 @@ export class InstagramDOMHelper {
   // 여러 요소 찾기
   private async findElements(selector: string): Promise<{ rect: { left:number; top:number; width:number; height:number }, text?: string }[]> {
     if (!this.webViewControl.exec) return [];
-    const list = await this.webViewControl.exec(() => {
-      const sel = arguments[0] as string;
+    const list = await this.webViewControl.exec((sel: string) => {
       const elements = document.querySelectorAll(sel);
       return Array.from(elements).map((el:any)=>{
         const r = el.getBoundingClientRect();
         return { rect: { left: r.left, top: r.top, width: r.width, height: r.height }, text: el.textContent || '' };
       });
-    }.bind(null, selector));
+    }, selector);
     return list || [];
   }
 
@@ -101,8 +99,60 @@ export class InstagramDOMHelper {
       }
       return true;
     } catch (error) {
-      console.error('프로필 페이지 이동 실패:', error);
+      console.error('Fail to:', error);
       return false;
+    }
+  }
+
+  // 프로필 스냅샷 수집 (bio, 링크, 팔로워/팔로잉 수)
+  async getProfileSnapshot(): Promise<{ bio?: string | null; links?: string | null; followers?: string | null; followings?: string | null; }>{
+    if (!this.webViewControl.exec) return { bio: null, links: null, followers: null, followings: null };
+    try {
+      const data = await this.webViewControl.exec(() => {
+        // bio 텍스트 찾기 (여러 후보 셀렉터 시도)
+        const bioCandidates = [
+          'header section div[role="button"] ~ div',
+          'header section ul + div',
+          'header + section div',
+          'div.-vDIg'
+        ];
+        let bio: string | null = null;
+        for (const sel of bioCandidates) {
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (el && el.innerText && el.innerText.trim().length > 0) {
+            bio = el.innerText.trim();
+            break;
+          }
+        }
+
+        // 링크 수집 (프로필 헤더 내 a 태그 href)
+        const header = document.querySelector('header') || document;
+        const linkHrefs = Array.from(header.querySelectorAll('a'))
+          .map(a => (a as HTMLAnchorElement).href)
+          .filter(h => !!h)
+          .slice(0, 5);
+        const links = linkHrefs.length ? linkHrefs.join(',') : null;
+
+        // 팔로워/팔로잉 수
+        const followersAnchor = document.querySelector('a[href*="/followers/"]');
+        const followingAnchor = document.querySelector('a[href*="/following/"]');
+        const followersText = followersAnchor ? (followersAnchor.textContent || '').trim() : '';
+        const followingText = followingAnchor ? (followingAnchor.textContent || '').trim() : '';
+
+        // 숫자만 추출 (예: 1,234 → 1234)
+        const extractNumber = (t: string) => {
+          const m = t.replace(/[,\.]/g, '').match(/\d+/);
+          return m ? m[0] : null;
+        };
+        const followers = extractNumber(followersText);
+        const followings = extractNumber(followingText);
+
+        return { bio, links, followers, followings };
+      });
+      return data || { bio: null, links: null, followers: null, followings: null };
+    } catch (e) {
+      console.warn('프로필 스냅샷 수집 실패:', e);
+      return { bio: null, links: null, followers: null, followings: null };
     }
   }
 
@@ -268,7 +318,6 @@ export class InstagramDOMHelper {
   // 스크롤하며 사용자 목록 수집
   async scrollAndCollectUsers(): Promise<InstagramUser[]> {
     const users: InstagramUser[] = [];
-    let previousCount = 0;
     let noNewUsersCount = 0;
     const maxNoNewUsers = 3; // 3번 연속으로 새 사용자가 없으면 중단
     
@@ -315,14 +364,11 @@ export class InstagramDOMHelper {
     
     try {
       const userItems = await this.findElements(this.selectors.userListItem);
-      
-      for (const item of userItems) {
+      for (const _ of userItems) {
         const usernameElement = await this.findElement(this.selectors.userUsername);
-        if (usernameElement) {
-          const username = usernameElement.textContent?.trim();
-          if (username) {
-            users.push({ username });
-          }
+        if (usernameElement && usernameElement.text) {
+          const username = usernameElement.text.trim();
+          if (username) users.push({ username });
         }
       }
     } catch (error) {
@@ -371,7 +417,7 @@ export class InstagramDOMHelper {
   }
 
   // 특정 사용자의 Follow 버튼 확인
-  private async checkUserFollowButton(username: string): Promise<boolean> {
+  private async checkUserFollowButton(_username: string): Promise<boolean> {
     try {
       // 사용자 항목에서 Follow 버튼 찾기
       const followButton = await this.findElement(this.selectors.userFollowButton);
@@ -444,7 +490,7 @@ export class InstagramDOMHelper {
       for (const selector of errorSelectors) {
         const errorElement = await this.findElement(selector);
         if (errorElement) {
-          const errorText = errorElement.textContent?.trim();
+          const errorText = errorElement.text?.trim();
           if (errorText) {
             errors.push(errorText);
           }

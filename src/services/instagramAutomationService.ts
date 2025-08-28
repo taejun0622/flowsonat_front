@@ -101,12 +101,35 @@ export class InstagramAutomationService {
       if (this.dom) {
         await this.dom.navigateToProfile(username);
       } else {
-        if (this.dom) await this.dom.navigateToProfile(username);
+        await this.navigateToProfile(username);
       }
       
-      // Call profile history API
+      // Update profile history when entering the profile page
+      try {
+        let bio: string | null = null;
+        let links: string | null = null;
+        let followers: string | null = null;
+        let followings: string | null = null;
+        if (this.dom) {
+          const snap = await this.dom.getProfileSnapshot();
+          bio = snap.bio ?? null;
+          links = snap.links ?? null;
+          followers = snap.followers ?? null;
+          followings = snap.followings ?? null;
+        }
+        await InstagramService.createHistoryApiV1InstagramHistoryUsernamePost(username, {
+          bio,
+          links,
+          followers,
+          followings,
+        });
+      } catch (e) {
+        console.warn('Failed to create IG history (non-fatal):', e);
+      }
+      
+      // Optionally fetch history for logging/validation
       const historyResponse = await InstagramService.getHistoryByUsernameApiV1InstagramHistoryUsernameGet(username);
-      console.log(`Profile information collected: ${username}`, historyResponse);
+      console.log(`Profile history updated: ${username}`, historyResponse?.total ?? 0);
       
     } catch (error) {
       console.error('Profile information collection failed:', error);
@@ -126,21 +149,23 @@ export class InstagramAutomationService {
       if (this.dom) {
         await this.dom.navigateToProfile(username);
       } else {
-        if (this.dom) await this.dom.navigateToProfile(username);
+        await this.navigateToProfile(username);
       }
       
       // Open followers modal
       if (this.dom) await this.dom.openFollowersModal(); else await this.openFollowersModal();
       
-      // Scroll and collect follower list
+      // Scroll and collect follower list (users who follow "username")
       const followers = this.dom ? await this.dom.scrollAndCollectUsers() : await this.scrollAndCollectUsers();
       
       // Get existing follower information via API
       const existingFollowers = await InstagramService.getFollowersApiV1InstagramFollowersUsernameGet(username);
       
       // Filter new followers and update via API
+      // existingFollowers should contain records where following_username === username
+      // We want follower_username to equal the collected follower's username
       const newFollowers = followers.filter(follower => 
-        !existingFollowers.some((existing: FollowResponse) => existing.following_username === follower.username)
+        !existingFollowers.some((existing: FollowResponse) => existing.follower_username === follower.username)
       );
       
       if (newFollowers.length > 0) {
@@ -149,12 +174,24 @@ export class InstagramAutomationService {
         for (const follower of newFollowers) {
           try {
             await InstagramService.createFollowRelationshipApiV1InstagramFollowPost({
-              follower_username: username,
-              following_username: follower.username
+              // follower -> me
+              follower_username: follower.username,
+              following_username: username,
             });
           } catch (error) {
             console.error(`Failed to create follow relationship for ${follower.username}:`, error);
           }
+        }
+      }
+
+      // Remove followers that no longer exist (server has but scrape doesn't)
+      const followerUsernames = new Set(followers.map(f => f.username));
+      const removedFollowers = existingFollowers.filter((existing: FollowResponse) => !followerUsernames.has(existing.follower_username));
+      for (const rf of removedFollowers) {
+        try {
+          await InstagramService.deleteFollowRelationshipApiV1InstagramFollowDelete(rf.follower_username, rf.following_username);
+        } catch (error) {
+          console.error(`Failed to delete follower relationship ${rf.follower_username} -> ${rf.following_username}:`, error);
         }
       }
       
@@ -177,7 +214,7 @@ export class InstagramAutomationService {
       if (this.dom) {
         await this.dom.navigateToProfile(username);
       } else {
-        if (this.dom) await this.dom.navigateToProfile(username);
+        await this.navigateToProfile(username);
       }
       
       // Open following modal
@@ -206,6 +243,17 @@ export class InstagramAutomationService {
           } catch (error) {
             console.error(`Failed to create follow relationship for ${follow.username}:`, error);
           }
+        }
+      }
+
+      // Remove following that no longer exist (server has but scrape doesn't)
+      const followingUsernames = new Set(following.map(f => f.username));
+      const removedFollowing = existingFollowing.filter((existing: FollowResponse) => !followingUsernames.has(existing.following_username));
+      for (const rf of removedFollowing) {
+        try {
+          await InstagramService.deleteFollowRelationshipApiV1InstagramFollowDelete(rf.follower_username, rf.following_username);
+        } catch (error) {
+          console.error(`Failed to delete following relationship ${rf.follower_username} -> ${rf.following_username}:`, error);
         }
       }
       
@@ -242,7 +290,7 @@ export class InstagramAutomationService {
         
         try {
           // Navigate to profile page
-          if (this.dom) await this.dom.navigateToProfile(target.ig.username);
+          if (this.dom) await this.dom.navigateToProfile(target.ig.username); else await this.navigateToProfile(target.ig.username);
           
           // Click unfollow button
           const unfollowed = this.dom ? await this.dom.clickUnfollowButton() : await this.clickUnfollowButton();
@@ -298,10 +346,21 @@ export class InstagramAutomationService {
         
         try {
           // Navigate to profile page
-          if (this.dom) await this.dom.navigateToProfile(benchmark.ig.username);
+          if (this.dom) await this.dom.navigateToProfile(benchmark.ig.username); else await this.navigateToProfile(benchmark.ig.username);
           
-          // Check if follow button exists
+          // Check if follow button exists and follow the benchmark account first
           const hasFollowButton = this.dom ? await this.dom.checkFollowButton() : await this.checkFollowButton();
+          if (hasFollowButton) {
+            try {
+              if (this.dom) {
+                await this.dom.clickFollowButton();
+              } else {
+                await this.clickFollowButton();
+              }
+            } catch (e) {
+              console.warn('Failed to follow benchmark account (continuing):', benchmark.ig.username, e);
+            }
+          }
           
           if (hasFollowButton) {
             // Open followers modal and collect potential targets
@@ -359,7 +418,7 @@ export class InstagramAutomationService {
         
         try {
           // Navigate to profile page
-          if (this.dom) await this.dom.navigateToProfile(target.ig.username);
+          if (this.dom) await this.dom.navigateToProfile(target.ig.username); else await this.navigateToProfile(target.ig.username);
           
           // Check if unfollow button exists (already following)
           const hasUnfollowButton = this.dom ? await this.dom.checkUnfollowButton() : await this.checkUnfollowButton();
@@ -388,6 +447,50 @@ export class InstagramAutomationService {
       console.log(`Follow processing completed: ${followCount} users`);
     } catch (error) {
       console.error('Follow processing failed:', error);
+      if (error instanceof ApiError) {
+        throw new Error(`API Error: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  // Add my followers to a specific benchmark as targets
+  async addFollowersToBenchmark(benchmarkId: string): Promise<{ added: number; total: number }>{
+    try {
+      this.updateState('Adding my followers to benchmark...', this.state.currentStepIndex, this.state.totalSteps || 8);
+
+      // Get my IG username
+      const me = await InstagramService.getMyInstagramAccountApiV1InstagramMeGet();
+      const myUsername = me.username;
+
+      // Navigate to my profile
+      if (this.dom) await this.dom.navigateToProfile(myUsername); else await this.navigateToProfile(myUsername);
+
+      // Open followers modal and collect
+      if (this.dom) await this.dom.openFollowersModal(); else await this.openFollowersModal();
+      const followers = this.dom ? await this.dom.scrollAndCollectUsers() : await this.scrollAndCollectUsers();
+
+      // Fetch existing targets for the benchmark to dedupe
+      const existingTargets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(benchmarkId);
+      const existingSet = new Set(
+        (existingTargets.targets || []).map(t => t.ig?.username).filter(Boolean) as string[]
+      );
+
+      let added = 0;
+      for (const user of followers) {
+        if (!user.username || existingSet.has(user.username)) continue;
+        try {
+          await this.createTarget({ username: user.username }, benchmarkId);
+          added++;
+        } catch (e) {
+          console.error('Failed to add follower to benchmark:', user.username, e);
+        }
+      }
+
+      console.log(`Added ${added}/${followers.length} followers to benchmark ${benchmarkId}`);
+      return { added, total: followers.length };
+    } catch (error) {
+      console.error('Failed to add followers to benchmark:', error);
       if (error instanceof ApiError) {
         throw new Error(`API Error: ${error.message}`);
       }
@@ -517,9 +620,10 @@ export class InstagramAutomationService {
           StageEnum.REQUESTED
         );
         
-        // Filter targets older than unfollowDelayDays
+        // Filter targets older than unfollowDelayDays based on last update (updated_at)
         const oldTargets = targets.targets?.filter(target => {
-          const targetDate = new Date(target.created_at);
+          const basis = target.updated_at || target.created_at;
+          const targetDate = new Date(basis as string);
           return targetDate < fourDaysAgo;
         }) || [];
         

@@ -29,36 +29,12 @@ const WebViewManager: React.FC<WebViewManagerProps> = ({
   };
 
   const quickAccessItems: QuickAccessItem[] = [
-    { 
-      name: 'Instagram Home', 
-      url: 'https://www.instagram.com',
-      description: 'Instagram 메인 페이지'
-    },
-    { 
-      name: 'Instagram Explore', 
-      url: 'https://www.instagram.com/explore',
-      description: '탐색 페이지'
-    },
-    { 
-      name: 'Instagram Reels', 
-      url: 'https://www.instagram.com/reels',
-      description: '릴스 페이지'
-    },
-    { 
-      name: 'Instagram Messages', 
-      url: 'https://www.instagram.com/direct/inbox',
-      description: '메시지 페이지'
-    },
-    { 
-      name: 'Instagram Notifications', 
-      url: 'https://www.instagram.com/accounts/activity',
-      description: '알림 페이지'
-    },
-    { 
-      name: 'Instagram Profile', 
-      url: 'https://www.instagram.com/accounts/edit',
-      description: '프로필 편집 페이지'
-    }
+    { name: 'Instagram Home', url: 'https://www.instagram.com', description: 'Instagram home page' },
+    { name: 'Instagram Explore', url: 'https://www.instagram.com/explore', description: 'Explore page' },
+    { name: 'Instagram Reels', url: 'https://www.instagram.com/reels', description: 'Reels page' },
+    { name: 'Instagram Messages', url: 'https://www.instagram.com/direct/inbox', description: 'Messages page' },
+    { name: 'Instagram Notifications', url: 'https://www.instagram.com/accounts/activity', description: 'Notifications page' },
+    { name: 'Instagram Profile', url: 'https://www.instagram.com/accounts/edit', description: 'Edit profile page' }
   ];
 
   return (

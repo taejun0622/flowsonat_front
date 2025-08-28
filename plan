@@ -1,0 +1,45 @@
+Here’s the English translation of your workflow:
+
+⸻
+
+Workflow
+
+Common Logic
+
+Collect Profile Information (update if entering the profile page)
+	•	/api/v1/instagram/history/{username}
+
+My Information
+
+Follower
+	1.	Open the Follower modal on my Instagram page
+	2.	Scroll to collect the Follower list
+	3.	Retrieve Followers via /api/v1/instagram/followers/{username}
+	4.	Compare and update values that have not yet been reflected
+
+Following
+	1.	Open the Following modal on my Instagram page
+	2.	Scroll to collect the Following list
+	3.	Retrieve Following via /api/v1/instagram/following/{username}
+	4.	Compare and update values that have not yet been reflected
+
+Unfollow
+	1.	From Targets, collect only those with stage REQUESTED that have been in that state for more than 4 days (edited_at)
+	2.	Visit each page and click the Unfollow button
+	3.	Change stage to UNFOLLOWED
+
+Target
+	1.	Retrieve Targets with stage PENDING
+	2.	If the count is 500 or fewer, continue; if 500 or more, skip Target collection and move to the Follow step
+	3.	From Benchmarks, select those with health = healthy and status = ACTIVE, then shuffle randomly
+	4.	Iterate through ig_username:
+	1.	If a Follow button exists, click it
+	2.	Open the Follower modal, scroll to collect list, and collect those with a Follow button next to them
+	3.	Register as target
+	4.	Maximum Unfollow count: 250
+
+Follow
+	1.	Iterate through Targets and navigate to each page
+	2.	If an Unfollow button exists, change Target stage to FOLLOW_BACK; if a Follow button exists, click Follow and change Target stage to FOLLOW
+	3.	Stop once the number of Follow button clicks equals 500 - number of Unfollows
+
