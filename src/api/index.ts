@@ -17,6 +17,8 @@ export type { EmailSend } from './models/EmailSend';
 export type { EmailTemplate } from './models/EmailTemplate';
 export type { EmailVerification } from './models/EmailVerification';
 export type { EmailVerificationRequest } from './models/EmailVerificationRequest';
+export type { FollowRequest } from './models/FollowRequest';
+export type { FollowResponse } from './models/FollowResponse';
 export { HealthEnum } from './models/HealthEnum';
 export type { HTTPValidationError } from './models/HTTPValidationError';
 export type { IGHistoryCreate } from './models/IGHistoryCreate';

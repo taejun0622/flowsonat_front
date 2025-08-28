@@ -2,7 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export enum HealthEnum {
-    HEALTHY = 'Healthy',
-    UNHEALTHY = 'Unhealthy',
-}
+export type FollowRequest = {
+    follower_username: string;
+    following_username: string;
+};
+

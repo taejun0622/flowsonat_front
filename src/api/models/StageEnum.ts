@@ -6,4 +6,5 @@ export enum StageEnum {
     PENDING = 'PENDING',
     REQUESTED = 'REQUESTED',
     UNFOLLOWED = 'UNFOLLOWED',
+    FOLLOW_BACK = 'FOLLOW_BACK',
 }

@@ -6,6 +6,8 @@ import type { BenchmarkCreate } from '../models/BenchmarkCreate';
 import type { BenchmarkListResponse } from '../models/BenchmarkListResponse';
 import type { BenchmarkResponse } from '../models/BenchmarkResponse';
 import type { BenchmarkUpdate } from '../models/BenchmarkUpdate';
+import type { FollowRequest } from '../models/FollowRequest';
+import type { FollowResponse } from '../models/FollowResponse';
 import type { HealthEnum } from '../models/HealthEnum';
 import type { IGHistoryCreate } from '../models/IGHistoryCreate';
 import type { IGHistoryListResponse } from '../models/IGHistoryListResponse';
@@ -26,6 +28,116 @@ import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class InstagramService {
+    /**
+     * Create Follow Relationship
+     * Create a follow relationship between two Instagram accounts
+     * @param requestBody
+     * @returns FollowResponse Successful Response
+     * @throws ApiError
+     */
+    public static createFollowRelationshipApiV1InstagramFollowPost(
+        requestBody: FollowRequest,
+    ): CancelablePromise<FollowResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/follow',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Delete Follow Relationship
+     * Delete a follow relationship between two Instagram accounts
+     * @param followerUsername Username of the follower
+     * @param followingUsername Username being followed
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static deleteFollowRelationshipApiV1InstagramFollowDelete(
+        followerUsername: string,
+        followingUsername: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/instagram/follow',
+            query: {
+                'follower_username': followerUsername,
+                'following_username': followingUsername,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Get Followers
+     * Get all followers of a specific Instagram account
+     * @param username
+     * @returns FollowResponse Successful Response
+     * @throws ApiError
+     */
+    public static getFollowersApiV1InstagramFollowersUsernameGet(
+        username: string,
+    ): CancelablePromise<Array<FollowResponse>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/followers/{username}',
+            path: {
+                'username': username,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Get Following
+     * Get all accounts that a specific Instagram account is following
+     * @param username
+     * @returns FollowResponse Successful Response
+     * @throws ApiError
+     */
+    public static getFollowingApiV1InstagramFollowingUsernameGet(
+        username: string,
+    ): CancelablePromise<Array<FollowResponse>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/following/{username}',
+            path: {
+                'username': username,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Check Follow Relationship
+     * Check if a follow relationship exists between two Instagram accounts
+     * @param followerUsername Username of the follower
+     * @param followingUsername Username being followed
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static checkFollowRelationshipApiV1InstagramFollowCheckGet(
+        followerUsername: string,
+        followingUsername: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/follow/check',
+            query: {
+                'follower_username': followerUsername,
+                'following_username': followingUsername,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
     /**
      * Get My Instagram Account
      * Get user's connected Instagram account
@@ -377,6 +489,18 @@ export class InstagramService {
             errors: {
                 422: `Validation Error`,
             },
+        });
+    }
+    /**
+     * Sync Follow Table With Targets
+     * Synchronize all targets for the current user with the Follow table
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static syncFollowTableWithTargetsApiV1InstagramSyncFollowTablePost(): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/sync-follow-table',
         });
     }
 }
