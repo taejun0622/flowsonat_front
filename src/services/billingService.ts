@@ -1,6 +1,7 @@
 import { StripeService } from '@/api/services/StripeService';
 import { PaymentLinkResponse } from '@/api/models/PaymentLinkResponse';
 import { Subscription, BillingInfo, Invoice } from '@/types/subscription';
+import { STRIPE_CONFIG } from '@/constants/subscription';
 
 export class BillingService {
   /**
@@ -62,10 +63,17 @@ export class BillingService {
 
   /**
    * Create payment link for subscription
+   * Uses production price ID in production environment
    */
-  static async createPaymentLink(priceId: string): Promise<string> {
+  static async createPaymentLink(priceId?: string): Promise<string> {
     try {
-      const response: PaymentLinkResponse = await StripeService.createPaymentLinkApiV1StripePaymentLinkPost(priceId);
+      // In production, always use the production price ID
+      const isProduction = import.meta.env.PROD;
+      const actualPriceId = isProduction ? 'price_1S0mZgCVaHm33FAQxI3ZvEeD' : (priceId || 'price_basic');
+      
+      console.log(`Creating payment link with price ID: ${actualPriceId} (Production: ${isProduction})`);
+      
+      const response: PaymentLinkResponse = await StripeService.createPaymentLinkApiV1StripePaymentLinkPost(actualPriceId);
       return response.url;
     } catch (error) {
       console.error('Failed to create payment link:', error);
