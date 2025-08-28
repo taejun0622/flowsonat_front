@@ -4,12 +4,23 @@ const isProduction = import.meta.env.PROD;
 // Production Stripe Price ID
 const PRODUCTION_PRICE_ID = 'price_1S0mZgCVaHm33FAQxI3ZvEeD';
 
-// Development Price IDs (placeholder - replace with actual test price IDs)
-const DEVELOPMENT_PRICE_ID = 'price_basic'; // Replace with actual test price ID
+// Use environment variable for price ID, fallback to production ID
+const getPriceId = () => {
+  const envPriceId = import.meta.env.VITE_STRIPE_PRICE_ID;
+  const finalPriceId = envPriceId || PRODUCTION_PRICE_ID;
+  
+  console.log('=== getPriceId Debug ===');
+  console.log('import.meta.env.VITE_STRIPE_PRICE_ID:', envPriceId);
+  console.log('PRODUCTION_PRICE_ID:', PRODUCTION_PRICE_ID);
+  console.log('Final price ID:', finalPriceId);
+  console.log('=== End getPriceId Debug ===');
+  
+  return finalPriceId;
+};
 
 export const SUBSCRIPTION_PLANS = {
   BASIC: {
-    id: isProduction ? PRODUCTION_PRICE_ID : DEVELOPMENT_PRICE_ID,
+    id: getPriceId(),
     name: 'Basic Plan',
     price: 999, // $9.99 in cents
     currency: 'USD',
@@ -19,11 +30,10 @@ export const SUBSCRIPTION_PLANS = {
       'Not only impression, but FOLLOW',
       'Auto-follow and unfollow',
       'Sophisticated targeting',
-
     ],
   },
   PRO: {
-    id: isProduction ? PRODUCTION_PRICE_ID : 'price_pro',
+    id: getPriceId(),
     name: 'Pro Plan',
     price: 2999, // $29.99 in cents
     currency: 'USD',
@@ -37,7 +47,7 @@ export const SUBSCRIPTION_PLANS = {
     ],
   },
   ENTERPRISE: {
-    id: isProduction ? PRODUCTION_PRICE_ID : 'price_enterprise',
+    id: getPriceId(),
     name: 'Enterprise Plan',
     price: 9999, // $99.99 in cents
     currency: 'USD',
@@ -60,6 +70,7 @@ export const STRIPE_CONFIG = {
   productId: isProduction 
     ? 'prod_SwfvVCI3rprIQK'
     : import.meta.env.VITE_STRIPE_PRODUCT_ID || 'prod_test_your_test_product_id',
+  priceId: getPriceId(),
 } as const;
 
 export const SUBSCRIPTION_STATUS = {

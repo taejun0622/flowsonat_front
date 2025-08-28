@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useBilling } from '@/hooks/useBilling';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
+import { STRIPE_CONFIG } from '@/constants/subscription';
 
 export const BillingTab: React.FC = () => {
   const { billingInfo, isLoading, isLoadingSubscription, cancelSubscription, reactivateSubscription, updatePaymentMethod } = useBilling();
@@ -239,7 +240,7 @@ export const BillingTab: React.FC = () => {
 
                   <Button 
                     className="w-full bg-white text-gray-900 hover:bg-gray-100"
-                    onClick={() => updatePaymentMethod('price_basic')}
+                    onClick={() => updatePaymentMethod(STRIPE_CONFIG.priceId)}
                     disabled={isLoading}
                   >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}

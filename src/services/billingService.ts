@@ -67,11 +67,18 @@ export class BillingService {
    */
   static async createPaymentLink(priceId?: string): Promise<string> {
     try {
-      // In production, always use the production price ID
-      const isProduction = import.meta.env.PROD;
-      const actualPriceId = isProduction ? 'price_1S0mZgCVaHm33FAQxI3ZvEeD' : (priceId || 'price_basic');
+      // Debug environment variables
+      console.log('=== Environment Variables Debug ===');
+      console.log('import.meta.env.VITE_STRIPE_PRICE_ID:', import.meta.env.VITE_STRIPE_PRICE_ID);
+      console.log('import.meta.env.PROD:', import.meta.env.PROD);
+      console.log('STRIPE_CONFIG.priceId:', STRIPE_CONFIG.priceId);
+      console.log('Provided priceId:', priceId);
       
-      console.log(`Creating payment link with price ID: ${actualPriceId} (Production: ${isProduction})`);
+      // Use STRIPE_CONFIG for consistent price ID handling
+      const actualPriceId = priceId || STRIPE_CONFIG.priceId;
+      
+      console.log(`Creating payment link with price ID: ${actualPriceId}`);
+      console.log('=== End Debug ===');
       
       const response: PaymentLinkResponse = await StripeService.createPaymentLinkApiV1StripePaymentLinkPost(actualPriceId);
       return response.url;
