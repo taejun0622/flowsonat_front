@@ -26,6 +26,12 @@ export const InstagramUsernameConfirmModal = ({
   onConfirm,
   onCancel
 }: InstagramUsernameConfirmModalProps) => {
+  const loginTime = sessionData?.timestamp
+    ? new Date(sessionData.timestamp).toLocaleString('en-US')
+    : 'Unknown';
+  const sessionIdStatus = sessionData?.sessionid ? 'Verified' : 'None';
+  const userId = sessionData?.ds_user_id || 'None';
+
   return (
     <Dialog open={open} onOpenChange={() => onCancel()}>
       <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md">
@@ -56,9 +62,9 @@ export const InstagramUsernameConfirmModal = ({
           
           <div className="text-sm text-gray-400 bg-black/10 p-3 rounded-lg">
             <div className="font-medium text-white mb-1">Connection Info:</div>
-            <div>• Login Time: {new Date(sessionData.timestamp).toLocaleString('en-US')}</div>
-            <div>• Session ID: {sessionData.sessionid ? 'Verified' : 'None'}</div>
-            <div>• User ID: {sessionData.ds_user_id || 'None'}</div>
+            <div>• Login Time: {loginTime}</div>
+            <div>• Session ID: {sessionIdStatus}</div>
+            <div>• User ID: {userId}</div>
           </div>
         </div>
         

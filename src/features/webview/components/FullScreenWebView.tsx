@@ -266,7 +266,7 @@ const FullScreenWebView = ({
           height: '100%'
         }}
         webpreferences="nodeIntegration=no, contextIsolation=yes"
-        allowpopups={true}
+        allowpopups="true"
         useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Accept-Language: en-US,en;q=0.9"
         {...(partition ? { partition } : {})}
       />
