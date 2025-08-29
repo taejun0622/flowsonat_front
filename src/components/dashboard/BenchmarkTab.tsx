@@ -307,111 +307,85 @@ export const BenchmarkTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+
+      {/* Glassmorphism Container */}
       <Card className="bg-black/10 backdrop-blur-sm border-black/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center text-white">
-                <BarChart3 className="h-5 w-5 mr-2" />
-                Performance Management
-              </CardTitle>
-              <CardDescription className="text-gray-300">
-                Manage benchmarks and suggestions for Instagram accounts
-              </CardDescription>
-            </div>
-            <div className="flex space-x-2">
-              <Button 
-                onClick={() => {
-                  loadBenchmarks();
-                  loadSuggestions();
-                }}
-                disabled={loading || suggestionsLoading}
-                variant="outline" 
-                className="border-black/20 text-white hover:bg-black/10"
+        <CardContent className="p-6">
+          {/* Suggestions Toggle */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant={showSuggestions ? "default" : "outline"}
+                onClick={() => setShowSuggestions(true)}
+                className={showSuggestions 
+                  ? "bg-white text-gray-900 hover:bg-gray-100" 
+                  : "border-black/20 text-white hover:bg-black/10"
+                }
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading || suggestionsLoading ? 'animate-spin' : ''}`} />
-                Refresh
+                <Lightbulb className="h-4 w-4 mr-2" />
+                Suggestions ({suggestions.length})
               </Button>
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center bg-white text-gray-900 hover:bg-gray-100">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Benchmark
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-white">Create New Benchmark</DialogTitle>
-                    <DialogDescription className="text-gray-300">
-                      Create a new performance benchmark for an Instagram account.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="ig_username" className="text-white">Instagram Username</Label>
-                      <Input
-                        id="ig_username"
-                        value={formData.ig_username}
-                        onChange={(e) => setFormData({ ...formData, ig_username: e.target.value })}
-                        placeholder="Enter Instagram username"
-                        className="bg-black/20 border-black/30 text-white placeholder:text-gray-400 focus:border-white/30"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setCreateDialogOpen(false)}
-                      className="border-black/30 text-white hover:bg-black/20"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleCreateBenchmark}
-                      disabled={loading}
-                      className="bg-white text-gray-900 hover:bg-gray-100"
-                    >
-                      {loading ? 'Creating...' : 'Create'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <Button
+                variant={!showSuggestions ? "default" : "outline"}
+                onClick={() => setShowSuggestions(false)}
+                className={!showSuggestions 
+                  ? "bg-white text-gray-900 hover:bg-gray-100" 
+                  : "border-black/20 text-white hover:bg-black/10"
+                }
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Benchmarks ({benchmarks.length})
+              </Button>
             </div>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center bg-white text-gray-900 hover:bg-gray-100">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Benchmark
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-white">Create New Benchmark</DialogTitle>
+                  <DialogDescription className="text-gray-300">
+                    Create a new performance benchmark for an Instagram account.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="ig_username" className="text-white">Instagram Username</Label>
+                    <Input
+                      id="ig_username"
+                      value={formData.ig_username}
+                      onChange={(e) => setFormData({ ...formData, ig_username: e.target.value })}
+                      placeholder="Enter Instagram username"
+                      className="bg-black/20 border-black/30 text-white placeholder:text-gray-400 focus:border-white/30"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCreateDialogOpen(false)}
+                    className="border-black/30 text-white hover:bg-black/20"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateBenchmark}
+                    disabled={loading}
+                    className="bg-white text-gray-900 hover:bg-gray-100"
+                  >
+                    {loading ? 'Creating...' : 'Create'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
-        </CardHeader>
-      </Card>
 
-      {/* Suggestions Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant={showSuggestions ? "default" : "outline"}
-            onClick={() => setShowSuggestions(true)}
-            className={showSuggestions 
-              ? "bg-white text-gray-900 hover:bg-gray-100" 
-              : "border-black/20 text-white hover:bg-black/10"
-            }
-          >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Suggestions ({suggestions.length})
-          </Button>
-          <Button
-            variant={!showSuggestions ? "default" : "outline"}
-            onClick={() => setShowSuggestions(false)}
-            className={!showSuggestions 
-              ? "bg-white text-gray-900 hover:bg-gray-100" 
-              : "border-black/20 text-white hover:bg-black/10"
-            }
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Benchmarks ({benchmarks.length})
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="space-y-6">
+          {/* Content */}
+          <div className="space-y-6">
         {showSuggestions ? (
           // Suggestions List
           suggestionsLoading && suggestions.length === 0 ? (
@@ -566,7 +540,9 @@ export const BenchmarkTab: React.FC = () => {
             ))
           )
         )}
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

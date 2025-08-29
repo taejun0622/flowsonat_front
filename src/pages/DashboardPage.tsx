@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, User, Settings, BarChart3, CreditCard, Bot } from 'lucide-react';
+import { LogOut, User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -87,6 +87,11 @@ export const DashboardPage: React.FC = () => {
     setShowAutomationOverlay(true);
   };
 
+  const handleRefresh = () => {
+    // Refresh Instagram connection status
+    checkConnection();
+  };
+
   // Show loading when checking connection status
   if (isCheckingConnection) {
     return (
@@ -105,27 +110,27 @@ export const DashboardPage: React.FC = () => {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-8 flex justify-between items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-2">Dashboard</h2>
-              <p className="text-gray-300">Service management and monitoring</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-gray-300" />
-                <span className="text-sm text-gray-300">{user?.email}</span>
-              </div>
+            <div className="flex items-center space-x-2">
               <Button 
                 onClick={handleStartAutomation}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                 disabled={!isConnected}
               >
                 <Bot className="h-4 w-4 mr-2" />
-                Instagram Automation
+                Execute
               </Button>
-              <Button variant="outline" size="sm" onClick={logout} className="text-white border-white hover:bg-white hover:text-gray-900">
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
+              <Button 
+                onClick={handleRefresh}
+                variant="outline" 
+                className="border-black/20 text-white hover:bg-black/10"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
               </Button>
+            </div>
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5 text-gray-300" />
+              <span className="text-sm text-gray-300">{user?.email}</span>
             </div>
           </div>
 
