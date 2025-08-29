@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/api/core/ApiError';
 
 const registerSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -25,7 +26,9 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const { register: registerUser, isLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const { register: registerUser } = useAuth();
   const navigate = useNavigate();
 
   const {
@@ -38,6 +41,8 @@ export const RegisterPage: React.FC = () => {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
       await registerUser({
         email: data.email,
         password: data.password,
@@ -45,7 +50,29 @@ export const RegisterPage: React.FC = () => {
       // 이메일 인증 페이지로 리다이렉트
       navigate(`/email-verification?email=${encodeURIComponent(data.email)}`);
     } catch (error) {
-      // Error is handled in AuthContext
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 409) {
+            setErrorMessage('An account with this email already exists. Please try logging in instead.');
+          } else if (error.status === 422) {
+            setErrorMessage('Invalid input data. Please check your email and password.');
+          } else if (error.status === 429) {
+            setErrorMessage('Too many registration attempts. Please try again later.');
+          } else {
+            setErrorMessage(error.body?.detail || error.message || 'Registration failed. Please try again.');
+          }
+        } else {
+          // Server errors (500-series)
+          setErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        setErrorMessage('Network error. Please check your connection and try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -60,6 +87,12 @@ export const RegisterPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-white">Email</Label>
               <div className="relative">
@@ -137,8 +170,8 @@ export const RegisterPage: React.FC = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-gray-100" disabled={isLoading}>
-              {isLoading ? 'Creating account...' : 'Sign Up'}
+            <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-gray-100" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating account...' : 'Sign Up'}
             </Button>
           </form>
 

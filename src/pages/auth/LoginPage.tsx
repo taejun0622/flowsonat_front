@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/api/core/ApiError';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -20,7 +21,9 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
-  const { login, isLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const {
@@ -33,10 +36,46 @@ export const LoginPage: React.FC = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      console.log('Attempting login...');
       await login(data);
+      console.log('Login successful');
       navigate('/dashboard');
-    } catch (error) {
-      // Error is handled in AuthContext
+    } catch (error: any) {
+      console.log('Login error caught:', error);
+      console.log('Error type:', typeof error);
+      console.log('Error instanceof ApiError:', error instanceof ApiError);
+      
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        console.log('ApiError status:', error.status);
+        console.log('ApiError body:', error.body);
+        console.log('ApiError message:', error.message);
+        
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 401) {
+            setErrorMessage('Invalid email or password. Please check your credentials.');
+          } else if (error.status === 422) {
+            setErrorMessage('Invalid input data. Please check your email and password.');
+          } else if (error.status === 429) {
+            setErrorMessage('Too many login attempts. Please try again later.');
+          } else {
+            setErrorMessage(error.body?.detail || error.message || 'Login failed. Please try again.');
+          }
+        } else {
+          // Server errors (500-series)
+          setErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        console.log('Non-ApiError:', error);
+        setErrorMessage('Network error. Please check your connection and try again.');
+      }
+    } finally {
+      console.log('Setting isSubmitting to false');
+      setIsSubmitting(false);
     }
   };
 
@@ -51,6 +90,12 @@ export const LoginPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-white">Email</Label>
               <div className="relative">
@@ -98,8 +143,8 @@ export const LoginPage: React.FC = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-gray-100" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+            <Button type="submit" className="w-full bg-white text-gray-900 hover:bg-gray-100" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
 

@@ -72,11 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     } catch (error: any) {
       console.error('Login error:', error);
-      toast({
-        title: "Login failed",
-        description: error.message || "Failed to sign in.",
-        variant: "destructive",
-      });
+      // Error handling is now done in the components
       throw error;
     } finally {
       setIsLoading(false);
@@ -96,11 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return newUser;
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast({
-        title: "Registration failed",
-        description: error.message || "Failed to create account.",
-        variant: "destructive",
-      });
+      // Error handling is now done in the components
       throw error;
     } finally {
       setIsLoading(false);

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AuthService } from '@/api/services/AuthService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/api/core/ApiError';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters long.'),
@@ -27,6 +28,7 @@ export const ResetPasswordPage: React.FC = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,16 +47,13 @@ export const ResetPasswordPage: React.FC = () => {
 
   const onSubmit = async (data: ResetPasswordFormData) => {
     if (!token || !email) {
-      toast({
-        title: "Error",
-        description: "Invalid reset link. Missing token or email.",
-        variant: "destructive",
-      });
+      setErrorMessage('Invalid reset link. Missing token or email.');
       return;
     }
 
     try {
       setIsLoading(true);
+      setErrorMessage(null);
       const response = await AuthService.confirmPasswordResetApiV1AuthPasswordResetConfirmPost({
         email: email,
         code: token,
@@ -72,11 +71,28 @@ export const ResetPasswordPage: React.FC = () => {
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Password reset error:', error);
-      toast({
-        title: "Password reset failed",
-        description: error.message || "Failed to reset password.",
-        variant: "destructive",
-      });
+      
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 400) {
+            setErrorMessage('Invalid reset token or email. Please request a new password reset.');
+          } else if (error.status === 422) {
+            setErrorMessage('Invalid password format. Please ensure your password meets the requirements.');
+          } else if (error.status === 429) {
+            setErrorMessage('Too many password reset attempts. Please try again later.');
+          } else {
+            setErrorMessage(error.body?.detail || error.message || 'Password reset failed. Please try again.');
+          }
+        } else {
+          // Server errors (500-series)
+          setErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        setErrorMessage('Network error. Please check your connection and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +129,12 @@ export const ResetPasswordPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-white">New Password</Label>
               <div className="relative">

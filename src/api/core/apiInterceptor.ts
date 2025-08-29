@@ -33,8 +33,29 @@ class ApiInterceptor {
     this.failedQueue = [];
   }
 
+  // Auth endpoints that should not trigger token refresh
+  private isAuthEndpoint(url: string): boolean {
+    const authEndpoints = [
+      '/api/v1/auth/login',
+      '/api/v1/auth/register',
+      '/api/v1/auth/refresh',
+      '/api/v1/auth/password-reset',
+      '/api/v1/auth/password-reset/confirm',
+      '/api/v1/auth/email-verification',
+      '/api/v1/auth/resend-verification',
+      '/api/v1/auth/resend-password-reset'
+    ];
+    
+    return authEndpoints.some(endpoint => url.includes(endpoint));
+  }
+
   async handleApiError(error: ApiError, retryRequest: () => Promise<any>): Promise<any> {
     const originalRequest: any = error.request as any;
+
+    // Skip token refresh for auth endpoints
+    if (this.isAuthEndpoint(error.url)) {
+      throw error;
+    }
 
     if (error.status === 401 && !originalRequest._retry) {
       if (this.isRefreshing) {

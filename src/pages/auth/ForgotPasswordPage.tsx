@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthService } from '@/api/services/AuthService';
 import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/api/core/ApiError';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -20,6 +21,7 @@ type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
 export const ForgotPasswordPage: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -34,6 +36,7 @@ export const ForgotPasswordPage: React.FC = () => {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     try {
       setIsLoading(true);
+      setErrorMessage(null);
       await AuthService.requestPasswordResetApiV1AuthPasswordResetPost({
         email: data.email,
       });
@@ -47,17 +50,32 @@ export const ForgotPasswordPage: React.FC = () => {
       navigate(`/email-verification?email=${encodeURIComponent(data.email)}&type=password-reset`);
     } catch (error: any) {
       console.error('Password reset error:', error);
-      toast({
-        title: "Email sending failed",
-        description: error.message || "Failed to send password reset email.",
-        variant: "destructive",
-      });
+      
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 404) {
+            setErrorMessage('No account found with this email address.');
+          } else if (error.status === 422) {
+            setErrorMessage('Invalid email format. Please check your email address.');
+          } else if (error.status === 429) {
+            setErrorMessage('Too many password reset attempts. Please try again later.');
+          } else {
+            setErrorMessage(error.body?.detail || error.message || 'Failed to send password reset email.');
+          }
+        } else {
+          // Server errors (500-series)
+          setErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        setErrorMessage('Network error. Please check your connection and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
-
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -70,6 +88,12 @@ export const ForgotPasswordPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email" className="text-white">Email</Label>
               <div className="relative">

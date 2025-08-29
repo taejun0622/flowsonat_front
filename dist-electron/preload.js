@@ -1,32 +1,32 @@
-import { contextBridge as i, ipcRenderer as r } from "electron";
-i.exposeInMainWorld("ipcRenderer", {
-  on(...n) {
-    const [o, e] = n;
-    return r.on(o, (t, ...s) => e(t, ...s));
+import { contextBridge, ipcRenderer } from "electron";
+contextBridge.exposeInMainWorld("ipcRenderer", {
+  on(...args) {
+    const [channel, listener] = args;
+    return ipcRenderer.on(channel, (event, ...args2) => listener(event, ...args2));
   },
-  off(...n) {
-    const [o, ...e] = n;
-    return r.off(o, ...e);
+  off(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.off(channel, ...omit);
   },
-  send(...n) {
-    const [o, ...e] = n;
-    return r.send(o, ...e);
+  send(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.send(channel, ...omit);
   },
-  invoke(...n) {
-    const [o, ...e] = n;
-    return r.invoke(o, ...e);
+  invoke(...args) {
+    const [channel, ...omit] = args;
+    return ipcRenderer.invoke(channel, ...omit);
   }
   // You can expose other APTs you need here.
   // ...
 });
-i.exposeInMainWorld("electronAPI", {
-  openInstagramLogin: (n) => r.invoke("open-instagram-login", n),
-  closeInstagramLogin: () => r.invoke("close-instagram-login"),
-  onInstagramLoginSuccess: (n) => {
-    r.on("instagram-login-success", (o, e) => n(e));
+contextBridge.exposeInMainWorld("electronAPI", {
+  openInstagramLogin: (url) => ipcRenderer.invoke("open-instagram-login", url),
+  closeInstagramLogin: () => ipcRenderer.invoke("close-instagram-login"),
+  onInstagramLoginSuccess: (callback) => {
+    ipcRenderer.on("instagram-login-success", (event, data) => callback(data));
   },
-  onInstagramLoginError: (n) => {
-    r.on("instagram-login-error", (o, e) => n(e));
+  onInstagramLoginError: (callback) => {
+    ipcRenderer.on("instagram-login-error", (event, error) => callback(error));
   },
-  getInstagramCookies: () => r.invoke("get-instagram-cookies")
+  getInstagramCookies: () => ipcRenderer.invoke("get-instagram-cookies")
 });

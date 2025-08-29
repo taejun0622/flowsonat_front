@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EmailService } from '@/api/services/EmailService';
 import { AuthService } from '@/api/services/AuthService';
 import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/api/core/ApiError';
 
 const emailVerificationSchema = z.object({
   code: z.string().min(6, 'Verification code must be at least 6 characters.').max(10, 'Verification code must be 10 characters or less.'),
@@ -34,6 +35,8 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resendErrorMessage, setResendErrorMessage] = useState<string | null>(null);
   
   const email = searchParams.get('email') || '';
   const type = searchParams.get('type') || verificationType;
@@ -62,15 +65,12 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
 
   const onSubmit = async (data: EmailVerificationForm) => {
     if (!email) {
-      toast({
-        title: 'Error',
-        description: 'Email information is missing.',
-        variant: 'destructive',
-      });
+      setErrorMessage('Email information is missing.');
       return;
     }
 
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       if (type === 'password-reset') {
         // 비밀번호 재설정용: 인증번호 확인 후 비밀번호 재설정 페이지로 이동
@@ -100,11 +100,31 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
         navigate(redirectTo);
       }
     } catch (error: any) {
-      toast({
-        title: 'Verification Failed',
-        description: error.message || 'Invalid verification code.',
-        variant: 'destructive',
-      });
+      console.error('Email verification error:', error);
+      
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 400) {
+            setErrorMessage('Invalid verification code. Please check the code and try again.');
+          } else if (error.status === 404) {
+            setErrorMessage('Email not found or verification code expired.');
+          } else if (error.status === 422) {
+            setErrorMessage('Invalid verification code format.');
+          } else if (error.status === 429) {
+            setErrorMessage('Too many verification attempts. Please try again later.');
+          } else {
+            setErrorMessage(error.body?.detail || error.message || 'Verification failed. Please try again.');
+          }
+        } else {
+          // Server errors (500-series)
+          setErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        setErrorMessage('Network error. Please check your connection and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -112,15 +132,12 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
 
   const handleResendCode = async () => {
     if (!email) {
-      toast({
-        title: 'Error',
-        description: 'Email information is missing.',
-        variant: 'destructive',
-      });
+      setResendErrorMessage('Email information is missing.');
       return;
     }
 
     setIsResending(true);
+    setResendErrorMessage(null);
     try {
       if (type === 'password-reset') {
         // 비밀번호 재설정 코드 재발송
@@ -137,11 +154,29 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
 
       setCountdown(60);
     } catch (error: any) {
-      toast({
-        title: 'Resend Failed',
-        description: error.message || 'Failed to resend verification code.',
-        variant: 'destructive',
-      });
+      console.error('Resend code error:', error);
+      
+      // Handle specific error types
+      if (error instanceof ApiError) {
+        if (error.status >= 400 && error.status < 500) {
+          // Client errors (400-series)
+          if (error.status === 404) {
+            setResendErrorMessage('Email not found. Please check your email address.');
+          } else if (error.status === 422) {
+            setResendErrorMessage('Invalid email format.');
+          } else if (error.status === 429) {
+            setResendErrorMessage('Too many resend attempts. Please try again later.');
+          } else {
+            setResendErrorMessage(error.body?.detail || error.message || 'Failed to resend verification code.');
+          }
+        } else {
+          // Server errors (500-series)
+          setResendErrorMessage('Server error. Please try again later.');
+        }
+      } else {
+        // Network or other errors
+        setResendErrorMessage('Network error. Please check your connection and try again.');
+      }
     } finally {
       setIsResending(false);
     }
@@ -187,6 +222,12 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="code" className="text-white">Verification Code</Label>
               <Input
@@ -209,6 +250,12 @@ export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
             >
               {isLoading ? 'Verifying...' : 'Verify Code'}
             </Button>
+
+            {resendErrorMessage && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-md">
+                <p className="text-sm text-red-400">{resendErrorMessage}</p>
+              </div>
+            )}
 
             <div className="text-center">
               <Button
