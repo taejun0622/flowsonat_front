@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { InstagramService } from '@/api/services/InstagramService';
@@ -12,9 +12,9 @@ interface InstagramConnectionManagerProps {
   onConnectionChange?: (isConnected: boolean) => void;
 }
 
-export const InstagramConnectionManager: React.FC<InstagramConnectionManagerProps> = ({
+export const InstagramConnectionManager = ({
   onConnectionChange
-}) => {
+}: InstagramConnectionManagerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);

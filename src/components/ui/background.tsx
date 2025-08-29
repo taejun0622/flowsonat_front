@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 // Type definitions for color4bg.js
 interface Color4BgOptions {
@@ -29,17 +29,17 @@ interface DynamicBackgroundProps {
   seed?: number;
   loop?: boolean;
   className?: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
-export const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
+export const DynamicBackground = ({
   type,
   colors = ['#D1ADFF', '#98D69B', '#FAE390', '#FFACD8', '#7DD5FF'],
   seed = 1000,
   loop = true,
   className = '',
   children
-}) => {
+}: DynamicBackgroundProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundInstanceRef = useRef<Color4BgInstance | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -162,10 +162,10 @@ export const BackgroundPresets = {
 };
 
 // Convenience component for common use cases
-export const AIBackground: React.FC<{ children?: React.ReactNode; className?: string }> = ({ 
+export const AIBackground = ({ 
   children, 
   className 
-}) => (
+}: { children?: ReactNode; className?: string }) => (
   <DynamicBackground
     type={BackgroundPresets.ai.type}
     colors={BackgroundPresets.ai.colors}
@@ -175,10 +175,10 @@ export const AIBackground: React.FC<{ children?: React.ReactNode; className?: st
   </DynamicBackground>
 );
 
-export const ModernBackground: React.FC<{ children?: React.ReactNode; className?: string }> = ({ 
+export const ModernBackground = ({ 
   children, 
   className 
-}) => (
+}: { children?: ReactNode; className?: string }) => (
   <DynamicBackground
     type={BackgroundPresets.modern.type}
     colors={BackgroundPresets.modern.colors}

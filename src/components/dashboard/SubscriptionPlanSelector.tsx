@@ -10,10 +10,10 @@ interface SubscriptionPlanSelectorProps {
   currentPlanId?: string;
 }
 
-export const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> = ({
+export const SubscriptionPlanSelector = ({
   onPlanSelect,
   currentPlanId,
-}) => {
+}: SubscriptionPlanSelectorProps) => {
   const { createPaymentLink, isLoading } = useBilling();
 
   const handlePlanSelect = async (planId: string) => {

@@ -74,7 +74,7 @@ export const useBrowserExtension = ({
     
     // 약간의 지연 후 extension 활성화 (webview가 완전히 준비될 때까지)
     setTimeout(() => {
-      setState(prev => ({ ...prev, isActive: true }));
+      setState((prev: BrowserExtensionState) => ({ ...prev, isActive: true }));
       console.log('Extension auto-activated');
       
       // 커서를 다시 생성하고 표시
@@ -108,7 +108,7 @@ export const useBrowserExtension = ({
     if (!state.isActive || !cursorRef.current) return;
 
     const { clientX, clientY } = event;
-    setState(prev => ({ ...prev, mousePosition: { x: clientX, y: clientY } }));
+    setState((prev: BrowserExtensionState) => ({ ...prev, mousePosition: { x: clientX, y: clientY } }));
 
     // 커서 위치 업데이트
     cursorRef.current.style.left = `${clientX}px`;
@@ -129,7 +129,7 @@ export const useBrowserExtension = ({
           const cursorType = computedStyle.cursor as CursorStyle['type'];
           
           if (cursorType !== state.cursorStyle.type) {
-            setState(prev => ({ ...prev, cursorStyle: { type: cursorType } }));
+            setState((prev: BrowserExtensionState) => ({ ...prev, cursorStyle: { type: cursorType } }));
             cursorRef.current.style.cssText = getCursorStyle(cursorType);
             cursorRef.current.style.left = `${clientX}px`;
             cursorRef.current.style.top = `${clientY}px`;
@@ -146,7 +146,7 @@ export const useBrowserExtension = ({
     isDraggingRef.current = true;
     dragStartRef.current = { x: clientX, y: clientY };
 
-    setState(prev => ({ ...prev, isDragging: true }));
+    setState((prev: BrowserExtensionState) => ({ ...prev, isDragging: true }));
 
     // 웹뷰 클릭 이벤트 전달
     const webview = webviewRef.current;
@@ -170,7 +170,7 @@ export const useBrowserExtension = ({
     if (!state.isActive) return;
 
     isDraggingRef.current = false;
-    setState(prev => ({ ...prev, isDragging: false }));
+    setState((prev: BrowserExtensionState) => ({ ...prev, isDragging: false }));
 
     // 더블클릭 감지
     if (event.detail === 2) {
@@ -281,7 +281,7 @@ export const useBrowserExtension = ({
 
   // 익스텐션 활성화/비활성화
   const toggleExtension = useCallback(() => {
-    setState(prev => ({ ...prev, isActive: !prev.isActive }));
+    setState((prev: BrowserExtensionState) => ({ ...prev, isActive: !prev.isActive }));
   }, []);
 
   // 이벤트 리스너 등록/해제
@@ -310,7 +310,7 @@ export const useBrowserExtension = ({
         cursorRef.current.style.left = `${centerX}px`;
         cursorRef.current.style.top = `${centerY}px`;
         cursorRef.current.style.display = 'block';
-        setState(prev => ({ 
+        setState((prev: BrowserExtensionState) => ({ 
           ...prev, 
           mousePosition: { x: centerX, y: centerY } 
         }));

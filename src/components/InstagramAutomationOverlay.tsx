@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Play, Square, Settings, BarChart3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -19,9 +19,9 @@ interface InstagramAutomationOverlayProps {
   onClose: () => void;
 }
 
-export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProps> = ({
+export const InstagramAutomationOverlay = ({
   onClose
-}) => {
+}: InstagramAutomationOverlayProps) => {
   const [username, setUsername] = useState('');
   const [automationService, setAutomationService] = useState<InstagramAutomationService | null>(null);
   const [domHelper, setDomHelper] = useState<InstagramDOMHelper | null>(null);
@@ -228,7 +228,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
   // Add log
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev.slice(-99), `[${timestamp}] ${message}`]); // 최대 100개 로그 유지
+    setLogs((prev: string[]) => [...prev.slice(-99), `[${timestamp}] ${message}`]); // 최대 100개 로그 유지
   };
 
   // Start workflow
@@ -281,7 +281,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
 
   // 설정 업데이트
   const updateConfig = (newConfig: Partial<InstagramAutomationConfig>) => {
-    setConfig(prev => ({ ...prev, ...newConfig }));
+    setConfig((prev: InstagramAutomationConfig) => ({ ...prev, ...newConfig }));
   };
 
   // 로그 클리어
@@ -336,7 +336,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                 <Input
                   id="username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e: any) => setUsername(e.target.value)}
                   placeholder="Enter username"
                   disabled={state.isRunning}
                   className="bg-gray-800 border-gray-600 text-white"
@@ -369,9 +369,9 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                 <select
                   className="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-2"
                   value={selectedBenchmarkId}
-                  onChange={(e) => setSelectedBenchmarkId(e.target.value)}
+                  onChange={(e: any) => setSelectedBenchmarkId(e.target.value)}
                 >
-                  {(benchmarks || []).map((b) => (
+                  {(benchmarks || []).map((b: any) => (
                     <option key={b.id} value={b.id}>{b.ig.username}</option>
                   ))}
                 </select>
@@ -410,7 +410,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                     id="maxTargets"
                     type="number"
                     value={config.maxTargets}
-                    onChange={(e) => updateConfig({ maxTargets: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ maxTargets: parseInt(e.target.value) })}
                     min="1"
                     max="1000"
                     className="bg-gray-800 border-gray-600 text-white"
@@ -422,7 +422,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                     id="maxUnfollows"
                     type="number"
                     value={config.maxUnfollows}
-                    onChange={(e) => updateConfig({ maxUnfollows: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ maxUnfollows: parseInt(e.target.value) })}
                     min="1"
                     max="500"
                     className="bg-gray-800 border-gray-600 text-white"
@@ -434,7 +434,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                     id="clickDelay"
                     type="number"
                     value={config.clickDelay}
-                    onChange={(e) => updateConfig({ clickDelay: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ clickDelay: parseInt(e.target.value) })}
                     min="100"
                     max="3000"
                     className="bg-gray-800 border-gray-600 text-white"
@@ -464,7 +464,7 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
                 {logs.length === 0 ? (
                   <p className="text-gray-500">No logs available.</p>
                 ) : (
-                  logs.map((log, index) => (
+                  logs.map((log: string, index: number) => (
                     <div key={index} className="mb-1">
                       {log}
                     </div>
@@ -505,8 +505,8 @@ export const InstagramAutomationOverlay: React.FC<InstagramAutomationOverlayProp
             </Button>
             <Input
               value={currentUrl}
-              onChange={(e) => setCurrentUrl(e.target.value)}
-              onKeyPress={(e) => {
+              onChange={(e: any) => setCurrentUrl(e.target.value)}
+              onKeyPress={(e: any) => {
                 if (e.key === 'Enter' && webviewRef.current) {
                   (webviewRef.current as any).loadURL(currentUrl);
                 }

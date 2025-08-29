@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -25,10 +25,10 @@ interface ProfileForm {
   email: string;
 }
 
-export const SettingsTab: React.FC<SettingsTabProps> = ({ 
+export const SettingsTab = ({ 
   isConnected, 
   onConnectInstagram 
-}) => {
+}: SettingsTabProps) => {
   const { user, logout } = useAuth();
   const { instagramAccount, disconnectAccount, isLoading: instagramLoading } = useInstagram();
   const { toast } = useToast();
@@ -54,7 +54,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: FormEvent) => {
     e.preventDefault();
     
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -142,8 +142,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
   };
 
-  const togglePasswordVisibility = (field: keyof typeof showPasswords) => {
-    setShowPasswords(prev => ({
+  const togglePasswordVisibility = (field: 'new' | 'confirm') => {
+    setShowPasswords((prev: { new: boolean; confirm: boolean }) => ({
       ...prev,
       [field]: !prev[field]
     }));
@@ -267,7 +267,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             id="email"
                             type="email"
                             value={profileForm.email}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                            onChange={(e: any) => setProfileForm((prev: ProfileForm) => ({ ...prev, email: e.target.value }))}
                             className="pl-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter your email"
                             required
@@ -325,7 +325,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             id="newPassword"
                             type={showPasswords.new ? "text" : "password"}
                             value={passwordForm.newPassword}
-                            onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                            onChange={(e: any) => setPasswordForm((prev: PasswordChangeForm) => ({ ...prev, newPassword: e.target.value }))}
                             className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter new password"
                             required
@@ -353,7 +353,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             id="confirmPassword"
                             type={showPasswords.confirm ? "text" : "password"}
                             value={passwordForm.confirmPassword}
-                            onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                            onChange={(e: any) => setPasswordForm((prev: PasswordChangeForm) => ({ ...prev, confirmPassword: e.target.value }))}
                             className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Confirm new password"
                             required

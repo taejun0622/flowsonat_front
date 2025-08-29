@@ -2,7 +2,7 @@ export interface WebViewProps {
   url?: string;
   onClose?: () => void;
   onLoginSuccess?: (sessionData: any) => void;
-  webviewRef?: React.RefObject<HTMLWebViewElement>;
+  webviewRef?: any;
   partition?: string; // optional custom session partition
 }
 
@@ -20,3 +20,4 @@ export interface WebViewSize {
   width: number;
   height: number;
 }
+// keep react types optional-free to avoid editor complaints in constrained TS setups

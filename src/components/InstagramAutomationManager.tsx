@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { InstagramAutomationService, InstagramAutomationConfig, AutomationState } from '../services/instagramAutomationService';
 import { WebViewControl } from '../features/browser-extension/types';
 import { useBrowserExtension } from '../features/browser-extension/hooks/useBrowserExtension';
@@ -16,12 +16,12 @@ import { HealthEnum } from '@/api/models/HealthEnum';
 import { StatusEnum } from '@/api/models/StatusEnum';
 
 interface InstagramAutomationManagerProps {
-  webviewRef: React.RefObject<HTMLWebViewElement>;
+  webviewRef: any;
 }
 
-const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
+const InstagramAutomationManager = ({
   webviewRef
-}) => {
+}: InstagramAutomationManagerProps) => {
   const [automationService, setAutomationService] = useState<InstagramAutomationService | null>(null);
   const [state, setState] = useState<AutomationState>({
     isRunning: false,
@@ -211,7 +211,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
   // Add log
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+    setLogs((prev: string[]) => [...prev, `[${timestamp}] ${message}`]);
   };
 
   // Start workflow
@@ -264,7 +264,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
 
   // Update config
   const updateConfig = (newConfig: Partial<InstagramAutomationConfig>) => {
-    setConfig(prev => ({ ...prev, ...newConfig }));
+    setConfig((prev: InstagramAutomationConfig) => ({ ...prev, ...newConfig }));
   };
 
   // Add my followers to selected benchmark
@@ -320,7 +320,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                 <Input
                   id="username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e: any) => setUsername(e.target.value)}
                   placeholder="Enter username"
                   disabled={state.isRunning}
                 />
@@ -350,9 +350,9 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                 <select
                   className="w-full border rounded px-2 py-2"
                   value={selectedBenchmarkId}
-                  onChange={(e)=> setSelectedBenchmarkId(e.target.value)}
+                  onChange={(e: any)=> setSelectedBenchmarkId(e.target.value)}
                 >
-                  {(benchmarks || []).map(b => (
+                  {(benchmarks || []).map((b: any) => (
                     <option key={b.id} value={b.id}>{b.ig.username}</option>
                   ))}
                 </select>
@@ -391,7 +391,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                     id="maxTargets"
                     type="number"
                     value={config.maxTargets}
-                    onChange={(e) => updateConfig({ maxTargets: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ maxTargets: parseInt(e.target.value) })}
                     min="1"
                     max="1000"
                   />
@@ -402,7 +402,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                     id="maxUnfollows"
                     type="number"
                     value={config.maxUnfollows}
-                    onChange={(e) => updateConfig({ maxUnfollows: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ maxUnfollows: parseInt(e.target.value) })}
                     min="1"
                     max="500"
                   />
@@ -413,7 +413,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                     id="unfollowDelayDays"
                     type="number"
                     value={config.unfollowDelayDays}
-                    onChange={(e) => updateConfig({ unfollowDelayDays: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ unfollowDelayDays: parseInt(e.target.value) })}
                     min="1"
                     max="30"
                   />
@@ -424,7 +424,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                     id="scrollDelay"
                     type="number"
                     value={config.scrollDelay}
-                    onChange={(e) => updateConfig({ scrollDelay: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ scrollDelay: parseInt(e.target.value) })}
                     min="100"
                     max="5000"
                   />
@@ -435,7 +435,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                     id="clickDelay"
                     type="number"
                     value={config.clickDelay}
-                    onChange={(e) => updateConfig({ clickDelay: parseInt(e.target.value) })}
+                    onChange={(e: any) => updateConfig({ clickDelay: parseInt(e.target.value) })}
                     min="100"
                     max="3000"
                   />
@@ -469,7 +469,7 @@ const InstagramAutomationManager: React.FC<InstagramAutomationManagerProps> = ({
                 {logs.length === 0 ? (
                   <p className="text-gray-500">No logs available.</p>
                 ) : (
-                  logs.map((log, index) => (
+                  logs.map((log: string, index: number) => (
                     <div key={index} className="mb-1">
                       {log}
                     </div>

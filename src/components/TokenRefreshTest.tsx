@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { useAuth } from '@/contexts/AuthContext';
 
-export const TokenRefreshTest: React.FC = () => {
+export const TokenRefreshTest = () => {
   const { isRefreshing, handleTokenRefresh } = useTokenRefresh();
   const { token, user } = useAuth();
 

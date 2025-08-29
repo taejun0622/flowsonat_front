@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import {
   StatusEnum 
 } from '@/api';
 
-export const BenchmarkTab: React.FC = () => {
+export const BenchmarkTab = () => {
   const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -286,7 +286,7 @@ export const BenchmarkTab: React.FC = () => {
   };
 
   // Group benchmarks by status
-  const groupedBenchmarks = benchmarks.reduce((groups, benchmark) => {
+  const groupedBenchmarks = benchmarks.reduce((groups: Record<StatusEnum, BenchmarkResponse[]>, benchmark: BenchmarkResponse) => {
     const status = benchmark.status;
     if (!groups[status]) {
       groups[status] = [];
@@ -296,7 +296,7 @@ export const BenchmarkTab: React.FC = () => {
   }, {} as Record<StatusEnum, BenchmarkResponse[]>);
 
   // Group suggestions by status
-  const groupedSuggestions = suggestions.reduce((groups, suggestion) => {
+  const groupedSuggestions = suggestions.reduce((groups: Record<StatusEnum, SuggestionResponse[]>, suggestion: SuggestionResponse) => {
     const status = suggestion.status;
     if (!groups[status]) {
       groups[status] = [];
@@ -358,7 +358,7 @@ export const BenchmarkTab: React.FC = () => {
                     <Input
                       id="ig_username"
                       value={formData.ig_username}
-                      onChange={(e) => setFormData({ ...formData, ig_username: e.target.value })}
+                      onChange={(e: any) => setFormData({ ...formData, ig_username: e.target.value })}
                       placeholder="Enter Instagram username"
                       className="bg-black/20 border-black/30 text-white placeholder:text-gray-400 focus:border-white/30"
                     />
@@ -400,7 +400,8 @@ export const BenchmarkTab: React.FC = () => {
               <p className="text-gray-400 text-sm">Suggestions will appear here when available</p>
             </div>
           ) : (
-            Object.entries(groupedSuggestions).map(([status, statusSuggestions]) => (
+            (Object.entries(groupedSuggestions) as [StatusEnum, SuggestionResponse[]][])
+              .map(([status, statusSuggestions]) => (
               <div key={status} className="space-y-3">
                 <h3 className={`text-lg font-semibold ${getStatusColor(status as StatusEnum)}`}>
                   {status} ({statusSuggestions.length})
@@ -474,7 +475,8 @@ export const BenchmarkTab: React.FC = () => {
               <p className="text-gray-400 text-sm">Create your first benchmark to get started</p>
             </div>
           ) : (
-            Object.entries(groupedBenchmarks).map(([status, statusBenchmarks]) => (
+            (Object.entries(groupedBenchmarks) as [StatusEnum, BenchmarkResponse[]][])
+              .map(([status, statusBenchmarks]) => (
               <div key={status} className="space-y-3">
                 <h3 className={`text-lg font-semibold ${getStatusColor(status as StatusEnum)}`}>
                   {status} ({statusBenchmarks.length})
@@ -558,7 +560,7 @@ export const BenchmarkTab: React.FC = () => {
               <Label htmlFor="status" className="text-white">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value as StatusEnum })}
+                onValueChange={(value: any) => setFormData({ ...formData, status: value as StatusEnum })}
               >
                 <SelectTrigger className="bg-black/20 border-black/30 text-white focus:border-white/30">
                   <SelectValue placeholder="Select status" />

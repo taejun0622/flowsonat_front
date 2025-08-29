@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LogOut, User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { InstagramService } from '@/api/services/InstagramService';
 import { useToast } from '@/hooks/use-toast';
 import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
-export const DashboardPage: React.FC = () => {
+export const DashboardPage = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { isConnected, checkConnection } = useInstagram();

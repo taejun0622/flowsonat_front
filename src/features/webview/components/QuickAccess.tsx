@@ -6,7 +6,7 @@ interface QuickAccessProps {
   onItemSelect: (url: string) => void;
 }
 
-const QuickAccess: React.FC<QuickAccessProps> = ({ items, onItemSelect }) => {
+const QuickAccess = ({ items, onItemSelect }: QuickAccessProps) => {
   return (
     <div style={{ marginBottom: '20px' }}>
       <h3 style={{ marginBottom: '10px', color: '#333' }}>Quick Access</h3>

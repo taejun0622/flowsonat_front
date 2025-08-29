@@ -6,10 +6,10 @@ interface BrowserExtensionControlsProps {
   onToggle: () => void;
 }
 
-const BrowserExtensionControls: React.FC<BrowserExtensionControlsProps> = ({
+const BrowserExtensionControls = ({
   state,
   onToggle
-}) => {
+}: BrowserExtensionControlsProps) => {
   return (
     <div style={{
       position: 'fixed',

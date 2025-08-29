@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import { InstagramService } from '@/api/services/InstagramService';
 import { InstagramConnectResponse } from '@/api';
 import { useAuth } from './AuthContext';
@@ -25,10 +25,10 @@ export const useInstagram = () => {
 };
 
 interface InstagramProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }) => {
+export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   const [instagramAccount, setInstagramAccount] = useState<InstagramConnectResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user, token } = useAuth();

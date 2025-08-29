@@ -1,17 +1,17 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { InstagramAutomation } from '@/features/automation/instagramAutomation';
 
-const InstagramAutomationRunner: React.FC = () => {
+const InstagramAutomationRunner = () => {
   const webviewRef = useRef<HTMLWebViewElement>(null);
   const [open, setOpen] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [username, setUsername] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const append = (line: string) => setLog(prev => [line, ...prev].slice(0, 200));
+  const append = (line: string) => setLog((prev: string[]) => [line, ...prev].slice(0, 200));
 
   const handleStart = async () => {
     if (!webviewRef.current || !username) return;
@@ -44,7 +44,7 @@ const InstagramAutomationRunner: React.FC = () => {
             <Button variant="outline" onClick={()=>{ setLog([]); }} className="border-black/30 text-white">Clear Logs</Button>
           </div>
           <div className="mt-3 h-40 overflow-auto bg-black/5 border border-black/20 rounded p-2 text-xs text-gray-200 space-y-1">
-            {log.map((l,i)=>(<div key={i}>{l}</div>))}
+            {log.map((l: string, i: number)=>(<div key={i}>{l}</div>))}
           </div>
         </CardContent>
       </Card>

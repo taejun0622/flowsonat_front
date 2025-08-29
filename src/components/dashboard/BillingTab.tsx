@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   CreditCard, 
   Calendar, 
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import type { Invoice } from '@/types/subscription';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useBilling } from '@/hooks/useBilling';
@@ -20,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { STRIPE_CONFIG } from '@/constants/subscription';
 
-export const BillingTab: React.FC = () => {
+export const BillingTab = () => {
   const { billingInfo, isLoading, isLoadingSubscription, cancelSubscription, reactivateSubscription, updatePaymentMethod } = useBilling();
   const { user } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -28,7 +29,7 @@ export const BillingTab: React.FC = () => {
 
   const subscription = billingInfo?.subscription;
   const paymentMethod = billingInfo?.payment_method;
-  const invoices = billingInfo?.invoices || [];
+  const invoices: Invoice[] = billingInfo?.invoices || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {

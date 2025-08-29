@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { WebViewManagerProps, QuickAccessItem } from '../types';
 import FullScreenWebView from './FullScreenWebView';
 import QuickAccess from './QuickAccess';
 
-const WebViewManager: React.FC<WebViewManagerProps> = ({
+const WebViewManager = ({
   defaultUrl = 'https://www.instagram.com'
-}) => {
+}: WebViewManagerProps) => {
   const [isWebViewOpen, setIsWebViewOpen] = useState(false);
   const [currentUrl, setCurrentUrl] = useState(defaultUrl);
 
@@ -17,7 +17,7 @@ const WebViewManager: React.FC<WebViewManagerProps> = ({
     setIsWebViewOpen(false);
   };
 
-  const handleUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUrlChange = (event: any) => {
     setCurrentUrl(event.target.value);
   };
 

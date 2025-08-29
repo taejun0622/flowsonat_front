@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,10 +24,10 @@ interface EmailVerificationPageProps {
   redirectTo?: string;
 }
 
-export const EmailVerificationPage: React.FC<EmailVerificationPageProps> = ({
+export const EmailVerificationPage = ({
   verificationType = 'register',
   redirectTo = '/dashboard'
-}) => {
+}: EmailVerificationPageProps) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();

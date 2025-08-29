@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { WebViewProps } from '../types';
 import { useBrowserExtension } from '../../browser-extension/hooks/useBrowserExtension';
 import BrowserExtensionControls from '../../browser-extension/components/BrowserExtensionControls';
 import { cursorAnimations } from '../../browser-extension/utils/cursorStyles';
 
-const FullScreenWebView: React.FC<WebViewProps> = ({
+const FullScreenWebView = ({
   url = 'https://www.instagram.com',
   onClose,
   onLoginSuccess,
   webviewRef: externalWebviewRef,
   partition
-}) => {
+}: WebViewProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const internalWebviewRef = useRef<HTMLWebViewElement>(null);

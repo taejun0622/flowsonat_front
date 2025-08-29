@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,10 @@ interface InstagramLoginOverlayProps {
   onLoginSuccess: (sessionData: any) => void;
 }
 
-export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
+export const InstagramLoginOverlay = ({
   onClose,
   onLoginSuccess
-}) => {
+}: InstagramLoginOverlayProps) => {
   const [showInstructions, setShowInstructions] = useState(true);
   // Use a fresh, ephemeral partition for each login overlay to avoid reusing cookies
   const partition = useMemo(() => `temp-instagram-${Date.now()}`, []);
