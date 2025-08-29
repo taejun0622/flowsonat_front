@@ -6,12 +6,14 @@ interface UseBrowserExtensionProps {
   webviewRef: any;
   onWebViewLoad?: () => void;
   onWebViewError?: (error: string) => void;
+  disableAutoActivation?: boolean;
 }
 
 export const useBrowserExtension = ({ 
   webviewRef, 
   onWebViewLoad, 
-  onWebViewError 
+  onWebViewError,
+  disableAutoActivation = false
 }: UseBrowserExtensionProps) => {
   const [state, setState] = React.useState<BrowserExtensionState>({
     isActive: false,
@@ -72,6 +74,12 @@ export const useBrowserExtension = ({
     isWebViewLoadedRef.current = true;
     onWebViewLoad?.();
     
+    // disableAutoActivation이 true면 자동 활성화하지 않음
+    if (disableAutoActivation) {
+      console.log('Auto-activation disabled');
+      return;
+    }
+    
     // 약간의 지연 후 extension 활성화 (webview가 완전히 준비될 때까지)
     setTimeout(() => {
       setState((prev: BrowserExtensionState) => ({ ...prev, isActive: true }));
@@ -80,7 +88,7 @@ export const useBrowserExtension = ({
       // 커서를 다시 생성하고 표시
       createCursor();
     }, 500);
-  }, [onWebViewLoad, createCursor]);
+  }, [onWebViewLoad, createCursor, disableAutoActivation]);
 
   // webview 에러 처리
   const handleWebViewError = React.useCallback((event: any) => {

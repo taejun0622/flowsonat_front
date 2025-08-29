@@ -16,6 +16,9 @@ const FullScreenWebView = ({
   const internalWebviewRef = React.useRef<HTMLWebViewElement>(null);
   const webviewRef = externalWebviewRef || internalWebviewRef;
 
+  // Instagram 로그인 페이지에서는 extension 비활성화
+  const isInstagramLogin = url.includes('instagram.com');
+
   // 브라우저 익스텐션 훅 사용 (Instagram 로그인에서는 비활성화)
   const { state: extensionState, toggleExtension, isWebViewLoaded } = useBrowserExtension({
     webviewRef: webviewRef,
@@ -27,24 +30,26 @@ const FullScreenWebView = ({
       setError(errorMessage);
       setIsLoading(false);
       console.error('WebView error:', errorMessage);
-    }
+    },
+    disableAutoActivation: isInstagramLogin // Instagram 로그인에서는 자동 활성화 비활성화
   });
 
-  // Instagram 로그인 페이지에서는 extension 비활성화
-  const isInstagramLogin = url.includes('instagram.com');
-
-
-
-  // 커서 애니메이션 스타일 추가
+  // 커서 애니메이션 스타일 추가 (Instagram 로그인에서는 제외)
   React.useEffect(() => {
+    if (isInstagramLogin) return; // 로그인 페이지에서는 커서 애니메이션 적용하지 않음
+    
     const style = document.createElement('style');
     style.textContent = cursorAnimations;
     document.head.appendChild(style);
 
     return () => {
-      document.head.removeChild(style);
+      try {
+        document.head.removeChild(style);
+      } catch (error) {
+        // Style element already removed or not found
+      }
     };
-  }, []);
+  }, [isInstagramLogin]);
 
   // webview 로딩 상태 직접 감지
   React.useEffect(() => {
@@ -266,7 +271,7 @@ const FullScreenWebView = ({
           height: '100%'
         }}
         webpreferences="nodeIntegration=no, contextIsolation=yes"
-        allowpopups="true"
+        allowpopups={true}
         useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Accept-Language: en-US,en;q=0.9"
         {...(partition ? { partition } : {})}
       />
