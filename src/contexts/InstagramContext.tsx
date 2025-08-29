@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import React from 'react';
 import { InstagramService } from '@/api/services/InstagramService';
 import { InstagramConnectResponse } from '@/api';
 import { useAuth } from './AuthContext';
@@ -14,10 +14,10 @@ interface InstagramContextType {
   refreshConnection: () => Promise<void>;
 }
 
-const InstagramContext = createContext<InstagramContextType | undefined>(undefined);
+const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
 
 export const useInstagram = () => {
-  const context = useContext(InstagramContext);
+  const context = React.useContext(InstagramContext);
   if (context === undefined) {
     throw new Error('useInstagram must be used within an InstagramProvider');
   }
@@ -25,16 +25,16 @@ export const useInstagram = () => {
 };
 
 interface InstagramProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export const InstagramProvider = ({ children }: InstagramProviderProps) => {
-  const [instagramAccount, setInstagramAccount] = useState<InstagramConnectResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [instagramAccount, setInstagramAccount] = React.useState<InstagramConnectResponse | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
   const { user, token } = useAuth();
   const { toast } = useToast();
 
-  const checkConnection = useCallback(async () => {
+  const checkConnection = React.useCallback(async () => {
     if (!token || !user) {
       setInstagramAccount(null);
       return;
@@ -126,12 +126,12 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     }
   };
 
-  const refreshConnection = useCallback(async () => {
+  const refreshConnection = React.useCallback(async () => {
     await checkConnection();
   }, [checkConnection]);
 
   // 사용자가 로그인하면 Instagram 연결 상태를 확인
-  useEffect(() => {
+  React.useEffect(() => {
     if (user && token) {
       // 자동으로 연결 상태 확인하지 않음 - Dashboard에서 필요할 때만 확인
       console.log('User logged in, Instagram connection check ready');

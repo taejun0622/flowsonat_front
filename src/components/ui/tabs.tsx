@@ -1,10 +1,10 @@
-import { forwardRef } from "react"
+import React from 'react'
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 import { cn } from "@/lib/utils"
 
 const Tabs = TabsPrimitive.Root
 
-const TabsList = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const TabsList = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <TabsPrimitive.List
     ref={ref}
     className={cn(
@@ -16,7 +16,7 @@ const TabsList = forwardRef<any, any>(({ className, ...props }: any, ref: any) =
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
 
-const TabsTrigger = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const TabsTrigger = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -28,7 +28,7 @@ const TabsTrigger = forwardRef<any, any>(({ className, ...props }: any, ref: any
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
-const TabsContent = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const TabsContent = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <TabsPrimitive.Content
     ref={ref}
     className={cn(

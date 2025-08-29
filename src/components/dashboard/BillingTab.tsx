@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react';
 import { 
   CreditCard, 
   Calendar, 
@@ -24,8 +24,8 @@ import { STRIPE_CONFIG } from '@/constants/subscription';
 export const BillingTab = () => {
   const { billingInfo, isLoading, isLoadingSubscription, cancelSubscription, reactivateSubscription, updatePaymentMethod } = useBilling();
   const { user } = useAuth();
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = React.useState(false);
+  const [showReactivateDialog, setShowReactivateDialog] = React.useState(false);
 
   const subscription = billingInfo?.subscription;
   const paymentMethod = billingInfo?.payment_method;

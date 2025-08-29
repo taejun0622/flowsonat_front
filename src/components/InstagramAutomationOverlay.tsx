@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { X, Play, Square, Settings, BarChart3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -22,30 +22,30 @@ interface InstagramAutomationOverlayProps {
 export const InstagramAutomationOverlay = ({
   onClose
 }: InstagramAutomationOverlayProps) => {
-  const [username, setUsername] = useState('');
-  const [automationService, setAutomationService] = useState<InstagramAutomationService | null>(null);
-  const [domHelper, setDomHelper] = useState<InstagramDOMHelper | null>(null);
-  const [state, setState] = useState<AutomationState>({
+  const [username, setUsername] = React.useState('');
+  const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
+  const [domHelper, setDomHelper] = React.useState<InstagramDOMHelper | null>(null);
+  const [state, setState] = React.useState<AutomationState>({
     isRunning: false,
     currentStep: '',
     progress: 0,
     totalSteps: 0,
     currentStepIndex: 0
   });
-  const [config, setConfig] = useState<InstagramAutomationConfig>({
+  const [config, setConfig] = React.useState<InstagramAutomationConfig>({
     maxTargets: 500,
     maxUnfollows: 250,
     unfollowDelayDays: 4,
     scrollDelay: 1000,
     clickDelay: 500
   });
-  const [logs, setLogs] = useState<string[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [currentUrl, setCurrentUrl] = useState('https://www.instagram.com');
-  const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
-  const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('');
+  const [logs, setLogs] = React.useState<string[]>([]);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [currentUrl, setCurrentUrl] = React.useState('https://www.instagram.com');
+  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
+  const [selectedBenchmarkId, setSelectedBenchmarkId] = React.useState<string>('');
   
-  const webviewRef = useRef<HTMLWebViewElement>(null);
+  const webviewRef = React.useRef<HTMLWebViewElement>(null);
   const { toast } = useToast();
 
   // Browser extension hook
@@ -187,7 +187,7 @@ export const InstagramAutomationOverlay = ({
   };
 
   // Service initialization
-  useEffect(() => {
+  React.useEffect(() => {
     const domHelperInstance = new InstagramDOMHelper(webViewControl);
     const automationServiceInstance = new InstagramAutomationService(webViewControl, config, domHelperInstance);
     
@@ -198,7 +198,7 @@ export const InstagramAutomationOverlay = ({
   }, [config]);
 
   // Load benchmarks
-  useEffect(() => {
+  React.useEffect(() => {
     const loadBenchmarks = async () => {
       try {
         const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
@@ -214,7 +214,7 @@ export const InstagramAutomationOverlay = ({
   }, []);
 
   // State monitoring
-  useEffect(() => {
+  React.useEffect(() => {
     if (!automationService) return;
 
     const interval = setInterval(() => {

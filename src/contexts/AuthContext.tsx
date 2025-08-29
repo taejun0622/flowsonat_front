@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import React from 'react';
 import { AuthService } from '@/api/services/AuthService';
 import { User, Token, UserLogin, UserCreate } from '@/api';
 import { useToast } from '@/hooks/use-toast';
@@ -14,10 +14,10 @@ interface AuthContextType {
   setTokens: (accessToken: string, refreshToken: string) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
+  const context = React.useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
@@ -25,16 +25,16 @@ export const useAuth = () => {
 };
 
 interface AuthProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [token, setToken] = React.useState<string | null>(localStorage.getItem('access_token'));
+  const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
+  React.useEffect(() => {
     const initializeAuth = async () => {
       if (token) {
         try {

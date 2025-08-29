@@ -1,13 +1,13 @@
-import { useState, useCallback } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export const useTokenRefresh = () => {
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const { refreshToken } = useAuth();
   const { toast } = useToast();
 
-  const handleTokenRefresh = useCallback(async () => {
+  const handleTokenRefresh = React.useCallback(async () => {
     if (isRefreshing) {
       return; // 이미 갱신 중이면 중복 실행 방지
     }

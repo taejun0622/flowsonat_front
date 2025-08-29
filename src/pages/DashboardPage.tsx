@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import { LogOut, User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,13 @@ export const DashboardPage = () => {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { isConnected, checkConnection } = useInstagram();
-  const [showLoginOverlay, setShowLoginOverlay] = useState(false);
-  const [showAutomationOverlay, setShowAutomationOverlay] = useState(false);
-  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
-  const [hasCheckedConnection, setHasCheckedConnection] = useState(false);
+  const [showLoginOverlay, setShowLoginOverlay] = React.useState(false);
+  const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
+  const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
 
   // Check Instagram connection status when entering dashboard (run only once)
-  useEffect(() => {
+  React.useEffect(() => {
     const checkInstagramConnection = async () => {
       if (!user || hasCheckedConnection || isCheckingConnection) return;
       
@@ -44,7 +44,7 @@ export const DashboardPage = () => {
   }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
 
   // Automatically show login overlay when Instagram is not connected
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
       console.log('Instagram not connected, showing login overlay');
       setShowLoginOverlay(true);

@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent } from 'react';
+import React from 'react';
 import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -36,22 +36,22 @@ import {
 } from '@/api';
 
 export const BenchmarkTab = () => {
-  const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
-  const [suggestions, setSuggestions] = useState<SuggestionResponse[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedBenchmark, setSelectedBenchmark] = useState<BenchmarkResponse | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [formData, setFormData] = useState({
+  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
+  const [suggestions, setSuggestions] = React.useState<SuggestionResponse[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [selectedBenchmark, setSelectedBenchmark] = React.useState<BenchmarkResponse | null>(null);
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [formData, setFormData] = React.useState({
     ig_username: '',
     status: '' as StatusEnum | ''
   });
   const { toast } = useToast();
 
   // Load data on component mount
-  useEffect(() => {
+  React.useEffect(() => {
     loadBenchmarks();
     loadSuggestions();
   }, []);

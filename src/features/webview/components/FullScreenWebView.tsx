@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { WebViewProps } from '../types';
 import { useBrowserExtension } from '../../browser-extension/hooks/useBrowserExtension';
 import BrowserExtensionControls from '../../browser-extension/components/BrowserExtensionControls';
@@ -11,9 +11,9 @@ const FullScreenWebView = ({
   webviewRef: externalWebviewRef,
   partition
 }: WebViewProps) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const internalWebviewRef = useRef<HTMLWebViewElement>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const internalWebviewRef = React.useRef<HTMLWebViewElement>(null);
   const webviewRef = externalWebviewRef || internalWebviewRef;
 
   // 브라우저 익스텐션 훅 사용 (Instagram 로그인에서는 비활성화)
@@ -36,7 +36,7 @@ const FullScreenWebView = ({
 
 
   // 커서 애니메이션 스타일 추가
-  useEffect(() => {
+  React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = cursorAnimations;
     document.head.appendChild(style);
@@ -47,7 +47,7 @@ const FullScreenWebView = ({
   }, []);
 
   // webview 로딩 상태 직접 감지
-  useEffect(() => {
+  React.useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
 

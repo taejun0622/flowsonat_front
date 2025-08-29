@@ -1,33 +1,33 @@
-import { contextBridge, ipcRenderer } from "electron";
-contextBridge.exposeInMainWorld("ipcRenderer", {
-  on(...args) {
-    const [channel, listener] = args;
-    return ipcRenderer.on(channel, (event, ...args2) => listener(event, ...args2));
+import { contextBridge as s, ipcRenderer as o } from "electron";
+s.exposeInMainWorld("ipcRenderer", {
+  on(...n) {
+    const [r, e] = n;
+    return o.on(r, (i, ...a) => e(i, ...a));
   },
-  off(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.off(channel, ...omit);
+  off(...n) {
+    const [r, ...e] = n;
+    return o.off(r, ...e);
   },
-  send(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.send(channel, ...omit);
+  send(...n) {
+    const [r, ...e] = n;
+    return o.send(r, ...e);
   },
-  invoke(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.invoke(channel, ...omit);
+  invoke(...n) {
+    const [r, ...e] = n;
+    return o.invoke(r, ...e);
   }
   // You can expose other APTs you need here.
   // ...
 });
-contextBridge.exposeInMainWorld("electronAPI", {
-  openInstagramLogin: (url) => ipcRenderer.invoke("open-instagram-login", url),
-  closeInstagramLogin: () => ipcRenderer.invoke("close-instagram-login"),
-  onInstagramLoginSuccess: (callback) => {
-    ipcRenderer.on("instagram-login-success", (event, data) => callback(data));
+s.exposeInMainWorld("electronAPI", {
+  openInstagramLogin: (n) => o.invoke("open-instagram-login", n),
+  closeInstagramLogin: () => o.invoke("close-instagram-login"),
+  onInstagramLoginSuccess: (n) => {
+    o.on("instagram-login-success", (r, e) => n(e));
   },
-  onInstagramLoginError: (callback) => {
-    ipcRenderer.on("instagram-login-error", (event, error) => callback(error));
+  onInstagramLoginError: (n) => {
+    o.on("instagram-login-error", (r, e) => n(e));
   },
-  getInstagramCookies: () => ipcRenderer.invoke("get-instagram-cookies"),
-  clearInstagramSession: () => ipcRenderer.invoke("clear-instagram-session")
+  getInstagramCookies: () => o.invoke("get-instagram-cookies"),
+  clearInstagramSession: () => o.invoke("clear-instagram-session")
 });

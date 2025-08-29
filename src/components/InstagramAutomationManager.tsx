@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { InstagramAutomationService, InstagramAutomationConfig, AutomationState } from '../services/instagramAutomationService';
 import { WebViewControl } from '../features/browser-extension/types';
 import { useBrowserExtension } from '../features/browser-extension/hooks/useBrowserExtension';
@@ -15,36 +15,34 @@ import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
 import { HealthEnum } from '@/api/models/HealthEnum';
 import { StatusEnum } from '@/api/models/StatusEnum';
 
-interface InstagramAutomationManagerProps {
-  webviewRef: any;
-}
+interface InstagramAutomationManagerProps { webviewRef: any }
 
 const InstagramAutomationManager = ({
   webviewRef
 }: InstagramAutomationManagerProps) => {
-  const [automationService, setAutomationService] = useState<InstagramAutomationService | null>(null);
-  const [state, setState] = useState<AutomationState>({
+  const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
+  const [state, setState] = React.useState<AutomationState>({
     isRunning: false,
     currentStep: '',
     progress: 0,
     totalSteps: 0,
     currentStepIndex: 0
   });
-  const [username, setUsername] = useState('');
-  const [config, setConfig] = useState<InstagramAutomationConfig>({
+  const [username, setUsername] = React.useState('');
+  const [config, setConfig] = React.useState<InstagramAutomationConfig>({
     maxTargets: 500,
     maxUnfollows: 250,
     unfollowDelayDays: 4,
     scrollDelay: 1000,
     clickDelay: 500
   });
-  const [logs, setLogs] = useState<string[]>([]);
-  const [isWebViewReady, setIsWebViewReady] = useState(false);
-  const [benchmarks, setBenchmarks] = useState<BenchmarkResponse[]>([]);
-  const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>('');
+  const [logs, setLogs] = React.useState<string[]>([]);
+  const [isWebViewReady, setIsWebViewReady] = React.useState(false);
+  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
+  const [selectedBenchmarkId, setSelectedBenchmarkId] = React.useState<string>('');
   
   const { toast } = useToast();
-  const logRef = useRef<HTMLDivElement>(null);
+  const logRef = React.useRef<HTMLDivElement>(null);
 
   // Browser extension hook usage
   const { state: extensionState } = useBrowserExtension({
@@ -166,7 +164,7 @@ const InstagramAutomationManager = ({
   };
 
   // Service initialization
-  useEffect(() => {
+  React.useEffect(() => {
     if (isWebViewReady && !automationService) {
       const domHelper = new InstagramDOMHelper(webViewControl);
       const automationServiceInstance = new InstagramAutomationService(webViewControl, config, domHelper);
@@ -176,7 +174,7 @@ const InstagramAutomationManager = ({
   }, [isWebViewReady, automationService, config, webViewControl]);
 
   // Load benchmarks
-  useEffect(() => {
+  React.useEffect(() => {
     const load = async () => {
       try {
         const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
@@ -190,7 +188,7 @@ const InstagramAutomationManager = ({
   }, []);
 
   // State monitoring
-  useEffect(() => {
+  React.useEffect(() => {
     if (!automationService) return;
 
     const interval = setInterval(() => {
@@ -202,7 +200,7 @@ const InstagramAutomationManager = ({
   }, [automationService]);
 
   // Log scroll
-  useEffect(() => {
+  React.useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }

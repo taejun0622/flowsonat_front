@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React from 'react';
 
 interface UseInstagramLoginDetectorProps {
   onLoginSuccess: (sessionData: any) => void;
@@ -9,9 +9,9 @@ export const useInstagramLoginDetector = ({
   onLoginSuccess,
   onLoginError
 }: UseInstagramLoginDetectorProps) => {
-  const webviewRef = useRef<HTMLWebViewElement>(null);
+  const webviewRef = React.useRef<HTMLWebViewElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
 

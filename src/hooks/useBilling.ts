@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { BillingInfo } from '@/types/subscription';
 import { BillingService } from '@/services/billingService';
 
 export const useBilling = () => {
-  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
+  const [billingInfo, setBillingInfo] = React.useState<BillingInfo | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoadingSubscription, setIsLoadingSubscription] = React.useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -123,7 +123,7 @@ export const useBilling = () => {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchSubscription();
   }, [user]);
 

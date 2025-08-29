@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import React from 'react';
 
 // Type definitions for color4bg.js
 interface Color4BgOptions {
@@ -29,7 +29,7 @@ interface DynamicBackgroundProps {
   seed?: number;
   loop?: boolean;
   className?: string;
-  children?: ReactNode;
+  children?: React.ReactNode;
 }
 
 export const DynamicBackground = ({
@@ -40,19 +40,19 @@ export const DynamicBackground = ({
   className = '',
   children
 }: DynamicBackgroundProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const backgroundInstanceRef = useRef<Color4BgInstance | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-  const [containerId] = useState(`color4bg-${Math.random().toString(36).substr(2, 9)}`);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const backgroundInstanceRef = React.useRef<Color4BgInstance | null>(null);
+  const [isMounted, setIsMounted] = React.useState(false);
+  const [containerId] = React.useState(`color4bg-${Math.random().toString(36).substr(2, 9)}`);
 
   // Check if DOM element is mounted
-  useEffect(() => {
+  React.useEffect(() => {
     if (containerRef.current) {
       setIsMounted(true);
     }
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMounted || !containerRef.current) return;
 
     const loadBackground = async () => {
@@ -165,7 +165,7 @@ export const BackgroundPresets = {
 export const AIBackground = ({ 
   children, 
   className 
-}: { children?: ReactNode; className?: string }) => (
+}: { children?: React.ReactNode; className?: string }) => (
   <DynamicBackground
     type={BackgroundPresets.ai.type}
     colors={BackgroundPresets.ai.colors}
@@ -178,7 +178,7 @@ export const AIBackground = ({
 export const ModernBackground = ({ 
   children, 
   className 
-}: { children?: ReactNode; className?: string }) => (
+}: { children?: React.ReactNode; className?: string }) => (
   <DynamicBackground
     type={BackgroundPresets.modern.type}
     colors={BackgroundPresets.modern.colors}

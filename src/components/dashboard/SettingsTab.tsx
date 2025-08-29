@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import React from 'react';
 import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -34,27 +34,27 @@ export const SettingsTab = ({
   const { toast } = useToast();
 
   // Dialog states
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
-  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = React.useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = React.useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = React.useState(false);
 
   // Form states
-  const [passwordForm, setPasswordForm] = useState<PasswordChangeForm>({
+  const [passwordForm, setPasswordForm] = React.useState<PasswordChangeForm>({
     newPassword: '',
     confirmPassword: ''
   });
-  const [profileForm, setProfileForm] = useState<ProfileForm>({
+  const [profileForm, setProfileForm] = React.useState<ProfileForm>({
     email: user?.email || ''
   });
 
   // UI states
-  const [showPasswords, setShowPasswords] = useState({
+  const [showPasswords, setShowPasswords] = React.useState({
     new: false,
     confirm: false
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handlePasswordChange = async (e: FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {

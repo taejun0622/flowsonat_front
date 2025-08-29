@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,11 +32,11 @@ export const EmailVerificationPage = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { setTokens } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [resendErrorMessage, setResendErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isResending, setIsResending] = React.useState(false);
+  const [countdown, setCountdown] = React.useState(0);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [resendErrorMessage, setResendErrorMessage] = React.useState<string | null>(null);
   
   const email = searchParams.get('email') || '';
   const type = searchParams.get('type') || verificationType;
@@ -51,7 +51,7 @@ export const EmailVerificationPage = ({
   });
 
   // 카운트다운 타이머
-  useEffect(() => {
+  React.useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
@@ -59,7 +59,7 @@ export const EmailVerificationPage = ({
   }, [countdown]);
 
   // 페이지 로드 시 카운트다운 시작
-  useEffect(() => {
+  React.useEffect(() => {
     setCountdown(60);
   }, []);
 

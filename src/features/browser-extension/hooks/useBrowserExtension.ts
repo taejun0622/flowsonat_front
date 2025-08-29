@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 import { BrowserExtensionState, MousePosition, CursorStyle, BrowserAction } from '../types';
 import { getCursorStyle } from '../utils/cursorStyles';
 
 interface UseBrowserExtensionProps {
-  webviewRef: React.RefObject<HTMLWebViewElement>;
+  webviewRef: any;
   onWebViewLoad?: () => void;
   onWebViewError?: (error: string) => void;
 }
@@ -13,7 +13,7 @@ export const useBrowserExtension = ({
   onWebViewLoad, 
   onWebViewError 
 }: UseBrowserExtensionProps) => {
-  const [state, setState] = useState<BrowserExtensionState>({
+  const [state, setState] = React.useState<BrowserExtensionState>({
     isActive: false,
     cursorStyle: { type: 'default' },
     mousePosition: { x: 0, y: 0 },
@@ -21,13 +21,13 @@ export const useBrowserExtension = ({
     selectedElement: null
   });
 
-  const cursorRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingRef = useRef(false);
-  const dragStartRef = useRef<MousePosition>({ x: 0, y: 0 });
-  const isWebViewLoadedRef = useRef(false);
+  const cursorRef = React.useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = React.useRef(false);
+  const dragStartRef = React.useRef<MousePosition>({ x: 0, y: 0 });
+  const isWebViewLoadedRef = React.useRef(false);
 
   // 커서 요소 생성 및 초기화
-  const createCursor = useCallback(() => {
+  const createCursor = React.useCallback(() => {
     // 기존 커서가 있다면 제거
     const existingCursor = document.getElementById('modern-cursor');
     if (existingCursor) {
@@ -52,7 +52,7 @@ export const useBrowserExtension = ({
   }, []);
 
   // 커서 요소 생성
-  useEffect(() => {
+  React.useEffect(() => {
     createCursor();
 
     return () => {
@@ -67,7 +67,7 @@ export const useBrowserExtension = ({
   }, [createCursor]);
 
   // webview 로드 완료 시 자동으로 extension 활성화
-  const handleWebViewLoaded = useCallback(() => {
+  const handleWebViewLoaded = React.useCallback(() => {
     console.log('WebView loaded, auto-activating extension...');
     isWebViewLoadedRef.current = true;
     onWebViewLoad?.();
@@ -83,14 +83,14 @@ export const useBrowserExtension = ({
   }, [onWebViewLoad, createCursor]);
 
   // webview 에러 처리
-  const handleWebViewError = useCallback((event: any) => {
+  const handleWebViewError = React.useCallback((event: any) => {
     const errorMessage = 'Failed to load page';
     console.error('WebView error:', errorMessage);
     onWebViewError?.(errorMessage);
   }, [onWebViewError]);
 
   // webview 로드 이벤트 리스너 등록
-  useEffect(() => {
+  React.useEffect(() => {
     const webview = webviewRef.current;
     if (webview) {
       webview.addEventListener('did-finish-load', handleWebViewLoaded);
@@ -104,7 +104,7 @@ export const useBrowserExtension = ({
   }, [webviewRef, handleWebViewLoaded, handleWebViewError]);
 
   // 마우스 이벤트 핸들러
-  const handleMouseMove = useCallback((event: MouseEvent) => {
+  const handleMouseMove = React.useCallback((event: MouseEvent) => {
     if (!state.isActive || !cursorRef.current) return;
 
     const { clientX, clientY } = event;
@@ -139,7 +139,7 @@ export const useBrowserExtension = ({
     }
   }, [state.isActive, state.cursorStyle.type, webviewRef]);
 
-  const handleMouseDown = useCallback((event: MouseEvent) => {
+  const handleMouseDown = React.useCallback((event: MouseEvent) => {
     if (!state.isActive) return;
 
     const { clientX, clientY, button } = event;
@@ -166,7 +166,7 @@ export const useBrowserExtension = ({
     }
   }, [state.isActive, webviewRef]);
 
-  const handleMouseUp = useCallback((event: MouseEvent) => {
+  const handleMouseUp = React.useCallback((event: MouseEvent) => {
     if (!state.isActive) return;
 
     isDraggingRef.current = false;
@@ -190,7 +190,7 @@ export const useBrowserExtension = ({
     }
   }, [state.isActive, webviewRef]);
 
-  const handleWheel = useCallback((event: WheelEvent) => {
+  const handleWheel = React.useCallback((event: WheelEvent) => {
     if (!state.isActive) return;
 
     const webview = webviewRef.current;
@@ -212,7 +212,7 @@ export const useBrowserExtension = ({
   }, [state.isActive, webviewRef]);
 
   // 브라우저 액션 실행
-  const executeBrowserAction = useCallback((action: BrowserAction) => {
+  const executeBrowserAction = React.useCallback((action: BrowserAction) => {
     const webview = webviewRef.current;
     if (!webview) return;
 
@@ -280,12 +280,12 @@ export const useBrowserExtension = ({
   }, [webviewRef]);
 
   // 익스텐션 활성화/비활성화
-  const toggleExtension = useCallback(() => {
+  const toggleExtension = React.useCallback(() => {
     setState((prev: BrowserExtensionState) => ({ ...prev, isActive: !prev.isActive }));
   }, []);
 
   // 이벤트 리스너 등록/해제
-  useEffect(() => {
+  React.useEffect(() => {
     if (state.isActive) {
       console.log('Activating extension, setting up event listeners...');
       

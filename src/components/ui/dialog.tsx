@@ -1,4 +1,4 @@
-import { forwardRef } from "react"
+import React from 'react'
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
@@ -12,7 +12,7 @@ const DialogPortal = DialogPrimitive.Portal
 
 const DialogClose = DialogPrimitive.Close
 
-const DialogOverlay = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const DialogOverlay = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
@@ -24,7 +24,7 @@ const DialogOverlay = forwardRef<any, any>(({ className, ...props }: any, ref: a
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = forwardRef<any, any>(({ className, children, ...props }: any, ref: any) => (
+const DialogContent = React.forwardRef<any, any>(({ className, children, ...props }: any, ref: any) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -73,7 +73,7 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
-const DialogTitle = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const DialogTitle = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
@@ -85,7 +85,7 @@ const DialogTitle = forwardRef<any, any>(({ className, ...props }: any, ref: any
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
-const DialogDescription = forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
+const DialogDescription = React.forwardRef<any, any>(({ className, ...props }: any, ref: any) => (
   <DialogPrimitive.Description
     ref={ref}
     className={cn("text-sm text-muted-foreground", className)}

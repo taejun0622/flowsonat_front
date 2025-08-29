@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React from 'react';
 import { WebViewManagerProps, QuickAccessItem } from '../types';
 import FullScreenWebView from './FullScreenWebView';
 import QuickAccess from './QuickAccess';
@@ -6,8 +6,8 @@ import QuickAccess from './QuickAccess';
 const WebViewManager = ({
   defaultUrl = 'https://www.instagram.com'
 }: WebViewManagerProps) => {
-  const [isWebViewOpen, setIsWebViewOpen] = useState(false);
-  const [currentUrl, setCurrentUrl] = useState(defaultUrl);
+  const [isWebViewOpen, setIsWebViewOpen] = React.useState(false);
+  const [currentUrl, setCurrentUrl] = React.useState(defaultUrl);
 
   const handleOpenWebView = () => {
     setIsWebViewOpen(true);

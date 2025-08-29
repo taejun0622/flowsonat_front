@@ -1,15 +1,15 @@
-import { useRef, useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { InstagramAutomation } from '@/features/automation/instagramAutomation';
 
 const InstagramAutomationRunner = () => {
-  const webviewRef = useRef<HTMLWebViewElement>(null);
-  const [open, setOpen] = useState(false);
-  const [log, setLog] = useState<string[]>([]);
-  const [username, setUsername] = useState('');
-  const [busy, setBusy] = useState(false);
+  const webviewRef = React.useRef<HTMLWebViewElement>(null);
+  const [open, setOpen] = React.useState(false);
+  const [log, setLog] = React.useState<string[]>([]);
+  const [username, setUsername] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
 
   const append = (line: string) => setLog((prev: string[]) => [line, ...prev].slice(0, 200));
 
