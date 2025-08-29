@@ -141,7 +141,7 @@ export class InstagramDOMHelper {
 
         // 숫자만 추출 (예: 1,234 → 1234)
         const extractNumber = (t: string) => {
-          const m = t.replace(/[,\.]/g, '').match(/\d+/);
+          const m = t.replace(/[,.]/g, '').match(/\d+/);
           return m ? m[0] : null;
         };
         const followers = extractNumber(followersText);

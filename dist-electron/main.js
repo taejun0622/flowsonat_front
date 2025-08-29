@@ -1,94 +1,124 @@
-import { app as c, BrowserWindow as m, ipcMain as l, session as p } from "electron";
-import { createRequire as h } from "node:module";
-import { fileURLToPath as f } from "node:url";
-import t from "node:path";
-h(import.meta.url);
-const w = t.dirname(f(import.meta.url));
-process.env.APP_ROOT = t.join(w, "..");
-const d = process.env.VITE_DEV_SERVER_URL, _ = t.join(process.env.APP_ROOT, "dist-electron"), g = t.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = d ? t.join(process.env.APP_ROOT, "public") : g;
-let s, e;
-function u() {
-  s = new m({
-    icon: t.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+import { app, BrowserWindow, ipcMain, session } from "electron";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.APP_ROOT = path.join(__dirname, "..");
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+let win;
+let instagramAuthWindow;
+function createWindow() {
+  win = new BrowserWindow({
+    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: t.join(w, "preload.mjs"),
-      webviewTag: !0,
+      preload: path.join(__dirname, "preload.mjs"),
+      webviewTag: true,
       // Enable webview tag
-      nodeIntegration: !1,
-      contextIsolation: !0,
-      webSecurity: !0,
-      allowRunningInsecureContent: !1
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
-  }), s.webContents.on("did-finish-load", () => {
-    s?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), d ? s.loadURL(d) : s.loadFile(t.join(g, "index.html"));
+  });
+  win.webContents.on("did-finish-load", () => {
+    win?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  });
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
 }
-c.on("window-all-closed", () => {
-  process.platform !== "darwin" && (c.quit(), s = null);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
+  }
 });
-c.on("activate", () => {
-  m.getAllWindows().length === 0 && u();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
-l.handle("open-instagram-login", async (o, a) => {
-  if (e) {
-    e.focus();
+ipcMain.handle("open-instagram-login", async (event, url) => {
+  if (instagramAuthWindow) {
+    instagramAuthWindow.focus();
     return;
   }
-  e = new m({
+  instagramAuthWindow = new BrowserWindow({
     width: 600,
     height: 700,
     webPreferences: {
-      nodeIntegration: !1,
-      contextIsolation: !0,
-      webSecurity: !0,
-      allowRunningInsecureContent: !1
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     },
-    parent: s,
-    modal: !0,
-    show: !1
-  }), e.once("ready-to-show", () => {
-    e?.show();
-  }), e.on("closed", () => {
-    e = null;
-  }), e.webContents.on("did-navigate", (i, r) => {
-    r.includes("instagram.com") && !r.includes("login") && (s?.webContents.send("instagram-login-success", {
-      url: r,
-      cookies: e?.webContents.session.cookies.get({})
-    }), e?.close());
-  }), await e.loadURL(a);
+    parent: win,
+    modal: true,
+    show: false
+  });
+  instagramAuthWindow.once("ready-to-show", () => {
+    instagramAuthWindow?.show();
+  });
+  instagramAuthWindow.on("closed", () => {
+    instagramAuthWindow = null;
+  });
+  instagramAuthWindow.webContents.on("did-navigate", (event2, navigationUrl) => {
+    if (navigationUrl.includes("instagram.com") && !navigationUrl.includes("login")) {
+      win?.webContents.send("instagram-login-success", {
+        url: navigationUrl,
+        cookies: instagramAuthWindow?.webContents.session.cookies.get({})
+      });
+      instagramAuthWindow?.close();
+    }
+  });
+  await instagramAuthWindow.loadURL(url);
 });
-l.handle("close-instagram-login", () => {
-  e && (e.close(), e = null);
-});
-l.handle("get-instagram-cookies", async () => {
-  if (!e)
-    throw new Error("Instagram window not found");
-  try {
-    const o = await e.webContents.session.cookies.get({
-      domain: ".instagram.com"
-    }), a = {};
-    return o.forEach((i) => {
-      a[i.name] = i.value;
-    }), a;
-  } catch (o) {
-    throw console.error("Error getting Instagram cookies:", o), o;
+ipcMain.handle("close-instagram-login", () => {
+  if (instagramAuthWindow) {
+    instagramAuthWindow.close();
+    instagramAuthWindow = null;
   }
 });
-l.handle("clear-instagram-session", async () => {
+ipcMain.handle("get-instagram-cookies", async () => {
+  if (!instagramAuthWindow) {
+    throw new Error("Instagram window not found");
+  }
   try {
-    const o = p.defaultSession, i = (await o.cookies.get({})).filter((n) => n.domain.includes("instagram.com"));
+    const cookies = await instagramAuthWindow.webContents.session.cookies.get({
+      domain: ".instagram.com"
+    });
+    const cookieObject = {};
+    cookies.forEach((cookie) => {
+      cookieObject[cookie.name] = cookie.value;
+    });
+    return cookieObject;
+  } catch (error) {
+    console.error("Error getting Instagram cookies:", error);
+    throw error;
+  }
+});
+ipcMain.handle("clear-instagram-session", async () => {
+  try {
+    const defaultSession = session.defaultSession;
+    const cookies = await defaultSession.cookies.get({});
+    const targets = cookies.filter((c) => c.domain.includes("instagram.com"));
     await Promise.all(
-      i.map(
-        (n) => o.cookies.remove(
-          `${n.secure ? "https" : "http"}://${n.domain.startsWith(".") ? n.domain.substring(1) : n.domain}${n.path}`,
-          n.name
+      targets.map(
+        (c) => defaultSession.cookies.remove(
+          `${c.secure ? "https" : "http"}://${c.domain.startsWith(".") ? c.domain.substring(1) : c.domain}${c.path}`,
+          c.name
         )
       )
     );
-    const r = async (n) => {
-      await o.clearStorageData({
-        origin: n,
+    const clearForOrigins = async (origin) => {
+      await defaultSession.clearStorageData({
+        origin,
         storages: [
           "cookies",
           "localstorage",
@@ -102,17 +132,19 @@ l.handle("clear-instagram-session", async () => {
         ]
       });
     };
-    return await Promise.all([
-      r("https://www.instagram.com"),
-      r("https://instagram.com")
-    ]), { success: !0 };
-  } catch (o) {
-    return console.error("Failed to clear Instagram session:", o), { success: !1, error: String(o) };
+    await Promise.all([
+      clearForOrigins("https://www.instagram.com"),
+      clearForOrigins("https://instagram.com")
+    ]);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to clear Instagram session:", error);
+    return { success: false, error: String(error) };
   }
 });
-c.whenReady().then(u);
+app.whenReady().then(createWindow);
 export {
-  _ as MAIN_DIST,
-  g as RENDERER_DIST,
-  d as VITE_DEV_SERVER_URL
+  MAIN_DIST,
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };
