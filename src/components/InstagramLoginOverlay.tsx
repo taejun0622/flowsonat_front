@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
   onLoginSuccess
 }) => {
   const [showInstructions, setShowInstructions] = useState(true);
+  // Use a fresh, ephemeral partition for each login overlay to avoid reusing cookies
+  const partition = useMemo(() => `temp-instagram-${Date.now()}`, []);
 
   const handleWebViewClose = () => {
     onClose();
@@ -39,6 +41,7 @@ export const InstagramLoginOverlay: React.FC<InstagramLoginOverlayProps> = ({
         url="https://www.instagram.com/accounts/login/"
         onClose={handleWebViewClose}
         webviewRef={webviewRef}
+        partition={partition}
       />
       
       {/* Instructions Card */}

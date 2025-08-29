@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -144,6 +144,53 @@ ipcMain.handle('get-instagram-cookies', async () => {
   } catch (error) {
     console.error('Error getting Instagram cookies:', error)
     throw error
+  }
+})
+
+// Clear Instagram cookies and storage (used on disconnect)
+ipcMain.handle('clear-instagram-session', async () => {
+  try {
+    const defaultSession = session.defaultSession
+
+    // Clear cookies for instagram domains
+    const cookies = await defaultSession.cookies.get({})
+    const targets = cookies.filter(c => c.domain.includes('instagram.com'))
+    await Promise.all(
+      targets.map(c =>
+        defaultSession.cookies.remove(
+          `${c.secure ? 'https' : 'http'}://${c.domain.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
+          c.name
+        )
+      )
+    )
+
+    // Clear storage data scoped to Instagram origins
+    const clearForOrigins = async (origin: string) => {
+      await defaultSession.clearStorageData({
+        origin,
+        storages: [
+          'cookies',
+          'localstorage',
+          'indexdb',
+          'cachestorage',
+          'serviceworkers',
+          'websql',
+          'filesystem',
+          'shadercache',
+          'appcache'
+        ]
+      })
+    }
+
+    await Promise.all([
+      clearForOrigins('https://www.instagram.com'),
+      clearForOrigins('https://instagram.com')
+    ])
+
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to clear Instagram session:', error)
+    return { success: false, error: String(error) }
   }
 })
 

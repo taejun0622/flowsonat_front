@@ -8,7 +8,8 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
   url = 'https://www.instagram.com',
   onClose,
   onLoginSuccess,
-  webviewRef: externalWebviewRef
+  webviewRef: externalWebviewRef,
+  partition
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +268,7 @@ const FullScreenWebView: React.FC<WebViewProps> = ({
         webpreferences="nodeIntegration=no, contextIsolation=yes"
         allowpopups={true}
         useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Accept-Language: en-US,en;q=0.9"
+        {...(partition ? { partition } : {})}
       />
 
       {/* Browser Extension Controls - Instagram 로그인에서는 숨김 */}

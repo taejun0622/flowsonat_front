@@ -100,6 +100,13 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
 
     try {
       setIsLoading(true);
+      // Clear local Electron session/cookies for Instagram so next login is fresh
+      try {
+        // @ts-expect-error exposed via preload
+        await window.electronAPI?.clearInstagramSession?.();
+      } catch (e) {
+        console.warn('Failed to clear local Instagram session (non-fatal):', e);
+      }
       await InstagramService.disconnectInstagramAccountApiV1InstagramMeDelete();
       setInstagramAccount(null);
       

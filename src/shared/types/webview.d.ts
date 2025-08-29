@@ -8,6 +8,7 @@ interface HTMLWebViewElement extends HTMLElement {
   src: string;
   webpreferences?: string;
   allowpopups?: string | boolean;
+  partition?: string;
   /** Custom user agent string that can include Accept-Language headers for language preference */
   useragent?: string;
   // Electron-specific WebView APIs
@@ -36,3 +37,10 @@ declare var HTMLWebViewElement: {
   prototype: HTMLWebViewElement;
   new(): HTMLWebViewElement;
 };
+
+// Extend React's WebViewHTMLAttributes to accept Electron-specific attributes like partition
+declare module 'react' {
+  interface WebViewHTMLAttributes<T> extends HTMLAttributes<T> {
+    partition?: string;
+  }
+}

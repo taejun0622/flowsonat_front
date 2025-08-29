@@ -3,6 +3,7 @@ export interface WebViewProps {
   onClose?: () => void;
   onLoginSuccess?: (sessionData: any) => void;
   webviewRef?: React.RefObject<HTMLWebViewElement>;
+  partition?: string; // optional custom session partition
 }
 
 export interface WebViewManagerProps {
