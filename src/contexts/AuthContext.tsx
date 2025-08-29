@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthService } from '@/api/services/AuthService';
-import { User, Token, UserLogin, UserCreate } from '@/api/models';
+import { User, Token, UserLogin, UserCreate } from '@/api';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -8,9 +8,9 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (credentials: UserLogin) => Promise<void>;
-  register: (userData: UserCreate) => Promise<void>;
+  register: (userData: UserCreate) => Promise<User>;
   logout: () => void;
-  refreshToken: () => Promise<void>;
+  refreshToken: () => Promise<Token>;
   setTokens: (accessToken: string, refreshToken: string) => void;
 }
 

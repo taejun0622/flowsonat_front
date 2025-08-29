@@ -1,111 +1,83 @@
-import { app, BrowserWindow, ipcMain } from "electron";
-import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-createRequire(import.meta.url);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path.join(__dirname, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-let instagramAuthWindow;
-function createWindow() {
-  win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+import { app as i, BrowserWindow as l, ipcMain as d } from "electron";
+import { createRequire as g } from "node:module";
+import { fileURLToPath as p } from "node:url";
+import o from "node:path";
+g(import.meta.url);
+const w = o.dirname(p(import.meta.url));
+process.env.APP_ROOT = o.join(w, "..");
+const c = process.env.VITE_DEV_SERVER_URL, E = o.join(process.env.APP_ROOT, "dist-electron"), m = o.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = c ? o.join(process.env.APP_ROOT, "public") : m;
+let n, e;
+function u() {
+  n = new l({
+    icon: o.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname, "preload.mjs"),
-      webviewTag: true,
+      preload: o.join(w, "preload.mjs"),
+      webviewTag: !0,
       // Enable webview tag
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false
+      nodeIntegration: !1,
+      contextIsolation: !0,
+      webSecurity: !0,
+      allowRunningInsecureContent: !1
     }
-  });
-  win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  }
+  }), n.webContents.on("did-finish-load", () => {
+    n?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  }), c ? n.loadURL(c) : n.loadFile(o.join(m, "index.html"));
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+i.on("window-all-closed", () => {
+  process.platform !== "darwin" && (i.quit(), n = null);
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+i.on("activate", () => {
+  l.getAllWindows().length === 0 && u();
 });
-ipcMain.handle("open-instagram-login", async (event, url) => {
-  if (instagramAuthWindow) {
-    instagramAuthWindow.focus();
+d.handle("open-instagram-login", async (t, s) => {
+  if (e) {
+    e.focus();
     return;
   }
-  instagramAuthWindow = new BrowserWindow({
+  e = new l({
     width: 600,
     height: 700,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false
+      nodeIntegration: !1,
+      contextIsolation: !0,
+      webSecurity: !0,
+      allowRunningInsecureContent: !1
     },
-    parent: win,
-    modal: true,
-    show: false
-  });
-  instagramAuthWindow.once("ready-to-show", () => {
-    instagramAuthWindow?.show();
-  });
-  instagramAuthWindow.on("closed", () => {
-    instagramAuthWindow = null;
-  });
-  instagramAuthWindow.webContents.on("did-navigate", (event2, navigationUrl) => {
-    if (navigationUrl.includes("instagram.com") && !navigationUrl.includes("login")) {
-      win?.webContents.send("instagram-login-success", {
-        url: navigationUrl,
-        cookies: instagramAuthWindow?.webContents.session.cookies.get({})
-      });
-      instagramAuthWindow?.close();
-    }
-  });
-  await instagramAuthWindow.loadURL(url);
+    parent: n,
+    modal: !0,
+    show: !1
+  }), e.once("ready-to-show", () => {
+    e?.show();
+  }), e.on("closed", () => {
+    e = null;
+  }), e.webContents.on("did-navigate", (r, a) => {
+    a.includes("instagram.com") && !a.includes("login") && (n?.webContents.send("instagram-login-success", {
+      url: a,
+      cookies: e?.webContents.session.cookies.get({})
+    }), e?.close());
+  }), await e.loadURL(s);
 });
-ipcMain.handle("close-instagram-login", () => {
-  if (instagramAuthWindow) {
-    instagramAuthWindow.close();
-    instagramAuthWindow = null;
-  }
+d.handle("close-instagram-login", () => {
+  e && (e.close(), e = null);
 });
-ipcMain.handle("get-instagram-cookies", async () => {
-  if (!instagramAuthWindow) {
+d.handle("get-instagram-cookies", async () => {
+  if (!e)
     throw new Error("Instagram window not found");
-  }
   try {
-    const cookies = await instagramAuthWindow.webContents.session.cookies.get({
+    const t = await e.webContents.session.cookies.get({
       domain: ".instagram.com"
-    });
-    const cookieObject = {};
-    cookies.forEach((cookie) => {
-      cookieObject[cookie.name] = cookie.value;
-    });
-    return cookieObject;
-  } catch (error) {
-    console.error("Error getting Instagram cookies:", error);
-    throw error;
+    }), s = {};
+    return t.forEach((r) => {
+      s[r.name] = r.value;
+    }), s;
+  } catch (t) {
+    throw console.error("Error getting Instagram cookies:", t), t;
   }
 });
-app.whenReady().then(createWindow);
+i.whenReady().then(u);
 export {
-  MAIN_DIST,
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  E as MAIN_DIST,
+  m as RENDERER_DIST,
+  c as VITE_DEV_SERVER_URL
 };

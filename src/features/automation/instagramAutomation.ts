@@ -1,7 +1,7 @@
 import { InstagramService } from '@/api/services/InstagramService';
 import { buildProfileUrl } from './selectors';
 import type { AutomationConfig, Progress, Username } from './types';
-import { StageEnum, StatusEnum } from '@/api/models';
+import { StageEnum, StatusEnum, HealthEnum } from '@/api';
 
 export class InstagramAutomation {
   private webview: HTMLWebViewElement;
@@ -36,8 +36,9 @@ export class InstagramAutomation {
     await this.delay(500);
   }
 
-  private async exec<T>(fn: () => T | Promise<T>): Promise<T> {
-    const src = `(${fn.toString()})()`;
+  private async exec<T, A extends any[]>(fn: (...args: A) => T | Promise<T>, ...args: A): Promise<T> {
+    const serializedArgs = args.map((a) => JSON.stringify(a)).join(',');
+    const src = `(${fn.toString()})(${serializedArgs})`;
     // @ts-ignore executeJavaScript exists on Electron webview
     return this.webview.executeJavaScript(src, true);
   }
@@ -72,11 +73,10 @@ export class InstagramAutomation {
 
   private async openModal(kind: 'followers'|'following') {
     const selector = kind === 'followers' ? 'a[href$="/followers/"]' : 'a[href$="/following/"]';
-    await this.exec(async () => {
-      const sel = arguments[0] as string;
+    await this.exec(async (sel: string) => {
       const el = document.querySelector(sel) as HTMLElement | null;
       if (el) (el as HTMLElement).click();
-    }.bind(null, selector));
+    }, selector);
     await this.delay(800);
   }
 
@@ -156,7 +156,7 @@ export class InstagramAutomation {
       return 0;
     }
     const benches = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(undefined, StatusEnum.ACTIVE);
-    const healthy = benches.benchmarks.filter(b => b.health === 'HEALTHY');
+    const healthy = benches.benchmarks.filter(b => b.health === HealthEnum.HEALTHY);
     for (let i = healthy.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [healthy[i], healthy[j]] = [healthy[j], healthy[i]];

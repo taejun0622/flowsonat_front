@@ -268,9 +268,7 @@ export const BenchmarkTab: React.FC = () => {
     switch (health) {
       case HealthEnum.HEALTHY:
         return 'text-green-400';
-      case HealthEnum.WARNING:
-        return 'text-yellow-400';
-      case HealthEnum.CRITICAL:
+      case HealthEnum.UNHEALTHY:
         return 'text-red-400';
       default:
         return 'text-gray-400';

@@ -60,9 +60,9 @@ export const useInstagramLoginDetector = ({
             onLoginSuccess(sessionData);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error checking Instagram login status:', error);
-        onLoginError?.(error.toString());
+        onLoginError?.(String(error?.message || error?.toString?.() || 'Unknown error'));
       }
     };
 

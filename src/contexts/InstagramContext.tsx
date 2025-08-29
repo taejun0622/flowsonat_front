@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { InstagramService } from '@/api/services/InstagramService';
-import { InstagramConnectResponse } from '@/api/models';
+import { InstagramConnectResponse } from '@/api';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -76,7 +76,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
     try {
       // Instagram 세션 정보를 서버에 저장
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        session_data: sessionData
+        username: String(sessionData?.username || '')
       });
       
       setInstagramAccount(response);

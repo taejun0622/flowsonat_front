@@ -102,7 +102,7 @@ export const InstagramConnectionManager: React.FC<InstagramConnectionManagerProp
             {instagramAccount && (
               <div className="text-sm text-gray-600">
                 <p>Username: {instagramAccount.username}</p>
-                <p>Account ID: {instagramAccount.account_id}</p>
+                <p>Account ID: {instagramAccount.ig_user_id || 'N/A'}</p>
               </div>
             )}
             <Button 

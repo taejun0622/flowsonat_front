@@ -21,7 +21,7 @@ class ApiInterceptor {
   private isRefreshing = false;
   private failedQueue: PendingRequest[] = [];
 
-  private processQueue(error: any, token: string | null = null) {
+  private processQueue(error: any, _token: string | null = null) {
     this.failedQueue.forEach(({ resolve, reject, config }) => {
       if (error) {
         reject(error);
@@ -34,7 +34,7 @@ class ApiInterceptor {
   }
 
   async handleApiError(error: ApiError, retryRequest: () => Promise<any>): Promise<any> {
-    const originalRequest = error.request;
+    const originalRequest: any = error.request as any;
 
     if (error.status === 401 && !originalRequest._retry) {
       if (this.isRefreshing) {
@@ -44,7 +44,7 @@ class ApiInterceptor {
         }).then(() => retryRequest());
       }
 
-      originalRequest._retry = true;
+      (originalRequest as any)._retry = true;
       this.isRefreshing = true;
 
       try {
