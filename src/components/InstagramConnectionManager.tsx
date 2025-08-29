@@ -35,9 +35,8 @@ export const InstagramConnectionManager = ({
     console.log('Instagram login successful:', sessionData);
     try {
       // Instagram 세션 정보를 서버에 저장
-      // TODO: 실제 Instagram API에서 username을 추출하거나 별도 API 사용
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: 'instagram_user' // 임시 username
+        username: String(sessionData?.username || 'instagram_user')
       });
       
       // 연결 상태 업데이트
@@ -45,7 +44,7 @@ export const InstagramConnectionManager = ({
       
       toast({
         title: "Instagram connected",
-        description: "Successfully connected to Instagram.",
+        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
       });
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);

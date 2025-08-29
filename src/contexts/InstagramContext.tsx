@@ -83,7 +83,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       
       toast({
         title: "Instagram connected",
-        description: "Successfully connected to Instagram.",
+        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
       });
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);
@@ -102,7 +102,6 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       setIsLoading(true);
       // Clear local Electron session/cookies for Instagram so next login is fresh
       try {
-        // @ts-expect-error exposed via preload
         await window.electronAPI?.clearInstagramSession?.();
       } catch (e) {
         console.warn('Failed to clear local Instagram session (non-fatal):', e);

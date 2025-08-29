@@ -194,4 +194,19 @@ ipcMain.handle('clear-instagram-session', async () => {
   }
 })
 
+// Execute JavaScript in Instagram window
+ipcMain.handle('execute-instagram-javascript', async (event, script: string) => {
+  if (!instagramAuthWindow) {
+    throw new Error('Instagram window not found')
+  }
+
+  try {
+    const result = await instagramAuthWindow.webContents.executeJavaScript(script)
+    return result
+  } catch (error) {
+    console.error('Error executing JavaScript in Instagram window:', error)
+    throw error
+  }
+})
+
 app.whenReady().then(createWindow)

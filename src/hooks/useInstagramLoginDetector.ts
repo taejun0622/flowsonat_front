@@ -3,13 +3,85 @@ import React from 'react';
 interface UseInstagramLoginDetectorProps {
   onLoginSuccess: (sessionData: any) => void;
   onLoginError?: (error: string) => void;
+  onUsernameFound?: (username: string, sessionData: any) => void;
 }
 
 export const useInstagramLoginDetector = ({
   onLoginSuccess,
-  onLoginError
+  onLoginError,
+  onUsernameFound
 }: UseInstagramLoginDetectorProps) => {
   const webviewRef = React.useRef<HTMLWebViewElement>(null);
+
+  // Instagram username을 찾는 함수
+  const findInstagramUsername = async (webview: HTMLWebViewElement): Promise<string | null> => {
+    try {
+      // Electron API를 통해 JavaScript 실행
+      if (window.electronAPI) {
+        const username = await window.electronAPI.executeInstagramJavaScript(`
+          (() => {
+            // 프로필 이미지가 있는 요소들을 찾기
+            const profileImages = document.querySelectorAll('img[alt*="profile picture"]');
+            
+            if (profileImages.length === 0) {
+              return null;
+            }
+            
+            // 마지막 프로필 이미지의 alt 텍스트에서 username 추출
+            const lastProfileImage = profileImages[profileImages.length - 1];
+            const altText = lastProfileImage.getAttribute('alt');
+            
+            if (!altText) {
+              return null;
+            }
+            
+            // "username's profile picture" 형식에서 username 추출
+            const match = altText.match(/^([^']+)'s profile picture$/);
+            if (match) {
+              return match[1];
+            }
+            
+            return null;
+          })()
+        `);
+        
+        return username;
+      } else {
+        // 브라우저 환경에서는 WebView의 executeJavaScript 사용
+        const username = await webview.executeJavaScript(`
+          (() => {
+            // 프로필 이미지가 있는 요소들을 찾기
+            const profileImages = document.querySelectorAll('img[alt*="profile picture"]');
+            
+            if (profileImages.length === 0) {
+              return null;
+            }
+            
+            // 마지막 프로필 이미지의 alt 텍스트에서 username 추출
+            const lastProfileImage = profileImages[profileImages.length - 1];
+            const altText = lastProfileImage.getAttribute('alt');
+            
+            if (!altText) {
+              return null;
+            }
+            
+            // "username's profile picture" 형식에서 username 추출
+            const match = altText.match(/^([^']+)'s profile picture$/);
+            if (match) {
+              return match[1];
+            }
+            
+            return null;
+          })()
+        `);
+        
+        return username;
+      }
+    } catch (error) {
+      console.error('Error finding Instagram username:', error);
+      return null;
+    }
+  };
 
   React.useEffect(() => {
     const webview = webviewRef.current;
@@ -40,7 +112,20 @@ export const useInstagramLoginDetector = ({
               status: 'logged_in'
             };
             
-            onLoginSuccess(sessionData);
+            // 페이지가 완전히 로드될 때까지 기다린 후 username 찾기
+            setTimeout(async () => {
+              const username = await findInstagramUsername(webview);
+              
+              if (username) {
+                console.log('Instagram username found:', username);
+                // username을 찾았으면 확인 모달을 위한 콜백 호출
+                onUsernameFound?.(username, sessionData);
+              } else {
+                console.log('Instagram username not found, proceeding without confirmation');
+                // username을 찾지 못했으면 바로 진행
+                onLoginSuccess(sessionData);
+              }
+            }, 3000); // 3초 대기
           } else {
             console.log('Instagram not logged in - c_user is deleted or not found');
           }
@@ -57,7 +142,18 @@ export const useInstagramLoginDetector = ({
               status: 'logged_in_estimated'
             };
             
-            onLoginSuccess(sessionData);
+            // 브라우저 환경에서도 username 찾기 시도
+            setTimeout(async () => {
+              const username = await findInstagramUsername(webview);
+              
+              if (username) {
+                console.log('Instagram username found (browser):', username);
+                onUsernameFound?.(username, sessionData);
+              } else {
+                console.log('Instagram username not found (browser), proceeding without confirmation');
+                onLoginSuccess(sessionData);
+              }
+            }, 3000);
           }
         }
       } catch (error: any) {
@@ -94,7 +190,7 @@ export const useInstagramLoginDetector = ({
       webview.removeEventListener('did-navigate-in-page', handleNavigation);
       webview.removeEventListener('did-stop-loading', handleLoadStop);
     };
-  }, [onLoginSuccess, onLoginError]);
+  }, [onLoginSuccess, onLoginError, onUsernameFound]);
 
   return { webviewRef };
 };

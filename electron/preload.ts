@@ -34,5 +34,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('instagram-login-error', (event, error) => callback(error))
   },
   getInstagramCookies: () => ipcRenderer.invoke('get-instagram-cookies'),
-  clearInstagramSession: () => ipcRenderer.invoke('clear-instagram-session')
+  clearInstagramSession: () => ipcRenderer.invoke('clear-instagram-session'),
+  executeInstagramJavaScript: (script: string) => ipcRenderer.invoke('execute-instagram-javascript', script)
 })

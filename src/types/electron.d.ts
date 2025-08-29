@@ -6,6 +6,8 @@ declare global {
       onInstagramLoginError: (callback: (error: string) => void) => void;
       closeInstagramLogin: () => void;
       getInstagramCookies: () => Promise<any>;
+      clearInstagramSession: () => Promise<any>;
+      executeInstagramJavaScript: (script: string) => Promise<any>;
     };
   }
 }

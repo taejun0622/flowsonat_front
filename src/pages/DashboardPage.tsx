@@ -55,7 +55,7 @@ export const DashboardPage = () => {
     try {
       // Save Instagram session information to server
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: 'instagram_user' // temporary username
+        username: String(sessionData?.username || 'instagram_user')
       });
       
       // Update connection status
@@ -63,7 +63,7 @@ export const DashboardPage = () => {
       
       toast({
         title: "Instagram connected",
-        description: "Successfully connected to Instagram.",
+        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
       });
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);
