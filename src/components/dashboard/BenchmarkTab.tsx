@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useInstagram } from '@/contexts/InstagramContext';
-import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
+
 
 import { InstagramService } from '@/api/services/InstagramService';
 import { 
@@ -50,8 +50,7 @@ export const BenchmarkTab = () => {
     ig_username: '',
     status: '' as StatusEnum | ''
   });
-  const [showWebView, setShowWebView] = React.useState(false);
-  const [isCollectingFollowers, setIsCollectingFollowers] = React.useState(false);
+
   const { toast } = useToast();
   const { instagramAccount, isConnected } = useInstagram();
 
@@ -250,33 +249,10 @@ export const BenchmarkTab = () => {
   };
 
   const handleAddMyFollowersToBenchmark = async () => {
-    if (!isConnected || !instagramAccount?.username) {
-      toast({
-        title: "Error",
-        description: "Please connect to Instagram first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Open WebView to collect followers
-    setShowWebView(true);
-    setIsCollectingFollowers(true);
-  };
-
-  const handleCloseWebView = () => {
-    setShowWebView(false);
-    setIsCollectingFollowers(false);
-    // Refresh benchmarks after closing webview
-    loadBenchmarks();
-  };
-
-  const handleFollowersCollected = () => {
-    // 팔로워 수집이 완료되면 웹뷰를 닫고 benchmark 목록을 새로고침
-    handleCloseWebView();
     toast({
-      title: "Success",
-      description: "Benchmark created with collected followers successfully!",
+      title: "Feature Removed",
+      description: "Instagram automation features have been removed.",
+      variant: "default",
     });
   };
 
@@ -642,40 +618,7 @@ export const BenchmarkTab = () => {
         </DialogContent>
       </Dialog>
 
-      {/* WebView for collecting followers */}
-      {showWebView && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm">
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 bg-black/20 border-b border-black/30">
-              <div className="flex items-center space-x-3">
-                <Users className="h-6 w-6 text-white" />
-                <div>
-                  <h2 className="text-white font-semibold">Collect Followers</h2>
-                  <p className="text-gray-400 text-sm">
-                    Collecting followers from @{instagramAccount?.username}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={handleCloseWebView}
-                variant="outline"
-                className="border-black/30 text-white hover:bg-black/20"
-              >
-                Close
-              </Button>
-            </div>
-            
-            {/* WebView Content */}
-            <div className="flex-1">
-              <InstagramAutomationOverlay 
-                isCollectingFollowers={isCollectingFollowers}
-                onFollowersCollected={handleFollowersCollected}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

@@ -1,10 +1,9 @@
 import React from 'react';
-import { useInstagram } from '@/contexts/InstagramContext';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Loader2, Instagram } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Instagram, CheckCircle, XCircle } from 'lucide-react';
-import { InstagramLoginOverlay } from './InstagramLoginOverlay';
+import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramConnectionManagerProps {
   onConnectionChange?: (isConnected: boolean) => void;
@@ -14,7 +13,6 @@ export const InstagramConnectionManager = ({
   onConnectionChange
 }: InstagramConnectionManagerProps) => {
   const { user } = useAuth();
-  const [showLoginOverlay, setShowLoginOverlay] = React.useState(false);
   const { 
     instagramAccount, 
     isConnected, 
@@ -29,26 +27,9 @@ export const InstagramConnectionManager = ({
     onConnectionChange?.(isConnected);
   }, [isConnected, onConnectionChange]);
 
-  const handleLoginSuccess = async (sessionData: any) => {
-    console.log('Instagram login successful:', sessionData);
-    try {
-      // Instagram 세션 정보를 서버에 저장 (통합된 로직 사용)
-      await saveInstagramSession(sessionData);
-      
-      // 연결 상태 업데이트
-      checkConnection();
-    } catch (error: any) {
-      console.error('Failed to save Instagram session:', error);
-      // 에러 처리는 saveInstagramSession 내부에서 이미 처리됨
-    }
-  };
-
   const handleConnectClick = () => {
-    setShowLoginOverlay(true);
-  };
-
-  const handleCloseLoginOverlay = () => {
-    setShowLoginOverlay(false);
+    // Instagram connection is now handled through the API only
+    console.log('Instagram connection requested');
   };
 
   if (!user) {
@@ -69,64 +50,47 @@ export const InstagramConnectionManager = ({
   return (
     <>
       <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Instagram className="h-5 w-5" />
-          Instagram Connection
-        </CardTitle>
-        <CardDescription>
-          Connect your Instagram account to enable automated features
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isConnected ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-5 w-5" />
-              <span className="font-medium">Connected</span>
-            </div>
-            {instagramAccount && (
-              <div className="text-sm text-gray-600">
-                <p>Username: {instagramAccount.username}</p>
-                <p>Account ID: {instagramAccount.ig_user_id || 'N/A'}</p>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Instagram className="h-5 w-5" />
+            Instagram Connection
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isConnected ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Connected Account</p>
+                  <p className="text-sm text-gray-600">
+                    @{instagramAccount?.username || 'Unknown'}
+                  </p>
+                </div>
+                <Button
+                  onClick={disconnectAccount}
+                  variant="outline"
+                  className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                >
+                  Disconnect
+                </Button>
               </div>
-            )}
-            <Button 
-              variant="outline" 
-              onClick={disconnectAccount}
-              className="w-full"
-            >
-              Disconnect Instagram
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-red-600">
-              <XCircle className="h-5 w-5" />
-              <span className="font-medium">Not Connected</span>
             </div>
-            <p className="text-sm text-gray-600">
-              Connect your Instagram account to get started with automated features.
-            </p>
-            <Button 
-              onClick={handleConnectClick}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-            >
-              <Instagram className="h-4 w-4 mr-2" />
-              Connect Instagram Account
-            </Button>
-          </div>
-        )}
-              </CardContent>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-gray-600">
+                Connect your Instagram account to enable automation features.
+              </p>
+              <Button
+                onClick={handleConnectClick}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                <Instagram className="h-4 w-4 mr-2" />
+                Connect Instagram
+              </Button>
+            </div>
+          )}
+        </CardContent>
       </Card>
-
-      {/* Instagram Login Overlay */}
-      {showLoginOverlay && (
-        <InstagramLoginOverlay
-          onClose={handleCloseLoginOverlay}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      )}
     </>
   );
 };

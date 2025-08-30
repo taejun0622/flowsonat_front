@@ -6,13 +6,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
-import { InstagramWebView } from '@/components/InstagramWebView';
-import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
-  const [showInstagramWebView, setShowInstagramWebView] = React.useState(false);
   const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
@@ -39,35 +36,6 @@ export const DashboardPage = () => {
       checkInstagramConnection();
     }
   }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
-
-  // Automatically show Instagram WebView when Instagram is not connected
-  React.useEffect(() => {
-    if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
-      console.log('Instagram not connected, showing Instagram WebView');
-      setShowInstagramWebView(true);
-    }
-  }, [isCheckingConnection, isConnected, user, hasCheckedConnection]);
-
-  const handleLoginSuccess = async (sessionData: any) => {
-    try {
-      // Save Instagram session information to server (통합된 로직 사용)
-      await saveInstagramSession(sessionData);
-      
-      // Update connection status
-      await checkConnection();
-    } catch (error: any) {
-      console.error('Failed to save Instagram session:', error);
-      // 에러 처리는 saveInstagramSession 내부에서 이미 처리됨
-    }
-  };
-
-  const handleCloseInstagramWebView = () => {
-    setShowInstagramWebView(false);
-  };
-
-  const handleConnectInstagram = () => {
-    setShowInstagramWebView(true);
-  };
 
   const handleStartAutomation = () => {
     setShowAutomationOverlay(true);
@@ -123,15 +91,15 @@ export const DashboardPage = () => {
           {/* Tabs */}
           <Tabs defaultValue="benchmark" className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-black/10 backdrop-blur-sm border border-black/20">
-                              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Benchmark
               </TabsTrigger>
-                              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Billing
               </TabsTrigger>
-                              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </TabsTrigger>
@@ -151,31 +119,27 @@ export const DashboardPage = () => {
             <TabsContent value="settings" className="mt-6">
               <SettingsTab 
                 isConnected={isConnected}
-                onConnectInstagram={handleConnectInstagram}
+                onConnectInstagram={() => {
+                  // Instagram connection is now handled through the API only
+                  console.log('Instagram connection requested');
+                }}
               />
             </TabsContent>
           </Tabs>
         </div>
       </main>
 
-      {/* Instagram WebView */}
-      {showInstagramWebView && (
-        <InstagramWebView
-          onClose={handleCloseInstagramWebView}
-          onLoginSuccess={handleLoginSuccess}
-          onAutomationReady={(username: string) => {
-            console.log('Automation ready for username:', username);
-          }}
-          initialUrl="https://www.instagram.com/accounts/login/"
-          showInstructions={true}
-        />
-      )}
-
       {/* Instagram Automation Overlay */}
       {showAutomationOverlay && (
-        <InstagramAutomationOverlay
-          onClose={() => setShowAutomationOverlay(false)}
-        />
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+          <div className="text-center text-white">
+            <h2 className="text-2xl font-bold mb-4">Instagram Automation</h2>
+            <p className="mb-4">Automation features have been removed.</p>
+            <Button onClick={() => setShowAutomationOverlay(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

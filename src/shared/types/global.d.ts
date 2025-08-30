@@ -7,13 +7,7 @@ declare global {
       invoke: (...args: any[]) => any;
     };
     electronAPI?: {
-      openInstagramLogin: (url: string) => Promise<any>;
-      closeInstagramLogin: () => Promise<any>;
-      onInstagramLoginSuccess: (callback: (data: any) => void) => void;
-      onInstagramLoginError: (callback: (error: string) => void) => void;
-      getInstagramCookies: () => Promise<any>;
-      clearInstagramSession: () => Promise<any>;
-      executeInstagramJavaScript: (script: string) => Promise<any>;
+      // Add any remaining Electron APIs here if needed
     };
     showToast?: (opts: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
   }
