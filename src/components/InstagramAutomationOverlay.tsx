@@ -1,21 +1,18 @@
 import React from 'react';
-import { X, Play, Square, Settings, BarChart3 } from 'lucide-react';
+import { X, Play, Square, Settings } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Progress } from './ui/progress';
-import { useToast } from '../hooks/use-toast';
-import { InstagramAutomationService, InstagramAutomationConfig, AutomationState } from '../services/instagramAutomationService';
-import { InstagramDOMHelper } from '../services/instagramDOMHelper';
-import { WebViewControl } from '../features/browser-extension/types';
 import { useBrowserExtension } from '../features/browser-extension/hooks/useBrowserExtension';
-import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
-import { BenchmarkCreate } from '@/api/models/BenchmarkCreate';
-import { HealthEnum } from '@/api/models/HealthEnum';
-import { StatusEnum } from '@/api/models/StatusEnum';
 import { useInstagram } from '@/contexts/InstagramContext';
+import { useWebViewControl } from '@/hooks/useWebViewControl';
+import { useFollowersCollection } from '@/hooks/useFollowersCollection';
+import { useAutomationService } from '@/hooks/useAutomationService';
+import { useAutomationLogs } from '@/hooks/useAutomationLogs';
+import { useAutomationConfig } from '@/hooks/useAutomationConfig';
+import { useWebViewNavigation } from '@/hooks/useWebViewNavigation';
 
 interface InstagramAutomationOverlayProps {
   onClose?: () => void;
@@ -29,34 +26,37 @@ export const InstagramAutomationOverlay = ({
   onFollowersCollected
 }: InstagramAutomationOverlayProps) => {
   const { instagramAccount, isConnected } = useInstagram();
-  const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
-  const [domHelper, setDomHelper] = React.useState<InstagramDOMHelper | null>(null);
-  const [state, setState] = React.useState<AutomationState>({
-    isRunning: false,
-    currentStep: '',
-    progress: 0,
-    totalSteps: 0,
-    currentStepIndex: 0
-  });
-  const [config, setConfig] = React.useState<InstagramAutomationConfig>({
-    maxTargets: 500,
-    maxUnfollows: 250,
-    unfollowDelayDays: 4,
-    scrollDelay: 1000,
-    clickDelay: 500
-  });
-  const [logs, setLogs] = React.useState<string[]>([]);
   const [showSettings, setShowSettings] = React.useState(false);
-  const [currentUrl, setCurrentUrl] = React.useState('https://www.instagram.com');
-  const [collectedFollowers, setCollectedFollowers] = React.useState<string[]>([]);
-  const [isCollecting, setIsCollecting] = React.useState(false);
-
   
-  const webviewRef = React.useRef<HTMLWebViewElement>(null);
-  const { toast } = useToast();
-
   // Get current username from connected Instagram account
   const currentUsername = instagramAccount?.username || '';
+
+  // Custom hooks
+  const { webviewRef, webViewControl } = useWebViewControl();
+  const { config, updateConfig } = useAutomationConfig();
+  const { logs, addLog, clearLogs } = useAutomationLogs();
+  const { currentUrl, setCurrentUrl, goBack, goForward, reload, loadUrl } = useWebViewNavigation();
+  
+  // Automation service
+  const { state, startWorkflow, stopWorkflow } = useAutomationService({
+    webViewControl,
+    config,
+    currentUsername,
+    isConnected
+  });
+
+  // Followers collection
+  const { 
+    collectedFollowers, 
+    isCollecting, 
+    startFollowersCollection, 
+    collectFollowersFromProfile 
+  } = useFollowersCollection({
+    webViewControl,
+    currentUsername,
+    isConnected,
+    onFollowersCollected
+  });
 
   // Browser extension hook
   const { state: extensionState } = useBrowserExtension({
@@ -74,571 +74,9 @@ export const InstagramAutomationOverlay = ({
     },
     onWebViewError: (errorMessage) => {
       console.error('WebView error:', errorMessage);
-      toast({
-        title: "WebView Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      // Toast notification will be handled by the automation service hook
     }
   });
-
-  // WebView Control implementation
-  const webViewControl: WebViewControl = {
-    click: (x: number, y: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 DOM 이벤트 직접 발생
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            const element = document.elementFromPoint(${x}, ${y});
-            if (!element) return false;
-            
-            // mousedown, mouseup, click 이벤트 순서대로 발생
-            element.dispatchEvent(new MouseEvent('mousedown', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('mouseup', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            return true;
-          })()
-        `, true);
-      }
-    },
-    doubleClick: (x: number, y: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 더블클릭 이벤트 발생
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            const element = document.elementFromPoint(${x}, ${y});
-            if (!element) return false;
-            
-            // 첫 번째 클릭
-            element.dispatchEvent(new MouseEvent('mousedown', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('mouseup', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            // 두 번째 클릭
-            element.dispatchEvent(new MouseEvent('mousedown', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('mouseup', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            element.dispatchEvent(new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            return true;
-          })()
-        `, true);
-      }
-    },
-    rightClick: (x: number, y: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 우클릭 이벤트 발생
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            const element = document.elementFromPoint(${x}, ${y});
-            if (!element) return false;
-            
-            element.dispatchEvent(new MouseEvent('contextmenu', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            return true;
-          })()
-        `, true);
-      }
-    },
-    hover: (x: number, y: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 hover 이벤트 발생
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            const element = document.elementFromPoint(${x}, ${y});
-            if (!element) return false;
-            
-            element.dispatchEvent(new MouseEvent('mousemove', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${x},
-              clientY: ${y}
-            }));
-            
-            return true;
-          })()
-        `, true);
-      }
-    },
-    scroll: (deltaX: number, deltaY: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 스크롤
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            // mouse_control_extension과 동일한 방식으로 스크롤 가능한 요소 찾기
-            const x = window.innerWidth / 2;
-            const y = window.innerHeight / 2;
-            
-            let scrollableElement = document.elementFromPoint(x, y);
-            while (scrollableElement && (scrollableElement.scrollHeight <= scrollableElement.clientHeight || getComputedStyle(scrollableElement).overflowY === 'visible')) {
-              scrollableElement = scrollableElement.parentElement;
-            }
-            
-            if (scrollableElement) {
-              console.log('스크롤 가능한 요소 발견:', scrollableElement);
-              scrollableElement.scrollBy(${deltaX}, ${deltaY});
-              return true;
-            } else {
-              console.log('스크롤 가능한 요소를 찾을 수 없음');
-              // 폴백: 전체 페이지 스크롤
-              window.scrollBy(${deltaX}, ${deltaY});
-              return true;
-            }
-          })()
-        `, true);
-      }
-    },
-    drag: (startX: number, startY: number, endX: number, endY: number) => {
-      if (webviewRef.current) {
-        // mouse_control_extension 방식으로 드래그 이벤트 발생
-        webviewRef.current.executeJavaScript(`
-          (() => {
-            const element = document.elementFromPoint(${startX}, ${startY});
-            if (!element) return false;
-            
-            // mousedown
-            element.dispatchEvent(new MouseEvent('mousedown', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${startX},
-              clientY: ${startY}
-            }));
-            
-            // mousemove
-            element.dispatchEvent(new MouseEvent('mousemove', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${endX},
-              clientY: ${endY}
-            }));
-            
-            // mouseup
-            element.dispatchEvent(new MouseEvent('mouseup', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: ${endX},
-              clientY: ${endY}
-            }));
-            
-            return true;
-          })()
-        `, true);
-      }
-    },
-    navigate: async (url: string) => {
-      if (!webviewRef.current) return;
-      webviewRef.current.loadURL(url);
-      await new Promise<void>((resolve)=>{
-        const f=()=>{ webviewRef.current?.removeEventListener('did-finish-load', f as any); resolve(); };
-        webviewRef.current?.addEventListener('did-finish-load', f as any, { once: true } as any);
-      });
-    },
-    exec: async <T,>(fn: (...fnArgs: any[]) => T | Promise<T>, ...fnArgs: any[]): Promise<T> => {
-      // @ts-ignore executeJavaScript exists on Electron webview
-      const argsStr = JSON.stringify(fnArgs);
-      // Pass arguments via apply to the evaluated function in the webview context
-      return await webviewRef.current!.executeJavaScript(`(${fn.toString()}).apply(null, ${argsStr})`, true);
-    },
-    getUrl: async () => {
-      // @ts-ignore getURL exists on Electron webview
-      return webviewRef.current?.getURL?.() || "";
-    },
-    reload: async () => {
-      webviewRef.current?.reload();
-    }
-  };
-
-  // Service initialization
-  React.useEffect(() => {
-    const domHelperInstance = new InstagramDOMHelper(webViewControl);
-    const automationServiceInstance = new InstagramAutomationService(webViewControl, config, domHelperInstance);
-    
-    setDomHelper(domHelperInstance);
-    setAutomationService(automationServiceInstance);
-    
-    addLog('Instagram automation service ready');
-  }, [config]);
-
-
-
-  // State monitoring
-  React.useEffect(() => {
-    if (!automationService) return;
-
-    const interval = setInterval(() => {
-      const currentState = automationService.getState();
-      setState(currentState);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [automationService]);
-
-  // Add log
-  const addLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev: string[]) => [...prev.slice(-99), `[${timestamp}] ${message}`]); // 최대 100개 로그 유지
-  };
-
-  // Start workflow
-  const startWorkflow = async () => {
-    if (!automationService || !isConnected || !currentUsername) {
-      toast({ title: 'Error', description: 'Please connect to Instagram first.', variant: 'destructive' });
-      return;
-    }
-
-    try {
-      addLog(`Workflow started: ${currentUsername}`);
-      toast({ title: 'Workflow Started', description: `Starting Instagram automation for ${currentUsername}.` });
-
-      await automationService.runWorkflow(currentUsername);
-      
-      addLog('Workflow completed');
-      toast({ title: 'Workflow Completed', description: 'Instagram automation completed successfully.' });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`Workflow failed: ${errorMessage}`);
-      toast({ title: 'Workflow Failed', description: errorMessage, variant: 'destructive' });
-    }
-  };
-
-  // Stop workflow
-  const stopWorkflow = () => {
-    if (automationService) {
-      automationService.stopWorkflow();
-      addLog('Workflow stopped');
-      toast({ title: 'Workflow Stopped', description: 'Instagram automation has been stopped.' });
-    }
-  };
-
-
-
-  // 설정 업데이트
-  const updateConfig = (newConfig: Partial<InstagramAutomationConfig>) => {
-    setConfig((prev: InstagramAutomationConfig) => ({ ...prev, ...newConfig }));
-  };
-
-  // 팔로워 수집 시작
-  const startFollowersCollection = async () => {
-    console.log('startFollowersCollection called');
-    console.log('Current state:', { isConnected, currentUsername });
-    
-    if (!isConnected || !currentUsername) {
-      console.log('Not connected or no username');
-      toast({
-        title: "Error",
-        description: "Please connect to Instagram first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      console.log('Setting isCollecting to true');
-      setIsCollecting(true);
-      setCollectedFollowers([]);
-      
-      addLog(`Preparing to navigate to profile: ${currentUsername}`);
-      
-      // 웹뷰가 이미 로드되어 있다면 바로 이동, 아니면 dom-ready 이벤트를 기다림
-      if (webviewRef.current && (webviewRef.current as any).isLoading === false) {
-        const profileUrl = `https://www.instagram.com/${currentUsername}/`;
-        console.log('WebView ready, navigating to:', profileUrl);
-        webviewRef.current.src = profileUrl;
-        setCurrentUrl(profileUrl);
-      } else {
-        console.log('WebView not ready, waiting for dom-ready event...');
-      }
-      
-    } catch (error) {
-      console.error('Failed to start followers collection:', error);
-      toast({
-        title: "Error",
-        description: "Failed to start followers collection",
-        variant: "destructive"
-      });
-      setIsCollecting(false);
-    }
-  };
-
-  // 프로필에서 팔로워 수집
-  const collectFollowersFromProfile = async () => {
-    console.log('collectFollowersFromProfile called');
-    
-    if (!webviewRef.current) {
-      console.log('No webviewRef.current');
-      return;
-    }
-
-    try {
-      // 현재 페이지 URL 확인
-      const currentPageUrl = await webviewRef.current.executeJavaScript(`
-        (() => {
-          return window.location.href;
-        })()
-      `);
-      console.log('Current page URL:', currentPageUrl);
-      
-      // 프로필 페이지가 아니라면 경고
-      if (!currentPageUrl.includes('/')) {
-        console.log('Not on profile page, current URL:', currentPageUrl);
-        addLog('Not on profile page, cannot collect followers');
-        setIsCollecting(false);
-        return;
-      }
-      
-      console.log('On profile page, proceeding with followers collection...');
-      
-      console.log('Executing JavaScript to find followers link...');
-      addLog('Starting followers collection...');
-      
-      // Click on followers link
-      const result = await webviewRef.current.executeJavaScript(`
-        (() => {
-          console.log('Looking for followers link...');
-          
-          // 페이지 로딩 대기
-          if (document.readyState !== 'complete') {
-            console.log('Page not fully loaded, waiting...');
-            return 'waiting';
-          }
-          
-          // 여러 방법으로 팔로워 링크 찾기
-          let followersLink = null;
-          
-          // 방법 1: 텍스트로 찾기 (더 정확하게)
-          followersLink = Array.from(document.querySelectorAll('a')).find(link => 
-            link.textContent && link.textContent.toLowerCase().includes('followers') && 
-            !link.textContent.toLowerCase().includes('following')
-          );
-          
-          // 방법 2: href로 찾기
-          if (!followersLink) {
-            followersLink = Array.from(document.querySelectorAll('a')).find(link => 
-              link.href && link.href.includes('/followers')
-            );
-          }
-          
-          // 방법 3: 더 구체적인 선택자로 찾기
-          if (!followersLink) {
-            followersLink = document.querySelector('a[href*="/followers"]');
-          }
-          
-          // 방법 4: 모든 링크를 로그로 확인
-          if (!followersLink) {
-            console.log('All links on page:');
-            Array.from(document.querySelectorAll('a')).forEach((link, index) => {
-              if (link.textContent && link.textContent.trim()) {
-                console.log(\`Link \${index}:\`, {
-                  text: link.textContent.trim(),
-                  href: link.href,
-                  className: link.className
-                });
-              }
-            });
-          }
-          
-          console.log('Found followers link:', followersLink);
-          
-          if (followersLink) {
-            console.log('Clicking followers link...');
-            followersLink.click();
-            console.log('Clicked followers link');
-            return true;
-          }
-          
-          console.log('No followers link found');
-          return false;
-        })()
-      `);
-
-      console.log('JavaScript execution result:', result);
-
-      // 결과에 따라 처리
-      if (result === 'waiting') {
-        // 페이지가 아직 로딩 중이면 다시 시도
-        console.log('Page still loading, retrying in 2 seconds...');
-        setTimeout(() => {
-          collectFollowersFromProfile();
-        }, 2000);
-        return;
-      } else if (result === true) {
-        // 팔로워 링크를 클릭했으면 모달 대기
-        console.log('Followers link clicked, waiting for modal...');
-        setTimeout(() => {
-          console.log('Starting scrollAndCollectFollowers...');
-          scrollAndCollectFollowers();
-        }, 3000); // 3초로 늘림
-      } else {
-        // 팔로워 링크를 찾지 못함
-        console.log('Failed to find followers link');
-        addLog('Failed to find followers link on profile page');
-        setIsCollecting(false);
-      }
-      
-    } catch (error) {
-      console.error('Failed to open followers modal:', error);
-      addLog('Failed to open followers modal');
-      setIsCollecting(false);
-    }
-  };
-
-  // 스크롤하면서 팔로워 수집
-  const scrollAndCollectFollowers = async () => {
-    if (!webviewRef.current) return;
-
-    try {
-      addLog('Scrolling and collecting followers...');
-      
-      const followers = await webviewRef.current.executeJavaScript(`
-        (() => {
-          const followers = [];
-          let scrollCount = 0;
-          const maxScrolls = 10; // 최대 스크롤 횟수
-          
-          function scrollAndCollect() {
-            // Find follower usernames in the modal
-            const usernameElements = document.querySelectorAll('a[href^="/"]');
-            usernameElements.forEach(element => {
-              const href = element.getAttribute('href');
-              if (href && href.startsWith('/') && !href.includes('/p/') && !href.includes('/reel/')) {
-                const username = href.substring(1);
-                if (username && !followers.includes(username)) {
-                  followers.push(username);
-                }
-              }
-            });
-            
-            // Scroll down in the modal
-            const modal = document.querySelector('[role="dialog"]');
-            if (modal && scrollCount < maxScrolls) {
-              modal.scrollTop = modal.scrollHeight;
-              scrollCount++;
-              setTimeout(scrollAndCollect, 1000);
-            } else {
-              return followers;
-            }
-          }
-          
-          scrollAndCollect();
-          return followers;
-        })()
-      `);
-
-      setCollectedFollowers(followers || []);
-      addLog(`Collected ${followers?.length || 0} followers`);
-      
-      // Send to server
-      await sendFollowersToServer(followers || []);
-      
-    } catch (error) {
-      console.error('Failed to collect followers:', error);
-      addLog('Failed to collect followers');
-    } finally {
-      setIsCollecting(false);
-    }
-  };
-
-  // 서버에 팔로워 전송
-  const sendFollowersToServer = async (followers: string[]) => {
-    try {
-      addLog('Sending followers to server...');
-      
-      // 팔로워 데이터로 새로운 Benchmark 생성
-      // TODO: 실제 API 호출로 팔로워 데이터와 함께 Benchmark 생성
-      // 예: await InstagramService.createBenchmarkWithFollowers(followers);
-      
-      addLog(`Successfully created benchmark with ${followers.length} followers`);
-      
-      toast({
-        title: "Success",
-        description: `Created benchmark with ${followers.length} followers`
-      });
-      
-      // Callback to parent component
-      if (onFollowersCollected) {
-        onFollowersCollected();
-      }
-      
-    } catch (error) {
-      console.error('Failed to create benchmark with followers:', error);
-      addLog('Failed to create benchmark with followers');
-      toast({
-        title: "Error",
-        description: "Failed to create benchmark with followers",
-        variant: "destructive"
-      });
-    }
-  };
 
   // 팔로워 수집 자동 시작
   React.useEffect(() => {
@@ -647,7 +85,7 @@ export const InstagramAutomationOverlay = ({
       console.log('Starting followers collection...');
       startFollowersCollection();
     }
-  }, [isCollectingFollowers, isCollecting]);
+  }, [isCollectingFollowers, isCollecting, startFollowersCollection]);
 
   // 웹뷰 로드 이벤트 처리
   React.useEffect(() => {
@@ -714,10 +152,7 @@ export const InstagramAutomationOverlay = ({
     }
   }, [currentUrl, isCollectingFollowers, isCollecting, currentUsername]);
 
-  // 로그 클리어
-  const clearLogs = () => {
-    setLogs([]);
-  };
+
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -901,7 +336,7 @@ export const InstagramAutomationOverlay = ({
           {/* WebView Navigation */}
           <div className="bg-gray-800 border-b border-gray-700 p-2 flex items-center space-x-2">
             <Button
-              onClick={() => webviewRef.current?.goBack()}
+              onClick={() => goBack(webviewRef)}
               variant="outline"
               size="sm"
               className="text-white border-gray-600 hover:bg-gray-700"
@@ -909,7 +344,7 @@ export const InstagramAutomationOverlay = ({
               ←
             </Button>
             <Button
-              onClick={() => webviewRef.current?.goForward()}
+              onClick={() => goForward(webviewRef)}
               variant="outline"
               size="sm"
               className="text-white border-gray-600 hover:bg-gray-700"
@@ -917,7 +352,7 @@ export const InstagramAutomationOverlay = ({
               →
             </Button>
             <Button
-              onClick={() => webviewRef.current?.reload()}
+              onClick={() => reload(webviewRef)}
               variant="outline"
               size="sm"
               className="text-white border-gray-600 hover:bg-gray-700"
@@ -928,8 +363,8 @@ export const InstagramAutomationOverlay = ({
               value={currentUrl}
               onChange={(e: any) => setCurrentUrl(e.target.value)}
               onKeyPress={(e: any) => {
-                if (e.key === 'Enter' && webviewRef.current) {
-                  (webviewRef.current as any).loadURL(currentUrl);
+                if (e.key === 'Enter') {
+                  loadUrl(webviewRef, currentUrl);
                 }
               }}
               className="flex-1 bg-gray-700 border-gray-600 text-white"
