@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight } from 'lucide-react';
+import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useInstagram } from '@/contexts/InstagramContext';
 
 import { InstagramService } from '@/api/services/InstagramService';
 import { 
@@ -49,6 +50,7 @@ export const BenchmarkTab = () => {
     status: '' as StatusEnum | ''
   });
   const { toast } = useToast();
+  const { instagramAccount, isConnected } = useInstagram();
 
   // Load data on component mount
   React.useEffect(() => {
@@ -237,6 +239,44 @@ export const BenchmarkTab = () => {
       toast({
         title: "Error",
         description: "Failed to convert suggestion to benchmark",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMyFollowersToBenchmark = async () => {
+    if (!isConnected || !instagramAccount?.username) {
+      toast({
+        title: "Error",
+        description: "Please connect to Instagram first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Create a new benchmark with current user's username
+      const createData: BenchmarkCreate = {
+        ig_username: instagramAccount.username
+      };
+      
+      await InstagramService.createBenchmarkApiV1InstagramBenchmarksPost(createData);
+      
+      toast({
+        title: "Success",
+        description: "Benchmark created from your followers successfully",
+      });
+      
+      loadBenchmarks();
+    } catch (error) {
+      console.error('Failed to create benchmark from followers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create benchmark from followers",
         variant: "destructive",
       });
     } finally {
@@ -472,7 +512,14 @@ export const BenchmarkTab = () => {
             <div className="text-center py-8">
               <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-300">No benchmarks found</p>
-              <p className="text-gray-400 text-sm">Create your first benchmark to get started</p>
+              <p className="text-gray-400 text-sm mb-6">Create your first benchmark to get started</p>
+              <Button 
+                onClick={handleAddMyFollowersToBenchmark}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Add My Followers to Benchmark
+              </Button>
             </div>
           ) : (
             (Object.entries(groupedBenchmarks) as [StatusEnum, BenchmarkResponse[]][])

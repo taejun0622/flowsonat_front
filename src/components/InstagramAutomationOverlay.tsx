@@ -43,8 +43,7 @@ export const InstagramAutomationOverlay = ({
   const [logs, setLogs] = React.useState<string[]>([]);
   const [showSettings, setShowSettings] = React.useState(false);
   const [currentUrl, setCurrentUrl] = React.useState('https://www.instagram.com');
-  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
-  const [selectedBenchmarkId, setSelectedBenchmarkId] = React.useState<string>('');
+
   
   const webviewRef = React.useRef<HTMLWebViewElement>(null);
   const { toast } = useToast();
@@ -315,21 +314,7 @@ export const InstagramAutomationOverlay = ({
     addLog('Instagram automation service ready');
   }, [config]);
 
-  // Load benchmarks
-  React.useEffect(() => {
-    const loadBenchmarks = async () => {
-      try {
-        const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
-        setBenchmarks(res.benchmarks || []);
-        if ((res.benchmarks || []).length > 0) {
-          setSelectedBenchmarkId(res.benchmarks![0].id);
-        }
-      } catch (e) {
-        console.error('Failed to load benchmarks', e);
-      }
-    };
-    loadBenchmarks();
-  }, []);
+
 
   // State monitoring
   React.useEffect(() => {
@@ -380,22 +365,7 @@ export const InstagramAutomationOverlay = ({
     }
   };
 
-  // Add my followers to selected benchmark
-  const addMyFollowersToBenchmark = async () => {
-    if (!automationService || !selectedBenchmarkId) {
-      toast({ title: 'Error', description: 'Please select a benchmark.', variant: 'destructive' });
-      return;
-    }
-    try {
-      addLog(`Adding my followers to benchmark (benchmark=${selectedBenchmarkId})`);
-      const { added, total } = await automationService.addFollowersToBenchmark(selectedBenchmarkId);
-      addLog(`Completed: ${added}/${total}`);
-      toast({ title: 'Completed', description: `Added ${added}/${total}` });
-    } catch (error: any) {
-      console.error(error);
-      toast({ title: 'Failed', description: error?.message || 'Operation failed.', variant: 'destructive' });
-    }
-  };
+
 
   // 설정 업데이트
   const updateConfig = (newConfig: Partial<InstagramAutomationConfig>) => {
@@ -469,26 +439,7 @@ export const InstagramAutomationOverlay = ({
                 </Button>
               </div>
 
-              {/* Add my followers → benchmark */}
-              <div className="space-y-2">
-                <Label className="text-white">Select Benchmark</Label>
-                <select
-                  className="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-2"
-                  value={selectedBenchmarkId}
-                  onChange={(e: any) => setSelectedBenchmarkId(e.target.value)}
-                >
-                  {(benchmarks || []).map((b: any) => (
-                    <option key={b.id} value={b.id}>{b.ig.username}</option>
-                  ))}
-                </select>
-                <Button
-                  onClick={addMyFollowersToBenchmark}
-                  disabled={!selectedBenchmarkId}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                >
-                  Add My Followers to Benchmark
-                </Button>
-              </div>
+
 
               {state.isRunning && (
                 <div className="space-y-2">

@@ -39,8 +39,7 @@ const InstagramAutomationManager = ({
   });
   const [logs, setLogs] = React.useState<string[]>([]);
   const [isWebViewReady, setIsWebViewReady] = React.useState(false);
-  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
-  const [selectedBenchmarkId, setSelectedBenchmarkId] = React.useState<string>('');
+
   
   const { toast } = useToast();
   const logRef = React.useRef<HTMLDivElement>(null);
@@ -310,19 +309,7 @@ const InstagramAutomationManager = ({
     }
   }, [isWebViewReady, automationService, config, webViewControl]);
 
-  // Load benchmarks
-  React.useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet(HealthEnum.HEALTHY, StatusEnum.ACTIVE);
-        setBenchmarks(res.benchmarks || []);
-        if ((res.benchmarks || []).length > 0) setSelectedBenchmarkId(res.benchmarks![0].id);
-      } catch (e) {
-        console.error('Failed to load benchmarks', e);
-      }
-    };
-    load();
-  }, []);
+
 
   // State monitoring
   React.useEffect(() => {
@@ -402,22 +389,7 @@ const InstagramAutomationManager = ({
     setConfig((prev: InstagramAutomationConfig) => ({ ...prev, ...newConfig }));
   };
 
-  // Add my followers to selected benchmark
-  const addMyFollowersToBenchmark = async () => {
-    if (!automationService || !selectedBenchmarkId) {
-      toast({ title: 'Error', description: 'Please select a benchmark first.', variant: 'destructive' });
-      return;
-    }
-    try {
-      addLog(`Adding my followers to benchmark: ${selectedBenchmarkId}`);
-      const { added, total } = await automationService.addFollowersToBenchmark(selectedBenchmarkId);
-      addLog(`Added ${added}/${total} followers to benchmark`);
-      toast({ title: 'Completed', description: `Added ${added}/${total} followers.` });
-    } catch (error: any) {
-      console.error(error);
-      toast({ title: 'Failed', description: error?.message || 'Operation failed.', variant: 'destructive' });
-    }
-  };
+
 
   // Clear logs
   const clearLogs = () => {
@@ -470,22 +442,7 @@ const InstagramAutomationManager = ({
                 </Button>
               </div>
 
-              {/* Add my followers to benchmark */}
-              <div className="space-y-2">
-                <Label>Select Benchmark</Label>
-                <select
-                  className="w-full border rounded px-2 py-2"
-                  value={selectedBenchmarkId}
-                  onChange={(e: any)=> setSelectedBenchmarkId(e.target.value)}
-                >
-                  {(benchmarks || []).map((b: any) => (
-                    <option key={b.id} value={b.id}>{b.ig.username}</option>
-                  ))}
-                </select>
-                <Button onClick={addMyFollowersToBenchmark} disabled={!selectedBenchmarkId} className="w-full">
-                  Add My Followers to Benchmark
-                </Button>
-              </div>
+
 
               {state.isRunning && (
                 <div className="space-y-2">
