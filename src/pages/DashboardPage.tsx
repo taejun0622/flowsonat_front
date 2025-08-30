@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
+import { User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -7,14 +7,11 @@ import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { InstagramLoginOverlay } from '@/components/InstagramLoginOverlay';
-import { InstagramService } from '@/api/services/InstagramService';
-import { useToast } from '@/hooks/use-toast';
 import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
 export const DashboardPage = () => {
-  const { user, logout } = useAuth();
-  const { toast } = useToast();
-  const { isConnected, checkConnection } = useInstagram();
+  const { user } = useAuth();
+  const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
   const [showLoginOverlay, setShowLoginOverlay] = React.useState(false);
   const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
@@ -53,25 +50,14 @@ export const DashboardPage = () => {
 
   const handleLoginSuccess = async (sessionData: any) => {
     try {
-      // Save Instagram session information to server
-      const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(sessionData?.username || 'instagram_user')
-      });
+      // Save Instagram session information to server (통합된 로직 사용)
+      await saveInstagramSession(sessionData);
       
       // Update connection status
       await checkConnection();
-      
-      toast({
-        title: "Instagram connected",
-        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
-      });
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);
-      toast({
-        title: "Connection failed",
-        description: "Failed to save Instagram session.",
-        variant: "destructive",
-      });
+      // 에러 처리는 saveInstagramSession 내부에서 이미 처리됨
     }
   };
 

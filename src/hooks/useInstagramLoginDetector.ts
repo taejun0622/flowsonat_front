@@ -13,32 +13,30 @@ export const useInstagramLoginDetector = ({
 }: UseInstagramLoginDetectorProps) => {
   const webviewRef = React.useRef<HTMLWebViewElement>(null);
 
-  // Instagram username을 찾는 함수
+  // Instagram username을 찾는 함수 (프로필 이미지 alt 텍스트만 사용)
   const findInstagramUsername = async (webview: HTMLWebViewElement): Promise<string | null> => {
     try {
       // Electron API를 통해 JavaScript 실행
       if (window.electronAPI) {
-        const username = await window.electronAPI.executeInstagramJavaScript(`
+        const electronAPI = window.electronAPI as any;
+        const username = await electronAPI.executeInstagramJavaScript(`
           (() => {
-            // 프로필 이미지가 있는 요소들을 찾기
+            // 프로필 이미지의 alt 텍스트에서 username 추출
             const profileImages = document.querySelectorAll('img[alt*="profile picture"]');
-            
-            if (profileImages.length === 0) {
-              return null;
-            }
-            
-            // 마지막 프로필 이미지의 alt 텍스트에서 username 추출
-            const lastProfileImage = profileImages[profileImages.length - 1];
-            const altText = lastProfileImage.getAttribute('alt');
-            
-            if (!altText) {
-              return null;
-            }
-            
-            // "username's profile picture" 형식에서 username 추출
-            const match = altText.match(/^([^']+)'s profile picture$/);
-            if (match) {
-              return match[1];
+            for (let i = 0; i < profileImages.length; i++) {
+              const altText = profileImages[i].getAttribute('alt');
+              if (altText) {
+                const match = altText.match(/^([^']+)'s profile picture$/);
+                if (match) {
+                  const detectedUsername = match[1];
+                  // 유효한 username인지 확인 (특수문자나 숫자만 있는 경우 제외)
+                  if (detectedUsername && detectedUsername.length > 0 && 
+                      /^[a-zA-Z0-9._]+$/.test(detectedUsername) && detectedUsername.length >= 3 &&
+                      !detectedUsername.match(/^[0-9_]+$/)) {
+                    return detectedUsername;
+                  }
+                }
+              }
             }
             
             return null;
@@ -48,27 +46,24 @@ export const useInstagramLoginDetector = ({
         return username;
       } else {
         // 브라우저 환경에서는 WebView의 executeJavaScript 사용
-        const username = await webview.executeJavaScript(`
+        const username = await (webview as any).executeJavaScript(`
           (() => {
-            // 프로필 이미지가 있는 요소들을 찾기
+            // 프로필 이미지의 alt 텍스트에서 username 추출
             const profileImages = document.querySelectorAll('img[alt*="profile picture"]');
-            
-            if (profileImages.length === 0) {
-              return null;
-            }
-            
-            // 마지막 프로필 이미지의 alt 텍스트에서 username 추출
-            const lastProfileImage = profileImages[profileImages.length - 1];
-            const altText = lastProfileImage.getAttribute('alt');
-            
-            if (!altText) {
-              return null;
-            }
-            
-            // "username's profile picture" 형식에서 username 추출
-            const match = altText.match(/^([^']+)'s profile picture$/);
-            if (match) {
-              return match[1];
+            for (let i = 0; i < profileImages.length; i++) {
+              const altText = profileImages[i].getAttribute('alt');
+              if (altText) {
+                const match = altText.match(/^([^']+)'s profile picture$/);
+                if (match) {
+                  const detectedUsername = match[1];
+                  // 유효한 username인지 확인 (특수문자나 숫자만 있는 경우 제외)
+                  if (detectedUsername && detectedUsername.length > 0 && 
+                      /^[a-zA-Z0-9._]+$/.test(detectedUsername) && detectedUsername.length >= 3 &&
+                      !detectedUsername.match(/^[0-9_]+$/)) {
+                    return detectedUsername;
+                  }
+                }
+              }
             }
             
             return null;
@@ -121,9 +116,9 @@ export const useInstagramLoginDetector = ({
                 // username을 찾았으면 확인 모달을 위한 콜백 호출
                 onUsernameFound?.(username, sessionData);
               } else {
-                console.log('Instagram username not found, proceeding without confirmation');
-                // username을 찾지 못했으면 바로 진행
-                onLoginSuccess(sessionData);
+                console.log('Instagram username not found, showing manual input modal');
+                // username을 찾지 못했으면 수동 입력 모달을 위한 콜백 호출
+                onUsernameFound?.('', sessionData);
               }
             }, 3000); // 3초 대기
           } else {
@@ -150,8 +145,8 @@ export const useInstagramLoginDetector = ({
                 console.log('Instagram username found (browser):', username);
                 onUsernameFound?.(username, sessionData);
               } else {
-                console.log('Instagram username not found (browser), proceeding without confirmation');
-                onLoginSuccess(sessionData);
+                console.log('Instagram username not found (browser), showing manual input modal');
+                onUsernameFound?.('', sessionData);
               }
             }, 3000);
           }

@@ -1,11 +1,9 @@
 import React from 'react';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { InstagramService } from '@/api/services/InstagramService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Instagram, CheckCircle, XCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { InstagramLoginOverlay } from './InstagramLoginOverlay';
 
 interface InstagramConnectionManagerProps {
@@ -16,7 +14,6 @@ export const InstagramConnectionManager = ({
   onConnectionChange
 }: InstagramConnectionManagerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [showLoginOverlay, setShowLoginOverlay] = React.useState(false);
   const { 
     instagramAccount, 
@@ -24,7 +21,8 @@ export const InstagramConnectionManager = ({
     isLoading, 
     checkConnection, 
     connectAccount, 
-    disconnectAccount 
+    disconnectAccount,
+    saveInstagramSession
   } = useInstagram();
 
   React.useEffect(() => {
@@ -34,25 +32,14 @@ export const InstagramConnectionManager = ({
   const handleLoginSuccess = async (sessionData: any) => {
     console.log('Instagram login successful:', sessionData);
     try {
-      // Instagram 세션 정보를 서버에 저장
-      const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(sessionData?.username || 'instagram_user')
-      });
+      // Instagram 세션 정보를 서버에 저장 (통합된 로직 사용)
+      await saveInstagramSession(sessionData);
       
       // 연결 상태 업데이트
       checkConnection();
-      
-      toast({
-        title: "Instagram connected",
-        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
-      });
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);
-      toast({
-        title: "Connection failed",
-        description: "Failed to save Instagram session.",
-        variant: "destructive",
-      });
+      // 에러 처리는 saveInstagramSession 내부에서 이미 처리됨
     }
   };
 

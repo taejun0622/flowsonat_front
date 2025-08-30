@@ -70,19 +70,19 @@ export const InstagramUsernameConfirmModal = ({
         
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
+            onClick={() => onConfirm(username, sessionData)}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none"
+          >
+            <Check className="h-4 w-4 mr-2" />
+            Connect Account
+          </Button>
+          <Button
             variant="outline"
             onClick={onCancel}
             className="border-black/30 text-white hover:bg-black/20 flex-1 sm:flex-none"
           >
             <X className="h-4 w-4 mr-2" />
             Cancel
-          </Button>
-          <Button
-            onClick={() => onConfirm(username, sessionData)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none"
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Connect Account
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -12,6 +12,7 @@ interface InstagramContextType {
   connectAccount: () => void;
   disconnectAccount: () => Promise<void>;
   refreshConnection: () => Promise<void>;
+  saveInstagramSession: (sessionData: any) => Promise<void>;
 }
 
 const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
@@ -76,7 +77,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     try {
       // Instagram 세션 정보를 서버에 저장
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(sessionData?.username || '')
+        username: String(sessionData?.username || 'instagram_user')
       });
       
       setInstagramAccount(response);
@@ -149,6 +150,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     connectAccount,
     disconnectAccount,
     refreshConnection,
+    saveInstagramSession,
   };
 
   return (

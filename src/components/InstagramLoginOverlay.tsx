@@ -2,9 +2,10 @@ import React from 'react';
 import FullScreenWebView from '@/features/webview/components/FullScreenWebView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Instagram, X } from 'lucide-react';
+import { Instagram } from 'lucide-react';
 import { useInstagramLoginDetector } from '@/hooks/useInstagramLoginDetector';
 import { InstagramUsernameConfirmModal } from './InstagramUsernameConfirmModal';
+import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 
 interface InstagramLoginOverlayProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ export const InstagramLoginOverlay = ({
 }: InstagramLoginOverlayProps) => {
   const [showInstructions, setShowInstructions] = React.useState(true);
   const [showUsernameModal, setShowUsernameModal] = React.useState(false);
+  const [showManualUsernameModal, setShowManualUsernameModal] = React.useState(false);
   const [detectedUsername, setDetectedUsername] = React.useState('');
   const [sessionData, setSessionData] = React.useState<any>(null);
   
@@ -53,13 +55,43 @@ export const InstagramLoginOverlay = ({
   };
 
   const handleUsernameCancel = () => {
-    console.log('Username confirmation cancelled');
+    console.log('Username confirmation cancelled, showing manual input modal');
     setShowUsernameModal(false);
+    // 수동 입력 모달 표시
+    setShowManualUsernameModal(true);
+  };
+
+  const handleManualUsernameConfirm = (username: string, sessionData: any) => {
+    console.log('Manual username confirmed:', username);
+    onLoginSuccess(sessionData);
+    setShowManualUsernameModal(false);
+    onClose();
+  };
+
+  const handleManualUsernameCancel = () => {
+    console.log('Manual username input cancelled');
+    setShowManualUsernameModal(false);
     // 취소 시에도 기본 sessionData로 진행
     if (sessionData) {
-      onLoginSuccess(sessionData);
+      const updatedSessionData = {
+        ...sessionData,
+        username: 'instagram_user'
+      };
+      onLoginSuccess(updatedSessionData);
       onClose();
     }
+  };
+
+  const handleDisconnect = async () => {
+    console.log('User chose to disconnect, clearing session');
+    try {
+      // Instagram 세션 삭제
+      await window.electronAPI?.clearInstagramSession?.();
+    } catch (e) {
+      console.warn('Failed to clear Instagram session:', e);
+    }
+    setShowManualUsernameModal(false);
+    onClose();
   };
 
   // Instagram login detection hook
@@ -129,6 +161,15 @@ export const InstagramLoginOverlay = ({
         sessionData={sessionData}
         onConfirm={handleUsernameConfirm}
         onCancel={handleUsernameCancel}
+      />
+
+      {/* Manual Username Input Modal */}
+      <InstagramManualUsernameModal
+        open={showManualUsernameModal}
+        sessionData={sessionData}
+        onConfirm={handleManualUsernameConfirm}
+        onCancel={handleManualUsernameCancel}
+        onDisconnect={handleDisconnect}
       />
     </>
   );
