@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge, shell } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -23,7 +23,19 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // ...
 })
 
-// Basic Electron API (Instagram WebView functionality removed)
+// Electron API for webview functionality
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Add any remaining Electron APIs here if needed
+  // Open external URL in default browser
+  openExternal: (url: string) => {
+    shell.openExternal(url)
+  },
+  
+  // Get app version
+  getVersion: () => process.versions.app,
+  
+  // Get platform
+  getPlatform: () => process.platform,
+  
+  // Check if running in Electron
+  isElectron: true
 })

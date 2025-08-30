@@ -17,6 +17,9 @@ import { EmailVerificationPage } from '@/pages/auth/EmailVerificationPage';
 // Dashboard
 import { DashboardPage } from '@/pages/DashboardPage';
 
+// WebView
+import { WebViewPage } from '@/pages/WebViewPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -43,6 +46,16 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <DashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* WebView Route - Full screen webview */}
+                <Route
+                  path="/webview"
+                  element={
+                    <ProtectedRoute>
+                      <WebViewPage />
                     </ProtectedRoute>
                   }
                 />

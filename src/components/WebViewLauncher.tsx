@@ -1,0 +1,39 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
+
+interface WebViewLauncherProps {
+  url: string;
+  children?: React.ReactNode;
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  className?: string;
+}
+
+export const WebViewLauncher: React.FC<WebViewLauncherProps> = ({
+  url,
+  children,
+  variant = 'default',
+  size = 'default',
+  className = ''
+}) => {
+  const navigate = useNavigate();
+
+  const handleOpenWebView = () => {
+    // Navigate to webview page with URL as search parameter
+    navigate(`/webview?url=${encodeURIComponent(url)}`);
+  };
+
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      onClick={handleOpenWebView}
+      className={`flex items-center space-x-2 ${className}`}
+    >
+      <ExternalLink className="h-4 w-4" />
+      {children || 'Open in WebView'}
+    </Button>
+  );
+};

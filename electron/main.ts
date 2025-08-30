@@ -79,8 +79,15 @@ app.on('activate', () => {
 })
 
 // When installing the app, create a shortcut on the desktop.
-if (require('electron-squirrel-startup')) {
-  app.quit()
+// Only run on Windows where electron-squirrel-startup is available
+if (process.platform === 'win32') {
+  try {
+    if (require('electron-squirrel-startup')) {
+      app.quit()
+    }
+  } catch (error) {
+    // electron-squirrel-startup not available, continue normally
+  }
 }
 
 app.whenReady().then(() => {
