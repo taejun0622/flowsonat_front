@@ -220,7 +220,7 @@ export const useBrowserExtension = ({
   }, [state.isActive, webviewRef]);
 
   // 브라우저 액션 실행
-  const executeBrowserAction = React.useCallback((action: BrowserAction) => {
+  const executeBrowserAction = React.useCallback(async (action: BrowserAction) => {
     const webview = webviewRef.current;
     if (!webview) return;
 
@@ -275,13 +275,56 @@ export const useBrowserExtension = ({
         break;
       case 'scroll':
         if (action.data) {
-          webview.sendInputEvent({
-            type: 'scrollWheel',
-            x: action.position.x,
-            y: action.position.y,
-            deltaX: action.data.deltaX,
-            deltaY: action.data.deltaY
-          });
+          // mouse_control_extension과 완전히 동일한 방식으로 스크롤
+          const webview = webviewRef.current;
+          if (webview && webview.executeJavaScript) {
+            try {
+              await webview.executeJavaScript(`
+                (() => {
+                  const deltaY = ${action.data.deltaY};
+                  
+                  // mouse_control_extension과 동일한 방식으로 스크롤 가능한 요소 찾기
+                  const x = window.innerWidth / 2;
+                  const y = window.innerHeight / 2;
+                  
+                  let scrollableElement = document.elementFromPoint(x, y);
+                  while (scrollableElement && (scrollableElement.scrollHeight <= scrollableElement.clientHeight || getComputedStyle(scrollableElement).overflowY === 'visible')) {
+                    scrollableElement = scrollableElement.parentElement;
+                  }
+                  
+                  if (scrollableElement) {
+                    console.log('스크롤 가능한 요소 발견:', scrollableElement);
+                    scrollableElement.scrollBy(0, deltaY);
+                    return true;
+                  } else {
+                    console.log('스크롤 가능한 요소를 찾을 수 없음');
+                    // 폴백: 전체 페이지 스크롤
+                    window.scrollBy(0, deltaY);
+                    return true;
+                  }
+                })()
+              `, true);
+            } catch (error) {
+              console.log('DOM 스크롤 실패:', error);
+              // 폴백: 기존 웹뷰 스크롤 방식
+              webview.sendInputEvent({
+                type: 'scrollWheel',
+                x: action.position.x,
+                y: action.position.y,
+                deltaX: action.data.deltaX,
+                deltaY: action.data.deltaY
+              });
+            }
+          } else {
+            // 폴백: 기존 웹뷰 스크롤 방식
+            webview.sendInputEvent({
+              type: 'scrollWheel',
+              x: action.position.x,
+              y: action.position.y,
+              deltaX: action.data.deltaX,
+              deltaY: action.data.deltaY
+            });
+          }
         }
         break;
     }

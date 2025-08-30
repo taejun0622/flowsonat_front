@@ -64,103 +64,217 @@ export const InstagramAutomationOverlay = ({
     }
   });
 
-  // WebView Control
+  // WebView Control implementation
   const webViewControl: WebViewControl = {
     click: (x: number, y: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'mouseDown',
-          x: x,
-          y: y,
-          button: 'left',
-          clickCount: 1
-        });
-        webviewRef.current.sendInputEvent({
-          type: 'mouseUp',
-          x: x,
-          y: y,
-          button: 'left',
-          clickCount: 1
-        });
+        // mouse_control_extension 방식으로 DOM 이벤트 직접 발생
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            const element = document.elementFromPoint(${x}, ${y});
+            if (!element) return false;
+            
+            // mousedown, mouseup, click 이벤트 순서대로 발생
+            element.dispatchEvent(new MouseEvent('mousedown', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('mouseup', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            return true;
+          })()
+        `, true);
       }
     },
     doubleClick: (x: number, y: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'mouseDown',
-          x: x,
-          y: y,
-          button: 'left',
-          clickCount: 2
-        });
-        webviewRef.current.sendInputEvent({
-          type: 'mouseUp',
-          x: x,
-          y: y,
-          button: 'left',
-          clickCount: 2
-        });
+        // mouse_control_extension 방식으로 더블클릭 이벤트 발생
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            const element = document.elementFromPoint(${x}, ${y});
+            if (!element) return false;
+            
+            // 첫 번째 클릭
+            element.dispatchEvent(new MouseEvent('mousedown', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('mouseup', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            // 두 번째 클릭
+            element.dispatchEvent(new MouseEvent('mousedown', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('mouseup', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            element.dispatchEvent(new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            return true;
+          })()
+        `, true);
       }
     },
     rightClick: (x: number, y: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'mouseDown',
-          x: x,
-          y: y,
-          button: 'right',
-          clickCount: 1
-        });
-        webviewRef.current.sendInputEvent({
-          type: 'mouseUp',
-          x: x,
-          y: y,
-          button: 'right',
-          clickCount: 1
-        });
+        // mouse_control_extension 방식으로 우클릭 이벤트 발생
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            const element = document.elementFromPoint(${x}, ${y});
+            if (!element) return false;
+            
+            element.dispatchEvent(new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            return true;
+          })()
+        `, true);
       }
     },
     hover: (x: number, y: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'mouseMove',
-          x: x,
-          y: y
-        });
+        // mouse_control_extension 방식으로 hover 이벤트 발생
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            const element = document.elementFromPoint(${x}, ${y});
+            if (!element) return false;
+            
+            element.dispatchEvent(new MouseEvent('mousemove', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${x},
+              clientY: ${y}
+            }));
+            
+            return true;
+          })()
+        `, true);
       }
     },
     scroll: (deltaX: number, deltaY: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'scrollWheel',
-          x: 0,
-          y: 0,
-          deltaX: deltaX,
-          deltaY: deltaY
-        });
+        // mouse_control_extension 방식으로 스크롤
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            // mouse_control_extension과 동일한 방식으로 스크롤 가능한 요소 찾기
+            const x = window.innerWidth / 2;
+            const y = window.innerHeight / 2;
+            
+            let scrollableElement = document.elementFromPoint(x, y);
+            while (scrollableElement && (scrollableElement.scrollHeight <= scrollableElement.clientHeight || getComputedStyle(scrollableElement).overflowY === 'visible')) {
+              scrollableElement = scrollableElement.parentElement;
+            }
+            
+            if (scrollableElement) {
+              console.log('스크롤 가능한 요소 발견:', scrollableElement);
+              scrollableElement.scrollBy(${deltaX}, ${deltaY});
+              return true;
+            } else {
+              console.log('스크롤 가능한 요소를 찾을 수 없음');
+              // 폴백: 전체 페이지 스크롤
+              window.scrollBy(${deltaX}, ${deltaY});
+              return true;
+            }
+          })()
+        `, true);
       }
     },
     drag: (startX: number, startY: number, endX: number, endY: number) => {
       if (webviewRef.current) {
-        webviewRef.current.sendInputEvent({
-          type: 'mouseDown',
-          x: startX,
-          y: startY,
-          button: 'left',
-          clickCount: 1
-        });
-        webviewRef.current.sendInputEvent({
-          type: 'mouseMove',
-          x: endX,
-          y: endY
-        });
-        webviewRef.current.sendInputEvent({
-          type: 'mouseUp',
-          x: endX,
-          y: endY,
-          button: 'left',
-          clickCount: 1
-        });
+        // mouse_control_extension 방식으로 드래그 이벤트 발생
+        webviewRef.current.executeJavaScript(`
+          (() => {
+            const element = document.elementFromPoint(${startX}, ${startY});
+            if (!element) return false;
+            
+            // mousedown
+            element.dispatchEvent(new MouseEvent('mousedown', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${startX},
+              clientY: ${startY}
+            }));
+            
+            // mousemove
+            element.dispatchEvent(new MouseEvent('mousemove', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${endX},
+              clientY: ${endY}
+            }));
+            
+            // mouseup
+            element.dispatchEvent(new MouseEvent('mouseup', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              clientX: ${endX},
+              clientY: ${endY}
+            }));
+            
+            return true;
+          })()
+        `, true);
       }
     },
     navigate: async (url: string) => {

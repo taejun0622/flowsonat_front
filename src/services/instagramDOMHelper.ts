@@ -52,7 +52,6 @@ export class InstagramDOMHelper {
 
   // DOM 요소 찾기 (webview 내부)
   private async findElement(selector: string, timeout: number = 5000): Promise<{ rect: { left:number; top:number; width:number; height:number }, text?: string } | null> {
-    // webview 내부 DOM 접근을 위한 스크립트 실행
     if (!this.webViewControl.exec) return null;
     const start = Date.now();
     while (Date.now() - start < timeout) {
@@ -71,35 +70,97 @@ export class InstagramDOMHelper {
   // 여러 요소 찾기
   private async findElements(selector: string): Promise<{ rect: { left:number; top:number; width:number; height:number }, text?: string }[]> {
     if (!this.webViewControl.exec) return [];
-    const list = await this.webViewControl.exec((sel: string) => {
-      const elements = document.querySelectorAll(sel);
-      return Array.from(elements).map((el:any)=>{
-        const r = el.getBoundingClientRect();
-        return { rect: { left: r.left, top: r.top, width: r.width, height: r.height }, text: el.textContent || '' };
-      });
-    }, selector);
-    return list || [];
+    try {
+      return await this.webViewControl.exec((sel: string) => {
+        const elements = document.querySelectorAll(sel);
+        return Array.from(elements).map(el => {
+          const r = el.getBoundingClientRect();
+          return { rect: { left: r.left, top: r.top, width: r.width, height: r.height }, text: el.textContent || '' };
+        });
+      }, selector);
+    } catch (error) {
+      console.error('요소들 찾기 실패:', error);
+      return [];
+    }
   }
 
-  // 요소 클릭
-  private async clickElement(info: { rect: { left:number; top:number; width:number; height:number } }): Promise<boolean> {
-    if (!info) return false;
-    const centerX = info.rect.left + info.rect.width / 2;
-    const centerY = info.rect.top + info.rect.height / 2;
-    this.webViewControl.click(centerX, centerY);
-    return true;
+  // mouse_control_extension 방식으로 DOM 이벤트 직접 발생
+  private async dispatchMouseEvent(element: HTMLElement, eventType: string, x: number, y: number): Promise<void> {
+    if (!this.webViewControl.exec) return;
+    
+    await this.webViewControl.exec((el: HTMLElement, type: string, clientX: number, clientY: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: clientX,
+        clientY: clientY
+      });
+      el.dispatchEvent(event);
+    }, element, eventType, x, y);
+  }
+
+  // 요소 클릭 (mouse_control_extension 방식)
+  private async clickElement(elementInfo: { rect: { left:number; top:number; width:number; height:number } }): Promise<boolean> {
+    try {
+      if (!this.webViewControl.exec) return false;
+      
+      const centerX = elementInfo.rect.left + elementInfo.rect.width / 2;
+      const centerY = elementInfo.rect.top + elementInfo.rect.height / 2;
+      
+      // mouse_control_extension과 동일한 방식으로 이벤트 발생
+      const success = await this.webViewControl.exec((x: number, y: number) => {
+        const element = document.elementFromPoint(x, y);
+        if (!element) return false;
+        
+        // mousedown, mouseup, click 이벤트 순서대로 발생
+        element.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: x,
+          clientY: y
+        }));
+        
+        element.dispatchEvent(new MouseEvent('mouseup', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: x,
+          clientY: y
+        }));
+        
+        element.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: x,
+          clientY: y
+        }));
+        
+        return true;
+      }, centerX, centerY);
+      
+      return success;
+    } catch (error) {
+      console.error('요소 클릭 실패:', error);
+      return false;
+    }
   }
 
   // 프로필 페이지로 이동
   async navigateToProfile(username: string): Promise<boolean> {
     try {
-      const profileUrl = `https://www.instagram.com/${username}/`;
+      const url = `https://www.instagram.com/${username}/`;
       if (this.webViewControl.navigate) {
-        await this.webViewControl.navigate(profileUrl);
+        await this.webViewControl.navigate(url);
+        await this.delay(2000); // 페이지 로드 대기
+        console.log(`프로필 페이지 이동 완료: ${username}`);
+        return true;
       }
-      return true;
+      return false;
     } catch (error) {
-      console.error('Fail to:', error);
+      console.error('프로필 페이지 이동 실패:', error);
       return false;
     }
   }
@@ -190,8 +251,7 @@ export class InstagramDOMHelper {
       const success = await this.clickElement(followButton);
       if (success) {
         console.log('Follow 버튼 클릭 완료');
-        // 클릭 후 잠시 대기
-        await this.delay(2000);
+        await this.delay(1000);
       }
       
       return success;
@@ -213,7 +273,6 @@ export class InstagramDOMHelper {
       const success = await this.clickElement(unfollowButton);
       if (success) {
         console.log('Unfollow 버튼 클릭 완료');
-        // 확인 모달이 나타날 수 있으므로 대기
         await this.delay(1000);
         
         // 확인 버튼 클릭 (있는 경우)
@@ -243,7 +302,6 @@ export class InstagramDOMHelper {
       const success = await this.clickElement(followersLink);
       if (success) {
         console.log('Follower 모달 열기 완료');
-        // 모달이 로드될 때까지 대기
         await this.waitForModal();
       }
       
@@ -266,7 +324,6 @@ export class InstagramDOMHelper {
       const success = await this.clickElement(followingLink);
       if (success) {
         console.log('Following 모달 열기 완료');
-        // 모달이 로드될 때까지 대기
         await this.waitForModal();
       }
       
@@ -286,9 +343,6 @@ export class InstagramDOMHelper {
         console.log('모달 닫기 완료');
         return true;
       }
-      
-      // ESC 키로 모달 닫기 시도
-      // webview.sendInputEvent({ type: 'keyDown', keyCode: 27 });
       return true;
     } catch (error) {
       console.error('모달 닫기 실패:', error);
@@ -315,11 +369,11 @@ export class InstagramDOMHelper {
     console.log('모달 로드 타임아웃');
   }
 
-  // 스크롤하며 사용자 목록 수집
+  // mouse_control_extension 방식으로 스크롤하며 사용자 목록 수집
   async scrollAndCollectUsers(): Promise<InstagramUser[]> {
     const users: InstagramUser[] = [];
     let noNewUsersCount = 0;
-    const maxNoNewUsers = 3; // 3번 연속으로 새 사용자가 없으면 중단
+    const maxNoNewUsers = 3;
     
     try {
       while (noNewUsersCount < maxNoNewUsers) {
@@ -332,6 +386,7 @@ export class InstagramDOMHelper {
         );
         
         users.push(...newUsers);
+        console.log(`현재 수집된 사용자: ${users.length}명, 새로 추가된 사용자: ${newUsers.length}명`);
         
         if (newUsers.length === 0) {
           noNewUsersCount++;
@@ -339,7 +394,7 @@ export class InstagramDOMHelper {
           noNewUsersCount = 0;
         }
         
-        // 스크롤 다운
+        // mouse_control_extension 방식으로 스크롤
         await this.scrollDown();
         await this.delay(1000);
         
@@ -358,19 +413,27 @@ export class InstagramDOMHelper {
     }
   }
 
-  // 현재 페이지의 사용자들 수집
+  // 현재 페이지의 사용자들 수집 (mouse_control_extension 방식)
   private async collectCurrentPageUsers(): Promise<InstagramUser[]> {
     const users: InstagramUser[] = [];
     
     try {
-      const userItems = await this.findElements(this.selectors.userListItem);
-      for (const _ of userItems) {
-        const usernameElement = await this.findElement(this.selectors.userUsername);
-        if (usernameElement && usernameElement.text) {
-          const username = usernameElement.text.trim();
-          if (username) users.push({ username });
-        }
-      }
+      if (!this.webViewControl.exec) return users;
+      
+             const userItems = await this.webViewControl.exec(() => {
+         // 모달 내부의 사용자 항목들 찾기
+         const modal = document.querySelector('div[role="dialog"]');
+         if (!modal) return [];
+         
+         const userItems = modal.querySelectorAll('a[data-testid="user-item-username"]');
+         return Array.from(userItems).map(item => {
+           const username = item.textContent?.trim();
+           return username ? { username } : null;
+         }).filter((item): item is { username: string } => item !== null);
+       });
+       
+       users.push(...userItems);
+      console.log(`현재 페이지에서 ${userItems.length}명의 사용자 발견`);
     } catch (error) {
       console.error('현재 페이지 사용자 수집 실패:', error);
     }
@@ -378,9 +441,31 @@ export class InstagramDOMHelper {
     return users;
   }
 
-  // 스크롤 다운
+  // mouse_control_extension 방식으로 스크롤 다운
   private async scrollDown(): Promise<void> {
-    this.webViewControl.scroll(0, 500);
+    try {
+      if (!this.webViewControl.exec) return;
+      
+      await this.webViewControl.exec(() => {
+        // mouse_control_extension과 동일한 방식으로 스크롤 가능한 요소 찾기
+        const x = window.innerWidth / 2;
+        const y = window.innerHeight / 2;
+        
+        let scrollableElement = document.elementFromPoint(x, y);
+        while (scrollableElement && (scrollableElement.scrollHeight <= scrollableElement.clientHeight || getComputedStyle(scrollableElement).overflowY === 'visible')) {
+          scrollableElement = scrollableElement.parentElement;
+        }
+        
+        if (scrollableElement) {
+          console.log('스크롤 가능한 요소 발견:', scrollableElement);
+          scrollableElement.scrollBy(0, 100);
+        } else {
+          console.log('스크롤 가능한 요소를 찾을 수 없음');
+        }
+      });
+    } catch (error) {
+      console.error('스크롤 다운 실패:', error);
+    }
   }
 
   // Follower 모달에서 Follow 버튼이 있는 사용자들 수집
@@ -419,9 +504,16 @@ export class InstagramDOMHelper {
   // 특정 사용자의 Follow 버튼 확인
   private async checkUserFollowButton(_username: string): Promise<boolean> {
     try {
-      // 사용자 항목에서 Follow 버튼 찾기
-      const followButton = await this.findElement(this.selectors.userFollowButton);
-      return followButton !== null;
+      if (!this.webViewControl.exec) return false;
+      
+      return await this.webViewControl.exec(() => {
+        // 모달 내부에서 Follow 버튼 찾기
+        const modal = document.querySelector('div[role="dialog"]');
+        if (!modal) return false;
+        
+        const followButton = modal.querySelector('button[data-testid="follow-button"]');
+        return followButton !== null;
+      });
     } catch (error) {
       console.error('사용자 Follow 버튼 확인 실패:', error);
       return false;
@@ -466,9 +558,12 @@ export class InstagramDOMHelper {
   // 로그인 상태 확인
   async isLoggedIn(): Promise<boolean> {
     try {
-      // 로그인 상태를 확인할 수 있는 요소 찾기
-      const loginIndicator = await this.findElement('a[href="/accounts/activity/"]');
-      return loginIndicator !== null;
+      if (!this.webViewControl.exec) return false;
+      
+      return await this.webViewControl.exec(() => {
+        const loginIndicator = document.querySelector('a[href="/accounts/activity/"]');
+        return loginIndicator !== null;
+      });
     } catch (error) {
       console.error('로그인 상태 확인 실패:', error);
       return false;
@@ -477,29 +572,16 @@ export class InstagramDOMHelper {
 
   // 에러 메시지 확인
   async checkForErrors(): Promise<string[]> {
-    const errors: string[] = [];
-    
     try {
-      // 일반적인 에러 메시지들 확인
-      const errorSelectors = [
-        'div[role="alert"]',
-        '.error-message',
-        '[data-testid="error-message"]'
-      ];
+      if (!this.webViewControl.exec) return [];
       
-      for (const selector of errorSelectors) {
-        const errorElement = await this.findElement(selector);
-        if (errorElement) {
-          const errorText = errorElement.text?.trim();
-          if (errorText) {
-            errors.push(errorText);
-          }
-        }
-      }
+      return await this.webViewControl.exec(() => {
+        const errorElements = document.querySelectorAll('[role="alert"], .error, .alert');
+        return Array.from(errorElements).map(el => el.textContent || '').filter(Boolean);
+      });
     } catch (error) {
-      console.error('에러 확인 실패:', error);
+      console.error('에러 메시지 확인 실패:', error);
+      return [];
     }
-    
-    return errors;
   }
 }
