@@ -23,17 +23,81 @@ export class InstagramAutomation {
   }
 
   private async nav(url: string) {
-    this.webview.loadURL(url);
-    await this.waitForLoad();
+    console.log('nav called with URL:', url);
+    console.log('webview element:', this.webview);
+    
+    try {
+      // Instagram 429 오류 방지를 위한 헤더 추가
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
+      };
+      
+      // @ts-ignore - Electron webview loadURL with headers
+      this.webview.loadURL(url, { extraHeaders: Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('\n') });
+      console.log('loadURL called with headers, waiting for load...');
+      await this.waitForLoad();
+      console.log('Navigation and load completed');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      throw error;
+    }
   }
 
   private async waitForLoad() {
-    await new Promise<void>((resolve) => {
-      const done = () => resolve();
-      const lf = () => { this.webview.removeEventListener('did-finish-load', lf as any); done(); };
+    console.log('waitForLoad started');
+    await new Promise<void>((resolve, reject) => {
+      const done = () => {
+        console.log('waitForLoad resolved');
+        resolve();
+      };
+      
+      const lf = () => { 
+        console.log('did-finish-load event fired');
+        this.webview.removeEventListener('did-finish-load', lf as any); 
+        done(); 
+      };
+      
+      const failLoad = (e: any) => {
+        console.log('did-fail-load event fired:', e);
+        this.webview.removeEventListener('did-fail-load', failLoad as any);
+        
+        // 429 오류 처리
+        if (e.errorCode === 429) {
+          console.log('429 Too Many Requests detected, waiting 30 seconds...');
+          this.progress('rate-limit', 'Instagram rate limit detected, waiting 30 seconds...');
+          setTimeout(() => {
+            console.log('Retrying after rate limit wait...');
+            this.webview.loadURL(this.webview.src);
+          }, 30000);
+        } else {
+          reject(new Error(`Failed to load: ${e.errorDescription || 'Unknown error'}`));
+        }
+      };
+      
       this.webview.addEventListener('did-finish-load', lf as any, { once: true } as any);
+      this.webview.addEventListener('did-fail-load', failLoad as any, { once: true } as any);
+      
+      // 타임아웃 추가 (30초 - 429 오류 대응)
+      setTimeout(() => {
+        console.log('waitForLoad timeout - forcing resolve');
+        this.webview.removeEventListener('did-finish-load', lf as any);
+        this.webview.removeEventListener('did-fail-load', failLoad as any);
+        done();
+      }, 30000);
     });
-    await this.delay(500);
+    console.log('waitForLoad completed, adding delay...');
+    await this.delay(1000); // 429 오류 대응으로 지연 시간 증가
+    console.log('waitForLoad fully completed');
   }
 
   private async exec<T, A extends any[]>(fn: (...args: A) => T | Promise<T>, ...args: A): Promise<T> {
@@ -236,5 +300,122 @@ export class InstagramAutomation {
     const unf = await this.processUnfollow();
     await this.collectTargetsFromBenchmarks();
     await this.processFollow(unf);
+  }
+
+  // 테스트용 public 메서드들
+  async testNavigate(url: string) {
+    console.log('testNavigate called with URL:', url);
+    try {
+      await this.nav(url);
+      console.log('Navigation completed successfully');
+    } catch (error) {
+      console.error('Navigation failed:', error);
+      throw error;
+    }
+  }
+
+  async testOpenModal(kind: 'followers'|'following') {
+    await this.openModal(kind);
+  }
+
+  async testScrollAndCollect(): Promise<Username[]> {
+    return this.scrollAndCollect();
+  }
+
+  async testClickFollowVariant(): Promise<'follow'|'unfollow'|'none'> {
+    return this.clickFollowVariant();
+  }
+
+  // 버튼 선택 기능
+  async startButtonSelection(): Promise<void> {
+    return this.exec(async () => {
+      // 기존 이벤트 리스너 제거
+      if ((window as any).buttonSelectionHandler) {
+        document.removeEventListener('click', (window as any).buttonSelectionHandler);
+      }
+      
+      // 새로운 이벤트 리스너 추가
+      (window as any).buttonSelectionHandler = (event: any) => {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const element = event.target;
+        const rect = element.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        
+        // 선택된 버튼 정보 저장
+        (window as any).selectedButtonInfo = {
+          element: element.tagName + (element.className ? '.' + element.className.split(' ')[0] : ''),
+          text: element.textContent?.trim() || 'No text',
+          x: Math.round(x),
+          y: Math.round(y),
+          tagName: element.tagName,
+          className: element.className,
+          id: element.id
+        };
+        
+        console.log('버튼 선택됨:', (window as any).selectedButtonInfo);
+        
+        // 선택 모드 비활성화
+        document.removeEventListener('click', (window as any).buttonSelectionHandler);
+        document.body.style.cursor = 'auto';
+        
+        // 선택 완료 신호
+        (window as any).buttonSelectionComplete = true;
+      };
+      
+      document.addEventListener('click', (window as any).buttonSelectionHandler);
+      document.body.style.cursor = 'crosshair';
+    });
+  }
+
+  async getSelectedButtonInfo(): Promise<any> {
+    return this.exec(async () => {
+      if ((window as any).selectedButtonInfo) {
+        return (window as any).selectedButtonInfo;
+      }
+      return null;
+    });
+  }
+
+  async clickAtCoordinates(x: number, y: number): Promise<any> {
+    return this.exec(async (clickX: number, clickY: number) => {
+      const element = document.elementFromPoint(clickX, clickY);
+      if (!element) {
+        return { success: false, message: '해당 좌표에 요소가 없습니다.' };
+      }
+      
+      // 클릭 이벤트 발생
+      element.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: clickX,
+        clientY: clickY
+      }));
+      
+      element.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: clickX,
+        clientY: clickY
+      }));
+      
+      element.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX: clickX,
+        clientY: clickY
+      }));
+      
+      return { 
+        success: true, 
+        element: element.tagName + (element.className ? '.' + element.className.split(' ')[0] : ''),
+        text: element.textContent?.substring(0, 50) || 'No text'
+      };
+    }, x, y);
   }
 }
