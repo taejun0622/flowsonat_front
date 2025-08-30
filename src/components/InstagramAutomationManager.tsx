@@ -14,12 +14,14 @@ import { InstagramService } from '@/api/services/InstagramService';
 import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
 import { HealthEnum } from '@/api/models/HealthEnum';
 import { StatusEnum } from '@/api/models/StatusEnum';
+import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramAutomationManagerProps { webviewRef: any }
 
 const InstagramAutomationManager = ({
   webviewRef
 }: InstagramAutomationManagerProps) => {
+  const { instagramAccount, isConnected } = useInstagram();
   const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
   const [state, setState] = React.useState<AutomationState>({
     isRunning: false,
@@ -28,7 +30,6 @@ const InstagramAutomationManager = ({
     totalSteps: 0,
     currentStepIndex: 0
   });
-  const [username, setUsername] = React.useState('');
   const [config, setConfig] = React.useState<InstagramAutomationConfig>({
     maxTargets: 500,
     maxUnfollows: 250,
@@ -43,6 +44,9 @@ const InstagramAutomationManager = ({
   
   const { toast } = useToast();
   const logRef = React.useRef<HTMLDivElement>(null);
+
+  // Get current username from connected Instagram account
+  const currentUsername = instagramAccount?.username || '';
 
   // Browser extension hook usage
   const { state: extensionState } = useBrowserExtension({
@@ -347,23 +351,23 @@ const InstagramAutomationManager = ({
 
   // Start workflow
   const startWorkflow = async () => {
-    if (!automationService || !username.trim()) {
+    if (!automationService || !currentUsername) {
       toast({
         title: "Error",
-        description: "Please enter a username and wait for WebView to be ready.",
+        description: "Please connect to Instagram and wait for WebView to be ready.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      addLog(`Starting workflow: ${username}`);
+      addLog(`Starting workflow: ${currentUsername}`);
       toast({
         title: "Workflow Started",
-        description: `Starting Instagram automation for ${username}.`
+        description: `Starting Instagram automation for ${currentUsername}.`
       });
 
-      await automationService.runWorkflow(username);
+      await automationService.runWorkflow(currentUsername);
       
       addLog('Workflow completed');
       toast({
@@ -446,21 +450,12 @@ const InstagramAutomationManager = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Instagram Username</Label>
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e: any) => setUsername(e.target.value)}
-                  placeholder="Enter username"
-                  disabled={state.isRunning}
-                />
-              </div>
+
 
               <div className="flex gap-4">
                 <Button
                   onClick={startWorkflow}
-                  disabled={!isWebViewReady || state.isRunning || !username.trim()}
+                  disabled={!isWebViewReady || state.isRunning || !currentUsername}
                   className="flex-1"
                 >
                   {state.isRunning ? 'Running...' : 'Start Workflow'}

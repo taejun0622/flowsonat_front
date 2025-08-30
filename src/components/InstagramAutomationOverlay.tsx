@@ -14,6 +14,7 @@ import { InstagramService } from '@/api/services/InstagramService';
 import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
 import { HealthEnum } from '@/api/models/HealthEnum';
 import { StatusEnum } from '@/api/models/StatusEnum';
+import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramAutomationOverlayProps {
   onClose: () => void;
@@ -22,7 +23,7 @@ interface InstagramAutomationOverlayProps {
 export const InstagramAutomationOverlay = ({
   onClose
 }: InstagramAutomationOverlayProps) => {
-  const [username, setUsername] = React.useState('');
+  const { instagramAccount, isConnected } = useInstagram();
   const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
   const [domHelper, setDomHelper] = React.useState<InstagramDOMHelper | null>(null);
   const [state, setState] = React.useState<AutomationState>({
@@ -47,6 +48,9 @@ export const InstagramAutomationOverlay = ({
   
   const webviewRef = React.useRef<HTMLWebViewElement>(null);
   const { toast } = useToast();
+
+  // Get current username from connected Instagram account
+  const currentUsername = instagramAccount?.username || '';
 
   // Browser extension hook
   const { state: extensionState } = useBrowserExtension({
@@ -347,16 +351,16 @@ export const InstagramAutomationOverlay = ({
 
   // Start workflow
   const startWorkflow = async () => {
-    if (!automationService || !username.trim()) {
-      toast({ title: 'Error', description: 'Please enter a username.', variant: 'destructive' });
+    if (!automationService || !isConnected || !currentUsername) {
+      toast({ title: 'Error', description: 'Please connect to Instagram first.', variant: 'destructive' });
       return;
     }
 
     try {
-      addLog(`Workflow started: ${username}`);
-      toast({ title: 'Workflow Started', description: `Starting Instagram automation for ${username}.` });
+      addLog(`Workflow started: ${currentUsername}`);
+      toast({ title: 'Workflow Started', description: `Starting Instagram automation for ${currentUsername}.` });
 
-      await automationService.runWorkflow(username);
+      await automationService.runWorkflow(currentUsername);
       
       addLog('Workflow completed');
       toast({ title: 'Workflow Completed', description: 'Instagram automation completed successfully.' });
@@ -445,22 +449,10 @@ export const InstagramAutomationOverlay = ({
               <CardTitle className="text-white">Control</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-white">Instagram Username</Label>
-                <Input
-                  id="username"
-                  value={username}
-                  onChange={(e: any) => setUsername(e.target.value)}
-                  placeholder="Enter username"
-                  disabled={state.isRunning}
-                  className="bg-gray-800 border-gray-600 text-white"
-                />
-              </div>
-
               <div className="flex gap-2">
                 <Button
                   onClick={startWorkflow}
-                  disabled={state.isRunning || !username.trim()}
+                  disabled={state.isRunning || !isConnected || !currentUsername}
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   <Play className="h-4 w-4 mr-2" />
