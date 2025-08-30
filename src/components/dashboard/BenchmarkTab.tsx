@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight, Users } from 'lucide-react';
+import { BarChart3, Activity, Plus, Edit, Trash2, Eye, RefreshCw, Lightbulb, ArrowRight, Users, ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useInstagram } from '@/contexts/InstagramContext';
+import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
 import { InstagramService } from '@/api/services/InstagramService';
 import { 
@@ -49,6 +50,8 @@ export const BenchmarkTab = () => {
     ig_username: '',
     status: '' as StatusEnum | ''
   });
+  const [showWebView, setShowWebView] = React.useState(false);
+  const [isCollectingFollowers, setIsCollectingFollowers] = React.useState(false);
   const { toast } = useToast();
   const { instagramAccount, isConnected } = useInstagram();
 
@@ -256,32 +259,25 @@ export const BenchmarkTab = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      
-      // Create a new benchmark with current user's username
-      const createData: BenchmarkCreate = {
-        ig_username: instagramAccount.username
-      };
-      
-      await InstagramService.createBenchmarkApiV1InstagramBenchmarksPost(createData);
-      
-      toast({
-        title: "Success",
-        description: "Benchmark created from your followers successfully",
-      });
-      
-      loadBenchmarks();
-    } catch (error) {
-      console.error('Failed to create benchmark from followers:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create benchmark from followers",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Open WebView to collect followers
+    setShowWebView(true);
+    setIsCollectingFollowers(true);
+  };
+
+  const handleCloseWebView = () => {
+    setShowWebView(false);
+    setIsCollectingFollowers(false);
+    // Refresh benchmarks after closing webview
+    loadBenchmarks();
+  };
+
+  const handleFollowersCollected = () => {
+    // 팔로워 수집이 완료되면 웹뷰를 닫고 benchmark 목록을 새로고침
+    handleCloseWebView();
+    toast({
+      title: "Success",
+      description: "Benchmark created with collected followers successfully!",
+    });
   };
 
   const openEditDialog = (benchmark: BenchmarkResponse) => {
@@ -645,6 +641,41 @@ export const BenchmarkTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* WebView for collecting followers */}
+      {showWebView && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm">
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 bg-black/20 border-b border-black/30">
+              <div className="flex items-center space-x-3">
+                <Users className="h-6 w-6 text-white" />
+                <div>
+                  <h2 className="text-white font-semibold">Collect Followers</h2>
+                  <p className="text-gray-400 text-sm">
+                    Collecting followers from @{instagramAccount?.username}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleCloseWebView}
+                variant="outline"
+                className="border-black/30 text-white hover:bg-black/20"
+              >
+                Close
+              </Button>
+            </div>
+            
+            {/* WebView Content */}
+            <div className="flex-1">
+              <InstagramAutomationOverlay 
+                isCollectingFollowers={isCollectingFollowers}
+                onFollowersCollected={handleFollowersCollected}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

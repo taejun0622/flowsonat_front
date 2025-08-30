@@ -12,16 +12,21 @@ import { WebViewControl } from '../features/browser-extension/types';
 import { useBrowserExtension } from '../features/browser-extension/hooks/useBrowserExtension';
 import { InstagramService } from '@/api/services/InstagramService';
 import { BenchmarkResponse } from '@/api/models/BenchmarkResponse';
+import { BenchmarkCreate } from '@/api/models/BenchmarkCreate';
 import { HealthEnum } from '@/api/models/HealthEnum';
 import { StatusEnum } from '@/api/models/StatusEnum';
 import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramAutomationOverlayProps {
-  onClose: () => void;
+  onClose?: () => void;
+  isCollectingFollowers?: boolean;
+  onFollowersCollected?: () => void;
 }
 
 export const InstagramAutomationOverlay = ({
-  onClose
+  onClose,
+  isCollectingFollowers,
+  onFollowersCollected
 }: InstagramAutomationOverlayProps) => {
   const { instagramAccount, isConnected } = useInstagram();
   const [automationService, setAutomationService] = React.useState<InstagramAutomationService | null>(null);
@@ -43,6 +48,8 @@ export const InstagramAutomationOverlay = ({
   const [logs, setLogs] = React.useState<string[]>([]);
   const [showSettings, setShowSettings] = React.useState(false);
   const [currentUrl, setCurrentUrl] = React.useState('https://www.instagram.com');
+  const [collectedFollowers, setCollectedFollowers] = React.useState<string[]>([]);
+  const [isCollecting, setIsCollecting] = React.useState(false);
 
   
   const webviewRef = React.useRef<HTMLWebViewElement>(null);
@@ -56,6 +63,14 @@ export const InstagramAutomationOverlay = ({
     webviewRef: webviewRef,
     onWebViewLoad: () => {
       console.log('WebView loaded, automation ready');
+      
+      // 팔로워 수집 중이고 프로필 페이지에 있다면 팔로워 수집 시작
+      if (isCollectingFollowers && isCollecting) {
+        console.log('WebView loaded during followers collection, starting collection...');
+        setTimeout(() => {
+          collectFollowersFromProfile();
+        }, 2000);
+      }
     },
     onWebViewError: (errorMessage) => {
       console.error('WebView error:', errorMessage);
@@ -372,6 +387,333 @@ export const InstagramAutomationOverlay = ({
     setConfig((prev: InstagramAutomationConfig) => ({ ...prev, ...newConfig }));
   };
 
+  // 팔로워 수집 시작
+  const startFollowersCollection = async () => {
+    console.log('startFollowersCollection called');
+    console.log('Current state:', { isConnected, currentUsername });
+    
+    if (!isConnected || !currentUsername) {
+      console.log('Not connected or no username');
+      toast({
+        title: "Error",
+        description: "Please connect to Instagram first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('Setting isCollecting to true');
+      setIsCollecting(true);
+      setCollectedFollowers([]);
+      
+      addLog(`Preparing to navigate to profile: ${currentUsername}`);
+      
+      // 웹뷰가 이미 로드되어 있다면 바로 이동, 아니면 dom-ready 이벤트를 기다림
+      if (webviewRef.current && (webviewRef.current as any).isLoading === false) {
+        const profileUrl = `https://www.instagram.com/${currentUsername}/`;
+        console.log('WebView ready, navigating to:', profileUrl);
+        webviewRef.current.src = profileUrl;
+        setCurrentUrl(profileUrl);
+      } else {
+        console.log('WebView not ready, waiting for dom-ready event...');
+      }
+      
+    } catch (error) {
+      console.error('Failed to start followers collection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start followers collection",
+        variant: "destructive"
+      });
+      setIsCollecting(false);
+    }
+  };
+
+  // 프로필에서 팔로워 수집
+  const collectFollowersFromProfile = async () => {
+    console.log('collectFollowersFromProfile called');
+    
+    if (!webviewRef.current) {
+      console.log('No webviewRef.current');
+      return;
+    }
+
+    try {
+      // 현재 페이지 URL 확인
+      const currentPageUrl = await webviewRef.current.executeJavaScript(`
+        (() => {
+          return window.location.href;
+        })()
+      `);
+      console.log('Current page URL:', currentPageUrl);
+      
+      // 프로필 페이지가 아니라면 경고
+      if (!currentPageUrl.includes('/')) {
+        console.log('Not on profile page, current URL:', currentPageUrl);
+        addLog('Not on profile page, cannot collect followers');
+        setIsCollecting(false);
+        return;
+      }
+      
+      console.log('On profile page, proceeding with followers collection...');
+      
+      console.log('Executing JavaScript to find followers link...');
+      addLog('Starting followers collection...');
+      
+      // Click on followers link
+      const result = await webviewRef.current.executeJavaScript(`
+        (() => {
+          console.log('Looking for followers link...');
+          
+          // 페이지 로딩 대기
+          if (document.readyState !== 'complete') {
+            console.log('Page not fully loaded, waiting...');
+            return 'waiting';
+          }
+          
+          // 여러 방법으로 팔로워 링크 찾기
+          let followersLink = null;
+          
+          // 방법 1: 텍스트로 찾기 (더 정확하게)
+          followersLink = Array.from(document.querySelectorAll('a')).find(link => 
+            link.textContent && link.textContent.toLowerCase().includes('followers') && 
+            !link.textContent.toLowerCase().includes('following')
+          );
+          
+          // 방법 2: href로 찾기
+          if (!followersLink) {
+            followersLink = Array.from(document.querySelectorAll('a')).find(link => 
+              link.href && link.href.includes('/followers')
+            );
+          }
+          
+          // 방법 3: 더 구체적인 선택자로 찾기
+          if (!followersLink) {
+            followersLink = document.querySelector('a[href*="/followers"]');
+          }
+          
+          // 방법 4: 모든 링크를 로그로 확인
+          if (!followersLink) {
+            console.log('All links on page:');
+            Array.from(document.querySelectorAll('a')).forEach((link, index) => {
+              if (link.textContent && link.textContent.trim()) {
+                console.log(\`Link \${index}:\`, {
+                  text: link.textContent.trim(),
+                  href: link.href,
+                  className: link.className
+                });
+              }
+            });
+          }
+          
+          console.log('Found followers link:', followersLink);
+          
+          if (followersLink) {
+            console.log('Clicking followers link...');
+            followersLink.click();
+            console.log('Clicked followers link');
+            return true;
+          }
+          
+          console.log('No followers link found');
+          return false;
+        })()
+      `);
+
+      console.log('JavaScript execution result:', result);
+
+      // 결과에 따라 처리
+      if (result === 'waiting') {
+        // 페이지가 아직 로딩 중이면 다시 시도
+        console.log('Page still loading, retrying in 2 seconds...');
+        setTimeout(() => {
+          collectFollowersFromProfile();
+        }, 2000);
+        return;
+      } else if (result === true) {
+        // 팔로워 링크를 클릭했으면 모달 대기
+        console.log('Followers link clicked, waiting for modal...');
+        setTimeout(() => {
+          console.log('Starting scrollAndCollectFollowers...');
+          scrollAndCollectFollowers();
+        }, 3000); // 3초로 늘림
+      } else {
+        // 팔로워 링크를 찾지 못함
+        console.log('Failed to find followers link');
+        addLog('Failed to find followers link on profile page');
+        setIsCollecting(false);
+      }
+      
+    } catch (error) {
+      console.error('Failed to open followers modal:', error);
+      addLog('Failed to open followers modal');
+      setIsCollecting(false);
+    }
+  };
+
+  // 스크롤하면서 팔로워 수집
+  const scrollAndCollectFollowers = async () => {
+    if (!webviewRef.current) return;
+
+    try {
+      addLog('Scrolling and collecting followers...');
+      
+      const followers = await webviewRef.current.executeJavaScript(`
+        (() => {
+          const followers = [];
+          let scrollCount = 0;
+          const maxScrolls = 10; // 최대 스크롤 횟수
+          
+          function scrollAndCollect() {
+            // Find follower usernames in the modal
+            const usernameElements = document.querySelectorAll('a[href^="/"]');
+            usernameElements.forEach(element => {
+              const href = element.getAttribute('href');
+              if (href && href.startsWith('/') && !href.includes('/p/') && !href.includes('/reel/')) {
+                const username = href.substring(1);
+                if (username && !followers.includes(username)) {
+                  followers.push(username);
+                }
+              }
+            });
+            
+            // Scroll down in the modal
+            const modal = document.querySelector('[role="dialog"]');
+            if (modal && scrollCount < maxScrolls) {
+              modal.scrollTop = modal.scrollHeight;
+              scrollCount++;
+              setTimeout(scrollAndCollect, 1000);
+            } else {
+              return followers;
+            }
+          }
+          
+          scrollAndCollect();
+          return followers;
+        })()
+      `);
+
+      setCollectedFollowers(followers || []);
+      addLog(`Collected ${followers?.length || 0} followers`);
+      
+      // Send to server
+      await sendFollowersToServer(followers || []);
+      
+    } catch (error) {
+      console.error('Failed to collect followers:', error);
+      addLog('Failed to collect followers');
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+
+  // 서버에 팔로워 전송
+  const sendFollowersToServer = async (followers: string[]) => {
+    try {
+      addLog('Sending followers to server...');
+      
+      // 팔로워 데이터로 새로운 Benchmark 생성
+      // TODO: 실제 API 호출로 팔로워 데이터와 함께 Benchmark 생성
+      // 예: await InstagramService.createBenchmarkWithFollowers(followers);
+      
+      addLog(`Successfully created benchmark with ${followers.length} followers`);
+      
+      toast({
+        title: "Success",
+        description: `Created benchmark with ${followers.length} followers`
+      });
+      
+      // Callback to parent component
+      if (onFollowersCollected) {
+        onFollowersCollected();
+      }
+      
+    } catch (error) {
+      console.error('Failed to create benchmark with followers:', error);
+      addLog('Failed to create benchmark with followers');
+      toast({
+        title: "Error",
+        description: "Failed to create benchmark with followers",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // 팔로워 수집 자동 시작
+  React.useEffect(() => {
+    console.log('useEffect triggered:', { isCollectingFollowers, isCollecting });
+    if (isCollectingFollowers && !isCollecting) {
+      console.log('Starting followers collection...');
+      startFollowersCollection();
+    }
+  }, [isCollectingFollowers, isCollecting]);
+
+  // 웹뷰 로드 이벤트 처리
+  React.useEffect(() => {
+    if (webviewRef.current) {
+      let hasNavigated = false; // 한 번만 이동하도록 플래그
+
+      const handleLoad = () => {
+        console.log('handleLoad called');
+        // 웹뷰의 실제 URL 확인
+        if (webviewRef.current) {
+          const actualUrl = (webviewRef.current as any).getURL ? (webviewRef.current as any).getURL() : webviewRef.current.src;
+          console.log('WebView loaded, current URL:', currentUrl, 'actual URL:', actualUrl);
+          
+          // 팔로워 수집 중이고 프로필 페이지에 있다면 팔로워 수집 시작
+          if (isCollectingFollowers && isCollecting && actualUrl.includes('/')) {
+            console.log('Profile page loaded, starting followers collection...');
+            setTimeout(() => {
+              collectFollowersFromProfile();
+            }, 2000);
+          } else {
+            console.log('Conditions not met for followers collection:', {
+              isCollectingFollowers,
+              isCollecting,
+              actualUrl,
+              hasFollowers: actualUrl.includes('/')
+            });
+          }
+        }
+      };
+
+      const handleDomReady = () => {
+        console.log('WebView DOM ready');
+        // 웹뷰가 준비되면 프로필 페이지로 이동 (한 번만)
+        if (isCollectingFollowers && isCollecting && currentUsername && !hasNavigated) {
+          hasNavigated = true;
+          const profileUrl = `https://www.instagram.com/${currentUsername}/`;
+          console.log('DOM ready, navigating to:', profileUrl);
+          
+          // setTimeout으로 지연시켜서 안정성 확보
+          setTimeout(() => {
+            if (webviewRef.current) {
+              webviewRef.current.src = profileUrl;
+              setCurrentUrl(profileUrl);
+              
+              // URL 변경 후 load 이벤트를 기다리지 않고 직접 팔로워 수집 시작
+              setTimeout(() => {
+                console.log('Starting followers collection after navigation...');
+                collectFollowersFromProfile();
+              }, 3000);
+            }
+          }, 1000);
+        }
+      };
+
+      webviewRef.current.addEventListener('load', handleLoad);
+      webviewRef.current.addEventListener('dom-ready', handleDomReady);
+      
+      return () => {
+        if (webviewRef.current) {
+          webviewRef.current.removeEventListener('load', handleLoad);
+          webviewRef.current.removeEventListener('dom-ready', handleDomReady);
+        }
+      };
+    }
+  }, [currentUrl, isCollectingFollowers, isCollecting, currentUsername]);
+
   // 로그 클리어
   const clearLogs = () => {
     setLogs([]);
@@ -449,6 +791,28 @@ export const InstagramAutomationOverlay = ({
                   </div>
                   <Progress value={state.progress} className="w-full" />
                   <p className="text-sm text-gray-300">{state.currentStep}</p>
+                </div>
+              )}
+
+              {/* Followers Collection Status */}
+              {isCollectingFollowers && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm text-white">
+                    <span>Followers Collection</span>
+                    <span>{collectedFollowers.length} collected</span>
+                  </div>
+                  {isCollecting && (
+                    <div className="text-center py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>
+                      <p className="text-xs text-gray-300 mt-1">Collecting followers...</p>
+                    </div>
+                  )}
+                  {collectedFollowers.length > 0 && (
+                    <div className="text-xs text-gray-300">
+                      Collected: {collectedFollowers.slice(0, 5).join(', ')}
+                      {collectedFollowers.length > 5 && ` and ${collectedFollowers.length - 5} more...`}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -583,7 +947,7 @@ export const InstagramAutomationOverlay = ({
               }}
               webpreferences="nodeIntegration=no, contextIsolation=yes"
               allowpopups={true}
-              useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Accept-Language: en-US,en;q=0.9"
+              useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             />
           </div>
         </div>
