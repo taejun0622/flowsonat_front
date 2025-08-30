@@ -4,6 +4,8 @@ export interface WebViewProps {
   onLoginSuccess?: (sessionData: any) => void;
   webviewRef?: any;
   partition?: string; // optional custom session partition
+  showHeader?: boolean; // show navigation header (default: true)
+  enableExtension?: boolean; // enable custom cursor/extension (default: true)
 }
 
 export interface WebViewManagerProps {

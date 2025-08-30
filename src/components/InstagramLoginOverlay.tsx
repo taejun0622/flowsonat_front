@@ -111,6 +111,8 @@ export const InstagramLoginOverlay = ({
           onClose={handleWebViewClose}
           webviewRef={webviewRef}
           partition={partition}
+          showHeader={false}
+          enableExtension={false}
         />
         
         {/* Instructions Card */}

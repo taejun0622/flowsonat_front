@@ -9,6 +9,8 @@ interface UseBrowserExtensionProps {
   disableAutoActivation?: boolean;
   // When true, do not react to the physical mouse; only programmatic control moves the cursor and triggers actions
   blockPhysicalMouse?: boolean;
+  // Completely disable the extension (no custom cursor, no listeners)
+  enabled?: boolean;
 }
 
 export const useBrowserExtension = ({ 
@@ -16,7 +18,8 @@ export const useBrowserExtension = ({
   onWebViewLoad, 
   onWebViewError,
   disableAutoActivation = false,
-  blockPhysicalMouse = true
+  blockPhysicalMouse = true,
+  enabled = true
 }: UseBrowserExtensionProps) => {
   const [state, setState] = React.useState<BrowserExtensionState>({
     isActive: true, // Always start as active
@@ -58,6 +61,7 @@ export const useBrowserExtension = ({
 
   // 커서 요소 생성
   React.useEffect(() => {
+    if (!enabled) return;
     createCursor();
 
     return () => {
@@ -69,13 +73,14 @@ export const useBrowserExtension = ({
         }
       }
     };
-  }, [createCursor]);
+  }, [createCursor, enabled]);
 
   // webview 로드 완료 시 자동으로 extension 활성화
   const handleWebViewLoaded = React.useCallback(() => {
     console.log('WebView loaded, extension is always active...');
     isWebViewLoadedRef.current = true;
     onWebViewLoad?.();
+    if (!enabled) return;
     
     // Extension is always active, no need to check disableAutoActivation
     
@@ -87,7 +92,7 @@ export const useBrowserExtension = ({
       // 커서를 다시 생성하고 표시
       createCursor();
     }, 500);
-  }, [onWebViewLoad, createCursor]);
+  }, [onWebViewLoad, createCursor, enabled]);
 
   // webview 에러 처리
   const handleWebViewError = React.useCallback((event: any) => {
@@ -98,6 +103,7 @@ export const useBrowserExtension = ({
 
   // webview 로드 이벤트 리스너 등록
   React.useEffect(() => {
+    if (!enabled) return;
     const webview = webviewRef.current;
     if (webview) {
       webview.addEventListener('did-finish-load', handleWebViewLoaded);
@@ -108,11 +114,11 @@ export const useBrowserExtension = ({
         webview.removeEventListener('did-fail-load', handleWebViewError);
       };
     }
-  }, [webviewRef, handleWebViewLoaded, handleWebViewError]);
+  }, [webviewRef, handleWebViewLoaded, handleWebViewError, enabled]);
 
   // 마우스 이벤트 핸들러 (physical mouse -> disabled when blockPhysicalMouse)
   const handleMouseMove = React.useCallback((event: MouseEvent) => {
-    if (!state.isActive || !cursorRef.current) return;
+    if (!enabled || !state.isActive || !cursorRef.current) return;
     if (blockPhysicalMouse) return;
 
     const { clientX, clientY } = event;
@@ -145,10 +151,10 @@ export const useBrowserExtension = ({
         }
       }
     }
-  }, [state.isActive, state.cursorStyle.type, webviewRef, blockPhysicalMouse]);
+  }, [enabled, state.isActive, state.cursorStyle.type, webviewRef, blockPhysicalMouse]);
 
   const handleMouseDown = React.useCallback((event: MouseEvent) => {
-    if (!state.isActive || blockPhysicalMouse) return;
+    if (!enabled || !state.isActive || blockPhysicalMouse) return;
 
     const { clientX, clientY, button } = event;
     isDraggingRef.current = true;
@@ -172,10 +178,10 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef, blockPhysicalMouse]);
+  }, [enabled, state.isActive, webviewRef, blockPhysicalMouse]);
 
   const handleMouseUp = React.useCallback((event: MouseEvent) => {
-    if (!state.isActive || blockPhysicalMouse) return;
+    if (!enabled || !state.isActive || blockPhysicalMouse) return;
 
     isDraggingRef.current = false;
     setState((prev: BrowserExtensionState) => ({ ...prev, isDragging: false }));
@@ -196,10 +202,10 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef, blockPhysicalMouse]);
+  }, [enabled, state.isActive, webviewRef, blockPhysicalMouse]);
 
   const handleWheel = React.useCallback((event: WheelEvent) => {
-    if (!state.isActive || blockPhysicalMouse) return;
+    if (!enabled || !state.isActive || blockPhysicalMouse) return;
 
     const webview = webviewRef.current;
     if (webview) {
@@ -217,12 +223,12 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef, blockPhysicalMouse]);
+  }, [enabled, state.isActive, webviewRef, blockPhysicalMouse]);
 
   // 브라우저 액션 실행
   const executeBrowserAction = React.useCallback(async (action: BrowserAction) => {
     const webview = webviewRef.current;
-    if (!webview) return;
+    if (!enabled || !webview) return;
 
     switch (action.type) {
       case 'click':
@@ -328,7 +334,7 @@ export const useBrowserExtension = ({
         }
         break;
     }
-  }, [webviewRef]);
+  }, [webviewRef, enabled]);
 
   // 익스텐션 활성화/비활성화 - 항상 활성화 상태 유지
   const toggleExtension = React.useCallback(() => {
@@ -338,6 +344,11 @@ export const useBrowserExtension = ({
 
   // 이벤트 리스너 등록/해제
   React.useEffect(() => {
+    if (!enabled) {
+      // Ensure native cursor remains
+      document.body.style.cursor = 'auto';
+      return;
+    }
     if (state.isActive) {
       console.log('Activating extension, setting up event listeners...');
       
@@ -398,7 +409,7 @@ export const useBrowserExtension = ({
       document.removeEventListener('wheel', handleWheel);
       document.body.style.cursor = 'auto';
     };
-  }, [state.isActive, handleMouseMove, handleMouseDown, handleMouseUp, handleWheel, createCursor, blockPhysicalMouse]);
+  }, [enabled, state.isActive, handleMouseMove, handleMouseDown, handleMouseUp, handleWheel, createCursor, blockPhysicalMouse]);
 
   // Programmatic cursor control API
   const moveCursor = React.useCallback((x: number, y: number, cursorType?: CursorStyle['type']) => {

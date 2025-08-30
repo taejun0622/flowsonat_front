@@ -8,17 +8,19 @@ const FullScreenWebView = ({
   onClose,
   onLoginSuccess,
   webviewRef: externalWebviewRef,
-  partition
+  partition,
+  showHeader = true,
+  enableExtension = true,
 }: WebViewProps) => {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const internalWebviewRef = React.useRef<HTMLWebViewElement>(null);
   const webviewRef = externalWebviewRef || internalWebviewRef;
 
-  // Instagram 로그인 페이지에서는 extension 비활성화
-  const isInstagramLogin = url.includes('instagram.com');
+  // Whether to inject fancy cursor animations; only when extension is enabled
+  const shouldInjectCursorAnimations = enableExtension;
 
-  // 브라우저 익스텐션 훅 사용 (Instagram 로그인에서는 비활성화)
+  // 브라우저 익스텐션 훅 사용 (can be disabled via prop)
   const { state: extensionState, isWebViewLoaded } = useBrowserExtension({
     webviewRef: webviewRef,
     onWebViewLoad: () => {
@@ -30,13 +32,14 @@ const FullScreenWebView = ({
       setIsLoading(false);
       console.error('WebView error:', errorMessage);
     },
-    disableAutoActivation: isInstagramLogin, // Instagram 로그인에서는 자동 활성화 비활성화
-    blockPhysicalMouse: true
+    disableAutoActivation: !enableExtension,
+    blockPhysicalMouse: true,
+    enabled: enableExtension,
   });
 
-  // 커서 애니메이션 스타일 추가 (Instagram 로그인에서는 제외)
+  // 커서 애니메이션 스타일 추가 (only when extension enabled)
   React.useEffect(() => {
-    if (isInstagramLogin) return; // 로그인 페이지에서는 커서 애니메이션 적용하지 않음
+    if (!shouldInjectCursorAnimations) return;
     
     const style = document.createElement('style');
     style.textContent = cursorAnimations;
@@ -49,7 +52,7 @@ const FullScreenWebView = ({
         // Style element already removed or not found
       }
     };
-  }, [isInstagramLogin]);
+  }, [shouldInjectCursorAnimations]);
 
   // webview 로딩 상태 직접 감지
   React.useEffect(() => {
@@ -118,87 +121,89 @@ const FullScreenWebView = ({
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Header */}
-      <div style={{
-        height: '50px',
-        backgroundColor: '#1a1a1a',
-        borderBottom: '1px solid #333',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 20px',
-        color: '#fff'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Header (optional) */}
+      {showHeader && (
+        <div style={{
+          height: '50px',
+          backgroundColor: '#1a1a1a',
+          borderBottom: '1px solid #333',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 20px',
+          color: '#fff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={handleGoBack}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              ← Back
+            </button>
+            <button
+              onClick={handleGoForward}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              Forward →
+            </button>
+            <button
+              onClick={handleRefresh}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              ↻ Refresh
+            </button>
+          </div>
+          
+          <div style={{ fontSize: '14px', color: '#ccc' }}>
+            WebView (Extension Always Active)
+          </div>
+          
           <button
-            onClick={handleGoBack}
+            onClick={handleClose}
             style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
+              padding: '8px 16px',
+              backgroundColor: '#dc3545',
               color: '#fff',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: '14px'
             }}
           >
-            ← Back
-          </button>
-          <button
-            onClick={handleGoForward}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
-          >
-            Forward →
-          </button>
-          <button
-            onClick={handleRefresh}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
-          >
-            ↻ Refresh
+            Close
           </button>
         </div>
-        
-        <div style={{ fontSize: '14px', color: '#ccc' }}>
-          WebView (Extension Always Active)
-        </div>
-        
-        <button
-          onClick={handleClose}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#dc3545',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          Close
-        </button>
-      </div>
+      )}
 
       {/* Loading Overlay */}
       {isLoading && (
         <div style={{
           position: 'absolute',
-          top: '50px',
+          top: showHeader ? '50px' : 0,
           left: 0,
           right: 0,
           bottom: 0,
@@ -213,12 +218,9 @@ const FullScreenWebView = ({
           <div style={{ textAlign: 'center' }}>
             <div style={{ marginBottom: '10px' }}>Loading...</div>
             <div style={{ fontSize: '14px', color: '#ccc' }}>
-              {isInstagramLogin 
-                ? 'Loading Instagram login page...' 
-                : isWebViewLoaded 
-                  ? 'Extension will be activated automatically' 
-                  : 'Please wait'
-              }
+              {isWebViewLoaded
+                ? 'Extension will be activated automatically'
+                : 'Please wait'}
             </div>
           </div>
         </div>
@@ -228,7 +230,7 @@ const FullScreenWebView = ({
       {error && (
         <div style={{
           position: 'absolute',
-          top: '50px',
+          top: showHeader ? '50px' : 0,
           left: 0,
           right: 0,
           bottom: 0,
