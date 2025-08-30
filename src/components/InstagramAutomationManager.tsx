@@ -631,10 +631,8 @@ const InstagramAutomationManager = ({
                 </div>
                 <div className="space-y-2">
                   <Label>Browser Extension</Label>
-                  <div className={`px-3 py-2 rounded-md text-sm ${
-                    extensionState.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {extensionState.isActive ? 'Active' : 'Inactive'}
+                  <div className="px-3 py-2 rounded-md text-sm bg-green-100 text-green-800">
+                    Always Active
                   </div>
                 </div>
                 <div className="space-y-2">

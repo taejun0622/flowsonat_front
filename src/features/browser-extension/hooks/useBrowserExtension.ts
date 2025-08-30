@@ -16,7 +16,7 @@ export const useBrowserExtension = ({
   disableAutoActivation = false
 }: UseBrowserExtensionProps) => {
   const [state, setState] = React.useState<BrowserExtensionState>({
-    isActive: false,
+    isActive: true, // Always start as active
     cursorStyle: { type: 'default' },
     mousePosition: { x: 0, y: 0 },
     isDragging: false,
@@ -70,25 +70,21 @@ export const useBrowserExtension = ({
 
   // webview 로드 완료 시 자동으로 extension 활성화
   const handleWebViewLoaded = React.useCallback(() => {
-    console.log('WebView loaded, auto-activating extension...');
+    console.log('WebView loaded, extension is always active...');
     isWebViewLoadedRef.current = true;
     onWebViewLoad?.();
     
-    // disableAutoActivation이 true면 자동 활성화하지 않음
-    if (disableAutoActivation) {
-      console.log('Auto-activation disabled');
-      return;
-    }
+    // Extension is always active, no need to check disableAutoActivation
     
     // 약간의 지연 후 extension 활성화 (webview가 완전히 준비될 때까지)
     setTimeout(() => {
       setState((prev: BrowserExtensionState) => ({ ...prev, isActive: true }));
-      console.log('Extension auto-activated');
+      console.log('Extension is always active');
       
       // 커서를 다시 생성하고 표시
       createCursor();
     }, 500);
-  }, [onWebViewLoad, createCursor, disableAutoActivation]);
+  }, [onWebViewLoad, createCursor]);
 
   // webview 에러 처리
   const handleWebViewError = React.useCallback((event: any) => {
@@ -330,9 +326,10 @@ export const useBrowserExtension = ({
     }
   }, [webviewRef]);
 
-  // 익스텐션 활성화/비활성화
+  // 익스텐션 활성화/비활성화 - 항상 활성화 상태 유지
   const toggleExtension = React.useCallback(() => {
-    setState((prev: BrowserExtensionState) => ({ ...prev, isActive: !prev.isActive }));
+    // Do nothing - extension is always active
+    console.log('Extension toggle disabled - extension is always active');
   }, []);
 
   // 이벤트 리스너 등록/해제

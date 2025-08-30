@@ -25,7 +25,7 @@ const BrowserExtensionControls = ({
         onClick={onToggle}
         style={{
           padding: '12px 16px',
-          backgroundColor: state.isActive ? '#28a745' : '#6c757d',
+          backgroundColor: '#28a745',
           color: '#fff',
           border: 'none',
           borderRadius: '8px',
@@ -51,10 +51,10 @@ const BrowserExtensionControls = ({
           width: '12px',
           height: '12px',
           borderRadius: '50%',
-          backgroundColor: state.isActive ? '#fff' : '#ccc',
-          animation: state.isActive ? 'pulse 2s infinite' : 'none'
+          backgroundColor: '#fff',
+          animation: 'pulse 2s infinite'
         }} />
-        {state.isActive ? 'Extension Active' : 'Extension Inactive'}
+        Extension Always Active
       </button>
 
       {/* 상태 표시 패널 */}

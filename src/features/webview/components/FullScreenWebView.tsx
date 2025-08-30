@@ -1,7 +1,6 @@
 import React from 'react';
 import { WebViewProps } from '../types';
 import { useBrowserExtension } from '../../browser-extension/hooks/useBrowserExtension';
-import BrowserExtensionControls from '../../browser-extension/components/BrowserExtensionControls';
 import { cursorAnimations } from '../../browser-extension/utils/cursorStyles';
 
 const FullScreenWebView = ({
@@ -20,7 +19,7 @@ const FullScreenWebView = ({
   const isInstagramLogin = url.includes('instagram.com');
 
   // 브라우저 익스텐션 훅 사용 (Instagram 로그인에서는 비활성화)
-  const { state: extensionState, toggleExtension, isWebViewLoaded } = useBrowserExtension({
+  const { state: extensionState, isWebViewLoaded } = useBrowserExtension({
     webviewRef: webviewRef,
     onWebViewLoad: () => {
       setIsLoading(false);
@@ -175,7 +174,7 @@ const FullScreenWebView = ({
         </div>
         
         <div style={{ fontSize: '14px', color: '#ccc' }}>
-          WebView {extensionState.isActive && '(Extension Active)'}
+          WebView (Extension Always Active)
         </div>
         
         <button
@@ -276,13 +275,7 @@ const FullScreenWebView = ({
         {...(partition ? { partition } : {})}
       />
 
-      {/* Browser Extension Controls - Instagram 로그인에서는 숨김 */}
-      {!url.includes('instagram.com') && (
-        <BrowserExtensionControls
-          state={extensionState}
-          onToggle={toggleExtension}
-        />
-      )}
+      {/* Browser Extension Controls removed - extension is always active */}
     </div>
   );
 };

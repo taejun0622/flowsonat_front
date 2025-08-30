@@ -49,7 +49,7 @@ export const InstagramAutomationOverlay = ({
   const { toast } = useToast();
 
   // Browser extension hook
-  const { state: extensionState, toggleExtension } = useBrowserExtension({
+  const { state: extensionState } = useBrowserExtension({
     webviewRef: webviewRef,
     onWebViewLoad: () => {
       console.log('WebView loaded, automation ready');
@@ -410,8 +410,8 @@ export const InstagramAutomationOverlay = ({
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-bold text-white">Instagram Automation</h1>
           <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${extensionState.isActive ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-            <span className="text-sm text-gray-300">{extensionState.isActive ? 'Extension Active' : 'Extension Inactive'}</span>
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span className="text-sm text-gray-300">Extension Always Active</span>
           </div>
         </div>
         
@@ -627,14 +627,6 @@ export const InstagramAutomationOverlay = ({
               }}
               className="flex-1 bg-gray-700 border-gray-600 text-white"
             />
-            <Button
-              onClick={() => toggleExtension()}
-              variant={extensionState.isActive ? "default" : "outline"}
-              size="sm"
-              className={extensionState.isActive ? "bg-green-600 hover:bg-green-700" : "text-white border-gray-600 hover:bg-gray-700"}
-            >
-              {extensionState.isActive ? 'Extension ON' : 'Extension OFF'}
-            </Button>
           </div>
 
           {/* WebView */}
