@@ -104,6 +104,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       // Clear local Electron session/cookies for Instagram so next login is fresh
       try {
         await window.electronAPI?.clearInstagramSession?.();
+        console.log('Instagram session cleared successfully');
       } catch (e) {
         console.warn('Failed to clear local Instagram session (non-fatal):', e);
       }
@@ -112,7 +113,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       
       toast({
         title: "Instagram disconnected",
-        description: "Successfully disconnected from Instagram.",
+        description: "Successfully disconnected from Instagram. Session cleared.",
       });
     } catch (error: any) {
       console.error('Failed to disconnect Instagram:', error);

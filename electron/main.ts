@@ -29,7 +29,7 @@ let instagramAuthWindow: BrowserWindow | null
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       webviewTag: true, // Enable webview tag
@@ -95,7 +95,7 @@ ipcMain.handle('open-instagram-login', async (event, url: string) => {
       webSecurity: true,
       allowRunningInsecureContent: false
     },
-    parent: win,
+    parent: win || undefined,
     modal: true,
     show: false
   })
@@ -158,23 +158,37 @@ ipcMain.handle('get-instagram-cookies', async () => {
 // Clear Instagram cookies and storage (used on disconnect)
 ipcMain.handle('clear-instagram-session', async () => {
   try {
+    // Clear both default session and Instagram partition session
     const defaultSession = session.defaultSession
+    const instagramSession = session.fromPartition('instagram-main-session')
 
-    // Clear cookies for instagram domains
-    const cookies = await defaultSession.cookies.get({})
-    const targets = cookies.filter(c => c.domain.includes('instagram.com'))
+    // Clear cookies for instagram domains from default session
+    const defaultCookies = await defaultSession.cookies.get({})
+    const defaultTargets = defaultCookies.filter(c => c.domain && c.domain.includes('instagram.com'))
     await Promise.all(
-      targets.map(c =>
+      defaultTargets.map(c =>
         defaultSession.cookies.remove(
-          `${c.secure ? 'https' : 'http'}://${c.domain.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
+          `${c.secure ? 'https' : 'http'}://${c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
           c.name
         )
       )
     )
 
-    // Clear storage data scoped to Instagram origins
-    const clearForOrigins = async (origin: string) => {
-      await defaultSession.clearStorageData({
+    // Clear cookies from Instagram partition session
+    const instagramCookies = await instagramSession.cookies.get({})
+    const instagramTargets = instagramCookies.filter(c => c.domain && c.domain.includes('instagram.com'))
+    await Promise.all(
+      instagramTargets.map(c =>
+        instagramSession.cookies.remove(
+          `${c.secure ? 'https' : 'http'}://${c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
+          c.name
+        )
+      )
+    )
+
+    // Clear storage data scoped to Instagram origins from both sessions
+    const clearForOrigins = async (sessionInstance: Electron.Session, origin: string) => {
+      await sessionInstance.clearStorageData({
         origin,
         storages: [
           'cookies',
@@ -184,17 +198,19 @@ ipcMain.handle('clear-instagram-session', async () => {
           'serviceworkers',
           'websql',
           'filesystem',
-          'shadercache',
-          'appcache'
+          'shadercache'
         ]
       })
     }
 
     await Promise.all([
-      clearForOrigins('https://www.instagram.com'),
-      clearForOrigins('https://instagram.com')
+      clearForOrigins(defaultSession, 'https://www.instagram.com'),
+      clearForOrigins(defaultSession, 'https://instagram.com'),
+      clearForOrigins(instagramSession, 'https://www.instagram.com'),
+      clearForOrigins(instagramSession, 'https://instagram.com')
     ])
 
+    console.log('Instagram session cleared from both default and partition sessions')
     return { success: true }
   } catch (error) {
     console.error('Failed to clear Instagram session:', error)

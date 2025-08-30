@@ -6,13 +6,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
-import { InstagramLoginOverlay } from '@/components/InstagramLoginOverlay';
+import { InstagramWebView } from '@/components/InstagramWebView';
 import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
-  const [showLoginOverlay, setShowLoginOverlay] = React.useState(false);
+  const [showInstagramWebView, setShowInstagramWebView] = React.useState(false);
   const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
@@ -40,11 +40,11 @@ export const DashboardPage = () => {
     }
   }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
 
-  // Automatically show login overlay when Instagram is not connected
+  // Automatically show Instagram WebView when Instagram is not connected
   React.useEffect(() => {
     if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
-      console.log('Instagram not connected, showing login overlay');
-      setShowLoginOverlay(true);
+      console.log('Instagram not connected, showing Instagram WebView');
+      setShowInstagramWebView(true);
     }
   }, [isCheckingConnection, isConnected, user, hasCheckedConnection]);
 
@@ -61,12 +61,12 @@ export const DashboardPage = () => {
     }
   };
 
-  const handleCloseLoginOverlay = () => {
-    setShowLoginOverlay(false);
+  const handleCloseInstagramWebView = () => {
+    setShowInstagramWebView(false);
   };
 
   const handleConnectInstagram = () => {
-    setShowLoginOverlay(true);
+    setShowInstagramWebView(true);
   };
 
   const handleStartAutomation = () => {
@@ -158,11 +158,16 @@ export const DashboardPage = () => {
         </div>
       </main>
 
-      {/* Instagram Login Overlay */}
-      {showLoginOverlay && (
-        <InstagramLoginOverlay
-          onClose={handleCloseLoginOverlay}
+      {/* Instagram WebView */}
+      {showInstagramWebView && (
+        <InstagramWebView
+          onClose={handleCloseInstagramWebView}
           onLoginSuccess={handleLoginSuccess}
+          onAutomationReady={(username: string) => {
+            console.log('Automation ready for username:', username);
+          }}
+          initialUrl="https://www.instagram.com/accounts/login/"
+          showInstructions={true}
         />
       )}
 
