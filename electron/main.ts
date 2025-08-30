@@ -47,6 +47,14 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
+    // Auto-open DevTools in development
+    win.webContents.openDevTools({ mode: 'undocked' })
+    // If a <webview> is attached, open its DevTools as well
+    win.webContents.on('did-attach-webview', (_event, webContents) => {
+      try {
+        webContents.openDevTools({ mode: 'detach' })
+      } catch {/* no-op */}
+    })
   } else {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))

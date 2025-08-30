@@ -1,11 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useMemo, useCallback } from 'react';
 import { WebViewControl } from '@/features/browser-extension/types';
 
 export const useWebViewControl = () => {
   const webviewRef = useRef<HTMLWebViewElement>(null);
 
-  const webViewControl: WebViewControl = {
-    click: (x: number, y: number) => {
+  // Stable method implementations that read from the ref at call time
+  const click = useCallback((x: number, y: number) => {
       if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
@@ -40,9 +40,10 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    doubleClick: (x: number, y: number) => {
-      if (webviewRef.current) {
+    }, []);
+
+  const doubleClick = useCallback((x: number, y: number) => {
+    if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
             const element = document.elementFromPoint(${x}, ${y});
@@ -102,9 +103,10 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    rightClick: (x: number, y: number) => {
-      if (webviewRef.current) {
+  }, []);
+
+  const rightClick = useCallback((x: number, y: number) => {
+    if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
             const element = document.elementFromPoint(${x}, ${y});
@@ -122,9 +124,10 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    hover: (x: number, y: number) => {
-      if (webviewRef.current) {
+  }, []);
+
+  const hover = useCallback((x: number, y: number) => {
+    if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
             const element = document.elementFromPoint(${x}, ${y});
@@ -142,9 +145,10 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    scroll: (deltaX: number, deltaY: number) => {
-      if (webviewRef.current) {
+  }, []);
+
+  const scroll = useCallback((deltaX: number, deltaY: number) => {
+    if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
             const x = window.innerWidth / 2;
@@ -167,9 +171,10 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    drag: (startX: number, startY: number, endX: number, endY: number) => {
-      if (webviewRef.current) {
+  }, []);
+
+  const drag = useCallback((startX: number, startY: number, endX: number, endY: number) => {
+    if (webviewRef.current) {
         webviewRef.current.executeJavaScript(`
           (() => {
             const element = document.elementFromPoint(${startX}, ${startY});
@@ -203,29 +208,46 @@ export const useWebViewControl = () => {
           })()
         `, true);
       }
-    },
-    navigate: async (url: string) => {
-      if (!webviewRef.current) return;
-      webviewRef.current.loadURL(url);
-      await new Promise<void>((resolve) => {
-        const f = () => { 
-          webviewRef.current?.removeEventListener('did-finish-load', f as any); 
-          resolve(); 
-        };
-        webviewRef.current?.addEventListener('did-finish-load', f as any, { once: true } as any);
-      });
-    },
-    exec: async <T,>(fn: (...fnArgs: any[]) => T | Promise<T>, ...fnArgs: any[]): Promise<T> => {
-      const argsStr = JSON.stringify(fnArgs);
-      return await webviewRef.current!.executeJavaScript(`(${fn.toString()}).apply(null, ${argsStr})`, true);
-    },
-    getUrl: async () => {
-      return webviewRef.current?.getURL?.() || "";
-    },
-    reload: async () => {
-      webviewRef.current?.reload();
-    }
-  };
+  }, []);
+
+  const navigate = useCallback(async (url: string) => {
+    if (!webviewRef.current) return;
+    webviewRef.current.loadURL(url);
+    await new Promise<void>((resolve) => {
+      const f = () => { 
+        webviewRef.current?.removeEventListener('did-finish-load', f as any); 
+        resolve(); 
+      };
+      webviewRef.current?.addEventListener('did-finish-load', f as any, { once: true } as any);
+    });
+  }, []);
+
+  const exec = useCallback(async <T,>(fn: (...fnArgs: any[]) => T | Promise<T>, ...fnArgs: any[]): Promise<T> => {
+    const argsStr = JSON.stringify(fnArgs);
+    return await webviewRef.current!.executeJavaScript(`(${fn.toString()}).apply(null, ${argsStr})`, true);
+  }, []);
+
+  const getUrl = useCallback(async () => {
+    return webviewRef.current?.getURL?.() || "";
+  }, []);
+
+  const reload = useCallback(async () => {
+    webviewRef.current?.reload();
+  }, []);
+
+  // Memoize the control object to keep stable identity across renders
+  const webViewControl: WebViewControl = useMemo(() => ({
+    click,
+    doubleClick,
+    rightClick,
+    hover,
+    scroll,
+    drag,
+    navigate,
+    exec,
+    getUrl,
+    reload,
+  }), [click, doubleClick, rightClick, hover, scroll, drag, navigate, exec, getUrl, reload]);
 
   return {
     webviewRef,
