@@ -64,7 +64,8 @@ export const InstagramAutomationOverlay = ({
     onWebViewError: (errorMessage) => {
       console.error('WebView error:', errorMessage);
       // Toast notification will be handled by the automation service hook
-    }
+    },
+    blockPhysicalMouse: true
   });
 
   // 팔로워 수집 자동 시작
@@ -186,6 +187,15 @@ export const InstagramAutomationOverlay = ({
         <div className="flex-1 flex flex-col">
           {/* WebView */}
           <div className="flex-1 relative">
+            {/* Interaction-blocking overlay: blocks physical mouse from hitting webview */}
+            <div
+              className="absolute inset-0 z-10"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => e.preventDefault()}
+              onDoubleClick={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+              onWheel={(e) => e.preventDefault()}
+            />
             <webview
               ref={webviewRef}
               src={currentUrl}

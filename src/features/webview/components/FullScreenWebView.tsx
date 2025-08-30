@@ -30,7 +30,8 @@ const FullScreenWebView = ({
       setIsLoading(false);
       console.error('WebView error:', errorMessage);
     },
-    disableAutoActivation: isInstagramLogin // Instagram 로그인에서는 자동 활성화 비활성화
+    disableAutoActivation: isInstagramLogin, // Instagram 로그인에서는 자동 활성화 비활성화
+    blockPhysicalMouse: true
   });
 
   // 커서 애니메이션 스타일 추가 (Instagram 로그인에서는 제외)

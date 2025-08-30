@@ -7,13 +7,16 @@ interface UseBrowserExtensionProps {
   onWebViewLoad?: () => void;
   onWebViewError?: (error: string) => void;
   disableAutoActivation?: boolean;
+  // When true, do not react to the physical mouse; only programmatic control moves the cursor and triggers actions
+  blockPhysicalMouse?: boolean;
 }
 
 export const useBrowserExtension = ({ 
   webviewRef, 
   onWebViewLoad, 
   onWebViewError,
-  disableAutoActivation = false
+  disableAutoActivation = false,
+  blockPhysicalMouse = true
 }: UseBrowserExtensionProps) => {
   const [state, setState] = React.useState<BrowserExtensionState>({
     isActive: true, // Always start as active
@@ -107,9 +110,10 @@ export const useBrowserExtension = ({
     }
   }, [webviewRef, handleWebViewLoaded, handleWebViewError]);
 
-  // 마우스 이벤트 핸들러
+  // 마우스 이벤트 핸들러 (physical mouse -> disabled when blockPhysicalMouse)
   const handleMouseMove = React.useCallback((event: MouseEvent) => {
     if (!state.isActive || !cursorRef.current) return;
+    if (blockPhysicalMouse) return;
 
     const { clientX, clientY } = event;
     setState((prev: BrowserExtensionState) => ({ ...prev, mousePosition: { x: clientX, y: clientY } }));
@@ -141,10 +145,10 @@ export const useBrowserExtension = ({
         }
       }
     }
-  }, [state.isActive, state.cursorStyle.type, webviewRef]);
+  }, [state.isActive, state.cursorStyle.type, webviewRef, blockPhysicalMouse]);
 
   const handleMouseDown = React.useCallback((event: MouseEvent) => {
-    if (!state.isActive) return;
+    if (!state.isActive || blockPhysicalMouse) return;
 
     const { clientX, clientY, button } = event;
     isDraggingRef.current = true;
@@ -168,10 +172,10 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef]);
+  }, [state.isActive, webviewRef, blockPhysicalMouse]);
 
   const handleMouseUp = React.useCallback((event: MouseEvent) => {
-    if (!state.isActive) return;
+    if (!state.isActive || blockPhysicalMouse) return;
 
     isDraggingRef.current = false;
     setState((prev: BrowserExtensionState) => ({ ...prev, isDragging: false }));
@@ -192,10 +196,10 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef]);
+  }, [state.isActive, webviewRef, blockPhysicalMouse]);
 
   const handleWheel = React.useCallback((event: WheelEvent) => {
-    if (!state.isActive) return;
+    if (!state.isActive || blockPhysicalMouse) return;
 
     const webview = webviewRef.current;
     if (webview) {
@@ -213,7 +217,7 @@ export const useBrowserExtension = ({
         executeBrowserAction(action);
       }
     }
-  }, [state.isActive, webviewRef]);
+  }, [state.isActive, webviewRef, blockPhysicalMouse]);
 
   // 브라우저 액션 실행
   const executeBrowserAction = React.useCallback(async (action: BrowserAction) => {
@@ -337,14 +341,20 @@ export const useBrowserExtension = ({
     if (state.isActive) {
       console.log('Activating extension, setting up event listeners...');
       
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mousedown', handleMouseDown);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.addEventListener('wheel', handleWheel);
+      if (!blockPhysicalMouse) {
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('wheel', handleWheel);
+      }
       document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-      // 기본 커서 숨기기
-      document.body.style.cursor = 'none';
+      // 기본 커서 숨기기: 물리 마우스를 사용할 때만 전역 숨김
+      if (!blockPhysicalMouse) {
+        document.body.style.cursor = 'none';
+      } else {
+        document.body.style.cursor = 'auto';
+      }
       
       // 커서가 없다면 생성
       if (!cursorRef.current) {
@@ -388,12 +398,26 @@ export const useBrowserExtension = ({
       document.removeEventListener('wheel', handleWheel);
       document.body.style.cursor = 'auto';
     };
-  }, [state.isActive, handleMouseMove, handleMouseDown, handleMouseUp, handleWheel, createCursor]);
+  }, [state.isActive, handleMouseMove, handleMouseDown, handleMouseUp, handleWheel, createCursor, blockPhysicalMouse]);
+
+  // Programmatic cursor control API
+  const moveCursor = React.useCallback((x: number, y: number, cursorType?: CursorStyle['type']) => {
+    if (!cursorRef.current) return;
+    cursorRef.current.style.left = `${x}px`;
+    cursorRef.current.style.top = `${y}px`;
+    if (cursorType) {
+      cursorRef.current.style.cssText = getCursorStyle(cursorType);
+      cursorRef.current.style.left = `${x}px`;
+      cursorRef.current.style.top = `${y}px`;
+    }
+    setState((prev: BrowserExtensionState) => ({ ...prev, mousePosition: { x, y }, cursorStyle: { type: cursorType || prev.cursorStyle.type } }));
+  }, []);
 
   return {
     state,
     toggleExtension,
     executeBrowserAction,
-    isWebViewLoaded: isWebViewLoadedRef.current
+    isWebViewLoaded: isWebViewLoadedRef.current,
+    moveCursor
   };
 };
