@@ -53,8 +53,8 @@ export const DashboardPage = () => {
   }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
   const handleStartAutomation = () => {
-    // Open full-screen WebView manager in minimal mode
-    navigate('/webview?minimal=1');
+    // Open full-screen WebView manager in minimal mode with auto-execution
+    navigate('/webview?minimal=1&autoExecute=1');
   };
 
   const handleRefresh = () => {

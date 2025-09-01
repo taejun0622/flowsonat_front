@@ -260,8 +260,8 @@ export const BenchmarkTab = () => {
       return;
     }
 
-    // Open full-screen WebView manager in minimal mode; extension can handle following actions there
-    navigate('/webview?minimal=1');
+    // Open full-screen WebView manager in minimal mode with auto-following collection
+    navigate('/webview?minimal=1&autoCollectFollowing=1');
   };
 
   const openEditDialog = (benchmark: BenchmarkResponse) => {

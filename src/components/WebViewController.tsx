@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { WebView, WebViewHandle } from './WebView';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useToast } from '../hooks/use-toast';
@@ -27,7 +26,6 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
   const [clickableElements, setClickableElements] = useState<any[]>([]);
   const [scrollableAreas, setScrollableAreas] = useState<any[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
-  const [testText, setTestText] = useState<string>('');
 
   // Enable extension when IG is logged in (server registered assumed by container)
   const shouldEnableExtension = instagramState === 'instagram_logged_in';
@@ -112,91 +110,86 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
     }
   };
 
+  const getElementInfo = async () => {
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    
+    try {
+      const { x, y } = cursorPosition;
+      const element = await webviewRef.current.getElementInfo(x, y);
+      setSelectedElement(element);
+      
+      toast({
+        title: "Element Info Retrieved",
+        description: `Element at (${x}, ${y}): ${element?.tagName || 'None'}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to get element info",
+        variant: "destructive",
+      });
+    }
+  };
+
   const findClickableElements = async () => {
-    if (webviewRef.current && isExtensionEnabled) {
-      try {
-        const elements = await webviewRef.current.findClickableElements();
-        setClickableElements(elements);
-        toast({
-          title: "Clickable Elements Found",
-          description: `Found ${elements.length} clickable elements`,
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to find clickable elements",
-          variant: "destructive",
-        });
-      }
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    
+    try {
+      const elements = await webviewRef.current.findClickableElements();
+      setClickableElements(elements);
+      
+      toast({
+        title: "Clickable Elements Found",
+        description: `Found ${elements.length} clickable elements`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to find clickable elements",
+        variant: "destructive",
+      });
     }
   };
 
   const findScrollableAreas = async () => {
-    if (webviewRef.current && isExtensionEnabled) {
-      try {
-        const areas = await webviewRef.current.findScrollableAreas();
-        setScrollableAreas(areas);
-        toast({
-          title: "Scrollable Areas Found",
-          description: `Found ${areas.length} scrollable areas`,
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to find scrollable areas",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const getElementInfo = async () => {
-    if (webviewRef.current && isExtensionEnabled) {
-      try {
-        const info = await webviewRef.current.getElementInfo(cursorPosition.x, cursorPosition.y);
-        setSelectedElement(info);
-        if (info) {
-          toast({
-            title: "Element Info",
-            description: `${info.tagName} - ${info.text.substring(0, 50)}...`,
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to get element info",
-          variant: "destructive",
-        });
-      }
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    
+    try {
+      const areas = await webviewRef.current.findScrollableAreas();
+      setScrollableAreas(areas);
+      
+      toast({
+        title: "Scrollable Areas Found",
+        description: `Found ${areas.length} scrollable areas`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to find scrollable areas",
+        variant: "destructive",
+      });
     }
   };
 
   const takeScreenshot = async () => {
-    if (webviewRef.current && isExtensionEnabled) {
-      try {
-        const screenshot = await webviewRef.current.takeScreenshot();
-        toast({
-          title: "Screenshot Taken",
-          description: `Viewport: ${screenshot.width}x${screenshot.height}`,
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to take screenshot",
-          variant: "destructive",
-        });
-      }
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    
+    try {
+      const screenshot = await webviewRef.current.takeScreenshot();
+      toast({
+        title: "Screenshot Taken",
+        description: `Viewport: ${screenshot.width}x${screenshot.height}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to take screenshot",
+        variant: "destructive",
+      });
     }
   };
 
-  // Test HUD actions
-  const handleClickByText = async (text: string) => {
-    if (!webviewRef.current || !isExtensionEnabled) return;
-    try {
-      await webviewRef.current.clickByText(text);
-      toast({ title: 'ClickByText', description: `Tried: ${text}` });
-    } catch {}
-  };
+
 
   const handleScrollStep = (dy: number) => {
     if (!webviewRef.current || !isExtensionEnabled) return;
@@ -228,45 +221,6 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
             onContextMenu={handleRightClick}
             onWheel={handleScroll}
           />
-        )}
-
-        {/* Test HUD Overlay */}
-        {isExtensionEnabled && (
-          <div
-            className="absolute top-4 right-4 z-20 w-80 bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg backdrop-blur p-3 space-y-2"
-            onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
-            onMouseUp={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
-            onClick={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
-            onWheel={(e: React.WheelEvent<HTMLDivElement>) => { e.stopPropagation(); }}
-          >
-            <div className="text-sm font-medium mb-1">Extension Test HUD</div>
-            <div className="grid grid-cols-3 gap-2">
-              <Button size="sm" variant="outline" onClick={() => findClickableElements()}>Find Btns</Button>
-              <Button size="sm" variant="outline" onClick={() => findScrollableAreas()}>Find Scroll</Button>
-              <Button size="sm" variant="outline" onClick={() => getElementInfo()}>Elem Info</Button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Button size="sm" onClick={() => handleClickByText('Follow')}>Follow</Button>
-              <Button size="sm" onClick={() => handleClickByText('Following')}>Following</Button>
-              <Button size="sm" onClick={() => handleClickByText('Unfollow')}>Unfollow</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleClickByText('Requested')}>Requested</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleClickByText('followers')}>followers</Button>
-              <Button size="sm" variant="secondary" onClick={() => handleClickByText('following')}>following</Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Text to click..."
-                value={testText}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTestText(e.target.value)}
-              />
-              <Button size="sm" onClick={() => testText && handleClickByText(testText)}>Go</Button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Button size="sm" variant="outline" onClick={() => handleScrollStep(-250)}>Scroll Up</Button>
-              <div className="text-center text-xs text-gray-600 dark:text-gray-400 py-1">x{cursorPosition.x} y{cursorPosition.y}</div>
-              <Button size="sm" variant="outline" onClick={() => handleScrollStep(250)}>Scroll Down</Button>
-            </div>
-          </div>
         )}
       </div>
 
