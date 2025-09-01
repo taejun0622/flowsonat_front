@@ -17,7 +17,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 }) => {
   const navigate = useNavigate();
   const { disconnectAccount } = useInstagram();
-  const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/');
+  const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
   
@@ -200,6 +200,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         onError={handleWebViewError}
         onInstagramLogin={handleInstagramLogin}
         onLoginStatusCheck={handleInstagramStatusCheck}
+        instagramState={webViewStatus.state}
         className="w-full h-full"
       />
         

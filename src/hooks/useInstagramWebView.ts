@@ -102,6 +102,9 @@ export const useInstagramWebView = () => {
           description: "Your Instagram account has been successfully connected.",
           variant: "default"
         });
+
+        // 이미 서버에 연결된 상태에서 로그인 감지되면 바로 Dashboard로 돌아가기
+        navigate('/dashboard');
       }
 
     } catch (error) {

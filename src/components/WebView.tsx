@@ -12,6 +12,7 @@ interface WebViewProps {
   onInstagramLogin?: (sessionData: any) => void;
   onLoginStatusCheck?: (isLoggedIn: boolean) => void;
   className?: string;
+  instagramState?: string; // Instagram 상태 추가
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -20,7 +21,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   onError,
   onInstagramLogin,
   onLoginStatusCheck,
-  className = ""
+  className = "",
+  instagramState
 }, ref) => {
   const webviewRef = useRef<any>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -40,9 +42,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     }
   }));
 
-  // 주기적으로 Instagram 로그인 상태 확인
+  // 주기적으로 Instagram 로그인 상태 확인 (로그아웃 + 서버 미등록 상태에서만)
   useEffect(() => {
     if (!webviewRef.current || !src.includes('instagram.com')) return;
+    
+    // instagram_logged_out_server_unregistered 상태에서만 주기적 체크 실행
+    if (instagramState !== 'instagram_logged_out_server_unregistered') {
+      console.log('Periodic check skipped - not in unregistered state:', instagramState);
+      return;
+    }
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -71,7 +79,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     }, 5000); // 5초로 늘림
 
     return () => clearInterval(interval);
-  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck]);
+  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState]);
 
   useEffect(() => {
     const webview = webviewRef.current;

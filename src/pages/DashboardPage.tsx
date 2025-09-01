@@ -18,7 +18,7 @@ export const DashboardPage = () => {
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
 
-  // Check Instagram connection status when entering dashboard (run only once)
+  // Check Instagram connection status when entering dashboard and handle auto-navigation
   React.useEffect(() => {
     const checkInstagramConnection = async () => {
       if (!user || hasCheckedConnection || isCheckingConnection) return;
@@ -39,7 +39,18 @@ export const DashboardPage = () => {
     if (user && !hasCheckedConnection && !isCheckingConnection) {
       checkInstagramConnection();
     }
-  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
+  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]);
+
+  // Auto-navigate to Instagram WebView based on connection status
+  React.useEffect(() => {
+    if (!hasCheckedConnection || isCheckingConnection) return;
+
+    // 로그아웃 상태면 바로 Instagram WebView로 이동
+    if (!isConnected) {
+      console.log('Instagram not connected, navigating to WebView...');
+      navigate('/webview');
+    }
+  }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
   const handleStartAutomation = () => {
     setShowAutomationOverlay(true);
