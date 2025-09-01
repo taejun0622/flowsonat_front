@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Info, Loader2, Users } from 'lucide-react';
 import { WebView, WebViewHandle } from './WebView';
 import { useInstagramWebView } from '@/hooks/useInstagramWebView';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { InstagramUsernameConfirmModal } from './InstagramUsernameConfirmModal';
 import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
+import { collectFollowingToBenchmark, FollowingCollectorResult } from '@/services/followingCollectorService';
 
 interface InstagramWebViewManagerProps {
   className?: string;
@@ -19,7 +20,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   minimal = false
 }) => {
   const navigate = useNavigate();
-  const { disconnectAccount } = useInstagram();
+  const { disconnectAccount, instagramAccount } = useInstagram();
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
@@ -74,6 +75,8 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // WebView 로드 완료 핸들러
   const handleWebViewLoad = useCallback(() => {
     setIsLoading(false);
+    setIsWebViewReady(true);
+    console.log('[WebView] Load completed, WebView is ready');
   }, []);
 
   // WebView 에러 핸들러
@@ -101,6 +104,13 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const [testText, setTestText] = useState<string>('');
   const [typeTextInput, setTypeTextInput] = useState<string>('');
   const [usernameInput, setUsernameInput] = useState<string>('');
+  
+  // Following collection state
+  const [isCollectingFollowing, setIsCollectingFollowing] = useState<boolean>(false);
+  const [collectedFollowing, setCollectedFollowing] = useState<string[]>([]);
+  const [collectionProgress, setCollectionProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [collectionStatus, setCollectionStatus] = useState<string>('');
+  const [isWebViewReady, setIsWebViewReady] = useState<boolean>(false);
   const handleClickByText = useCallback(async (text: string) => {
     if (!webviewApiRef.current || !extensionActive) return;
     try {
@@ -111,6 +121,69 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       console.error('[HUD] clickByText error:', err);
     }
   }, [extensionActive]);
+
+  // Following collection function
+  const startFollowingCollection = useCallback(async () => {
+    if (!webviewApiRef.current || !extensionActive || !instagramAccount?.username) {
+      console.error('[Following Collection] Cannot start: missing requirements');
+      return;
+    }
+
+    if (!isWebViewReady) {
+      console.error('[Following Collection] Cannot start: WebView not ready');
+      setCollectionStatus('WebView not ready. Please wait...');
+      return;
+    }
+
+    setIsCollectingFollowing(true);
+    setCollectedFollowing([]);
+    setCollectionProgress({ current: 0, total: 0 });
+    setCollectionStatus('Starting collection...');
+
+    try {
+      // Navigate to user's profile first
+      const profileUrl = `https://www.instagram.com/${instagramAccount.username}`;
+      setCurrentUrl(profileUrl);
+      setCollectionStatus('Navigating to profile...');
+      
+      // Wait for navigation
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Use the following collection service
+      setCollectionStatus('Starting following collection service...');
+      const result: FollowingCollectorResult = await collectFollowingToBenchmark(
+        webviewApiRef.current,
+        instagramAccount.username,
+        {
+          scrollDelay: 2000, // Increased delay
+          pageLoadDelay: 3000,
+          onProgress: (current: number, total: number, status: string) => {
+            setCollectionProgress({ current, total });
+            setCollectionStatus(status);
+          }
+        }
+      );
+
+      if (result.success) {
+        setCollectedFollowing(result.following);
+        setCollectionProgress({ current: result.collectedCount, total: result.collectedCount });
+        setCollectionStatus(`Successfully collected ${result.collectedCount} following!`);
+        
+        // Navigate back to dashboard after a delay
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 3000);
+      } else {
+        setCollectionStatus(`Error: ${result.error || 'Unknown error'}`);
+      }
+      
+    } catch (error) {
+      console.error('[Following Collection] Error:', error);
+      setCollectionStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsCollectingFollowing(false);
+    }
+  }, [extensionActive, instagramAccount?.username, navigate, isWebViewReady]);
   const handleScrollStep = useCallback((dy: number) => {
     if (!webviewApiRef.current || !extensionActive) return;
     // Use center of container for scroll if no recent mouse event
@@ -380,6 +453,55 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
                 <Button size="sm" onClick={clickUnfollow}>Unfollow</Button>
                 <Button size="sm" onClick={clickFollowing}>Following</Button>
                 <Button size="sm" onClick={clickRequested}>Requested</Button>
+              </div>
+              
+              {/* Following Collection Section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Following Collection</div>
+                <Button 
+                  size="sm" 
+                  onClick={startFollowingCollection}
+                  disabled={isCollectingFollowing || !extensionActive || !isWebViewReady}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                >
+                  {isCollectingFollowing ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Collecting...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3 w-3 mr-1" />
+                      Collect My Following
+                    </>
+                  )}
+                </Button>
+                
+                {isCollectingFollowing && (
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      {collectionStatus}
+                    </div>
+                    {collectionProgress.total > 0 && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Progress: {collectionProgress.current} / {collectionProgress.total}
+                      </div>
+                    )}
+                    {collectedFollowing.length > 0 && (
+                      <div className="text-xs text-green-600 dark:text-green-400">
+                        Collected: {collectedFollowing.length} following
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {!isWebViewReady && (
+                  <div className="mt-2">
+                    <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                      Waiting for WebView to load...
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

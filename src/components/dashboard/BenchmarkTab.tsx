@@ -25,7 +25,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useNavigate } from 'react-router-dom';
 
-
 import { InstagramService } from '@/api/services/InstagramService';
 import { 
   BenchmarkCreate, 
@@ -250,8 +249,18 @@ export const BenchmarkTab = () => {
     }
   };
 
-  const handleAddMyFollowersToBenchmark = async () => {
-    // Open full-screen WebView manager in minimal mode; extension can handle follower actions there
+  const handleAddMyFollowingToBenchmark = async () => {
+    // Check if Instagram is connected
+    if (!isConnected || !instagramAccount?.username) {
+      toast({
+        title: "Instagram Not Connected",
+        description: "Please connect your Instagram account first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Open full-screen WebView manager in minimal mode; extension can handle following actions there
     navigate('/webview?minimal=1');
   };
 
@@ -485,11 +494,11 @@ export const BenchmarkTab = () => {
               <p className="text-gray-300">No benchmarks found</p>
               <p className="text-gray-400 text-sm mb-6">Create your first benchmark to get started</p>
               <Button 
-                onClick={handleAddMyFollowersToBenchmark}
+                onClick={handleAddMyFollowingToBenchmark}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
               >
                 <Users className="h-4 w-4 mr-2" />
-                Add My Followers to Benchmark
+                Add My Following to Benchmark
               </Button>
             </div>
           ) : (

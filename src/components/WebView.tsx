@@ -29,6 +29,7 @@ export interface WebViewHandle {
   clickFollowingButton: () => Promise<boolean>;
   clickRequestedButton: () => Promise<boolean>;
   clickUnfollowButton: () => Promise<boolean>;
+  executeScript: (script: string) => Promise<any>;
 }
 
 interface WebViewProps {
@@ -609,6 +610,24 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         return !!res;
       }
       return false;
+    },
+    executeScript: async (script: string) => {
+      if (webviewRef.current) {
+        try {
+          // Wait a bit for DOM to be ready if not already
+          if (!isDomReady) {
+            console.log('[WebView] DOM not ready, waiting...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          const res = await webviewRef.current.executeJavaScript(script);
+          return res;
+        } catch (error) {
+          console.error('[WebView] EXECUTE_SCRIPT error:', error);
+          return null;
+        }
+      }
+      return null;
     }
   }));
 
