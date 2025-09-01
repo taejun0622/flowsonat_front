@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Info, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Info, Loader2, Users, Bot } from 'lucide-react';
 import { WebView, WebViewHandle } from './WebView';
 import { useInstagramWebView } from '@/hooks/useInstagramWebView';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { InstagramUsernameConfirmModal } from './InstagramUsernameConfirmModal';
 import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { collectFollowingToBenchmark, FollowingCollectorResult } from '@/services/followingCollectorService';
+import { executeAutomation, AutomationResult } from '@/services/automationService';
 
 interface InstagramWebViewManagerProps {
   className?: string;
@@ -111,6 +112,12 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const [collectionProgress, setCollectionProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [collectionStatus, setCollectionStatus] = useState<string>('');
   const [isWebViewReady, setIsWebViewReady] = useState<boolean>(false);
+  
+  // Automation state
+  const [isRunningAutomation, setIsRunningAutomation] = useState<boolean>(false);
+  const [automationProgress, setAutomationProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [automationStatus, setAutomationStatus] = useState<string>('');
+  const [automationResult, setAutomationResult] = useState<AutomationResult | null>(null);
   const handleClickByText = useCallback(async (text: string) => {
     if (!webviewApiRef.current || !extensionActive) return;
     try {
@@ -182,6 +189,82 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       setCollectionStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsCollectingFollowing(false);
+    }
+  }, [extensionActive, instagramAccount?.username, navigate, isWebViewReady]);
+  
+  // Automation execution function
+  const startAutomation = useCallback(async () => {
+    if (!webviewApiRef.current || !extensionActive || !instagramAccount?.username) {
+      console.error('[Automation] Cannot start: missing requirements');
+      return;
+    }
+
+    if (!isWebViewReady) {
+      console.error('[Automation] Cannot start: WebView not ready');
+      setAutomationStatus('WebView not ready. Please wait...');
+      return;
+    }
+
+    setIsRunningAutomation(true);
+    setAutomationProgress({ current: 0, total: 0 });
+    setAutomationStatus('Starting automation...');
+    setAutomationResult(null);
+
+    try {
+      // For now, we'll use a mock benchmark
+      // In real implementation, you would get the actual benchmark from props or context
+      const mockBenchmark = {
+        id: 'mock-benchmark',
+        user_id: 'mock-user-id',
+        ig_id: 'mock-ig-id',
+        ig: { 
+          id: 'mock-ig-id',
+          username: instagramAccount.username,
+          status: 'ACTIVE' as any,
+          created_at: new Date().toISOString()
+        },
+        status: 'ACTIVE' as any,
+        health: 'HEALTHY' as any,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const result: AutomationResult = await executeAutomation(
+        webviewApiRef.current,
+        instagramAccount.username,
+        mockBenchmark,
+        {
+          scrollDelay: 2000,
+          pageLoadDelay: 3000,
+          maxIterations: 10, // Limit for testing
+          onProgress: (current: number, total: number, status: string) => {
+            setAutomationProgress({ current, total });
+            setAutomationStatus(status);
+          },
+          onAction: (action: string, target: string, result: boolean) => {
+            console.log(`[Automation] Action: ${action} on ${target} - ${result ? 'Success' : 'Failed'}`);
+          }
+        }
+      );
+
+      setAutomationResult(result);
+      
+      if (result.success) {
+        setAutomationStatus(`Automation completed successfully! ${result.actionsPerformed} actions performed in ${result.executionTime}ms`);
+        
+        // Navigate back to dashboard after a delay
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 3000);
+      } else {
+        setAutomationStatus(`Automation failed: ${result.errors.join(', ')}`);
+      }
+      
+    } catch (error) {
+      console.error('[Automation] Error:', error);
+      setAutomationStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRunningAutomation(false);
     }
   }, [extensionActive, instagramAccount?.username, navigate, isWebViewReady]);
   const handleScrollStep = useCallback((dy: number) => {
@@ -476,6 +559,56 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
                     </>
                   )}
                 </Button>
+                
+                {/* Automation Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Automation</div>
+                  <Button 
+                    size="sm" 
+                    onClick={startAutomation}
+                    disabled={isRunningAutomation || !extensionActive || !isWebViewReady}
+                    className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white"
+                  >
+                    {isRunningAutomation ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Running...
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="h-3 w-3 mr-1" />
+                        Execute Automation
+                      </>
+                    )}
+                  </Button>
+                  
+                  {isRunningAutomation && (
+                    <div className="mt-2 space-y-1">
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {automationStatus}
+                      </div>
+                      {automationProgress.total > 0 && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Progress: {automationProgress.current} / {automationProgress.total}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {automationResult && (
+                    <div className="mt-2 space-y-1">
+                      <div className={`text-xs ${automationResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {automationResult.success ? 'Success' : 'Failed'}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Actions: {automationResult.actionsPerformed}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Time: {automationResult.executionTime}ms
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 {isCollectingFollowing && (
                   <div className="mt-2 space-y-1">

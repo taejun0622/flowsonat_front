@@ -8,6 +8,7 @@ import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useWebView } from '@/hooks/useWebView';
+import { executeAutomation, AutomationResult } from '@/services/automationService';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
