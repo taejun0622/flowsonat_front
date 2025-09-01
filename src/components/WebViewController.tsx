@@ -28,8 +28,8 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
   const [scrollableAreas, setScrollableAreas] = useState<any[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
 
-  // Instagram 로그인 + 서버 저장된 상태에서만 확장프로그램 활성화
-  const shouldEnableExtension = instagramState === 'instagram_logged_in_server_registered';
+  // Enable extension when IG is logged in (server registered assumed by container)
+  const shouldEnableExtension = instagramState === 'instagram_logged_in';
 
   useEffect(() => {
     if (shouldEnableExtension && !isExtensionEnabled) {

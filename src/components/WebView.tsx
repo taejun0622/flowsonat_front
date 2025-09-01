@@ -29,6 +29,7 @@ interface WebViewProps {
   className?: string;
   instagramState?: string; // Instagram 상태 추가
   enableExtension?: boolean; // 확장프로그램 활성화 여부
+  disablePointerEvents?: boolean; // 사용자 물리적 입력 차단
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -39,7 +40,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   onLoginStatusCheck,
   className = "",
   instagramState,
-  enableExtension = false
+  enableExtension = false,
+  disablePointerEvents = false
 }, ref) => {
   const webviewRef = useRef<any>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -48,9 +50,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [lastCheckTime, setLastCheckTime] = useState(0);
   const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
   const [extensionActive, setExtensionActive] = useState(false);
+  const [isDomReady, setIsDomReady] = useState(false);
 
   useEffect(() => {
     setCurrentSrc(src);
+    // New navigation; wait for next dom-ready
+    setIsDomReady(false);
   }, [src]);
 
   // Instagram disconnect 후 강제 리렌더링 이벤트 감지
@@ -67,15 +72,44 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     };
   }, []);
 
-  // 확장프로그램 활성화 상태 변경 감지
+  // 확장프로그램 활성화 상태 변경 감지 (Manager decides; trust enableExtension)
   useEffect(() => {
-    if (enableExtension && instagramState === 'instagram_logged_in_server_registered') {
-      // Instagram 로그인 + 서버 저장된 상태에서만 확장프로그램 활성화
+    console.log('🔍 Extension 활성화 조건 체크:', {
+      enableExtension,
+      instagramState,
+      condition: enableExtension
+    });
+    
+    // Enable when caller requests
+    if (enableExtension) {
+      console.log('✅ Extension 활성화 조건 만족 - extensionActive = true');
       setExtensionActive(true);
     } else {
+      console.log('❌ Extension 활성화 조건 불만족 - extensionActive = false');
       setExtensionActive(false);
     }
-  }, [enableExtension, instagramState]);
+  }, [enableExtension]);
+
+  // When extensionActive toggles, send activate/deactivate to the page (only after dom-ready)
+  useEffect(() => {
+    console.log('🔄 Extension 상태 변경 감지:', { extensionActive });
+    
+    const webview = webviewRef.current;
+    if (!webview || !isDomReady) {
+      console.log('⚠️ WebView ref가 없음');
+      return;
+    }
+    
+    const msg = extensionActive ? 'FLOWSONAT_ACTIVATE' : 'FLOWSONAT_DEACTIVATE';
+    console.log('📤 WebView에 메시지 전송:', msg);
+    
+    try {
+      webview.executeJavaScript(`window.postMessage({ type: '${msg}' }, '*');`);
+      console.log('✅ 메시지 전송 성공');
+    } catch (error) {
+      console.error('❌ 메시지 전송 실패:', error);
+    }
+  }, [extensionActive, isDomReady]);
 
   useImperativeHandle(ref, () => ({
     reload: () => {
@@ -366,6 +400,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
 
     const handleDomReady = () => {
       setIsLoading(false);
+      setIsDomReady(true);
       
       // Instagram 페이지인지 확인
       const isInstagram = src.includes('instagram.com');
@@ -384,16 +419,34 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         }, 1000);
       }
 
-      // 확장프로그램이 활성화되어 있고 Instagram 로그인 + 서버 저장된 상태라면 확장프로그램 활성화
-      if (isInstagram && extensionActive && instagramState === 'instagram_logged_in_server_registered') {
+      // 확장프로그램이 활성화되어 있고 Instagram 페이지라면 확장프로그램 활성화
+      console.log('🔍 Extension 컨텐츠 스크립트 주입 조건 체크:', {
+        isInstagram,
+        extensionActive,
+        instagramState,
+        condition: isInstagram && extensionActive
+      });
+      
+      if (isInstagram && extensionActive) {
+        console.log('✅ Extension 컨텐츠 스크립트 주입 시작');
         setTimeout(() => {
+          console.log('📥 Extension 컨텐츠 스크립트 주입 중...');
           webview.executeJavaScript(`
             // 확장프로그램 컨텐츠 스크립트 주입
             if (!window.flowsonatController) {
               ${getExtensionContentScript()}
             }
           `);
+          // Ensure controller is activated after injection
+          setTimeout(() => {
+            console.log('🚀 Extension 컨트롤러 활성화 중...');
+            try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}
+            try { webview.executeJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`); } catch {}
+            console.log('✅ Extension 컨트롤러 활성화 완료');
+          }, 200);
         }, 1000);
+      } else {
+        console.log('❌ Extension 컨텐츠 스크립트 주입 조건 불만족');
       }
     };
 
@@ -409,15 +462,33 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     };
 
+    // URL-based login detection as requested: if it redirects away from /accounts/login -> logged in
+    const handleDidNavigate = (e: any) => {
+      try {
+        const url: string = e?.url || webview.getURL?.() || '';
+        const isInstagramHost = url.includes('instagram.com');
+        const onLoginPage = /instagram\.com\/accounts\/login/.test(url);
+        if (isInstagramHost) {
+          const inferredLoggedIn = !onLoginPage;
+          console.log('🔎 URL-based status:', { url, inferredLoggedIn });
+          onLoginStatusCheck?.(inferredLoggedIn);
+        }
+      } catch {}
+    };
+
     webview.addEventListener('did-finish-load', handleLoad);
     webview.addEventListener('did-fail-load', handleError);
     webview.addEventListener('dom-ready', handleDomReady);
+    webview.addEventListener('did-navigate', handleDidNavigate as any);
+    webview.addEventListener('did-navigate-in-page', handleDidNavigate as any);
     window.addEventListener('message', handleMessage);
 
     return () => {
       webview.removeEventListener('did-finish-load', handleLoad);
       webview.removeEventListener('did-fail-load', handleError);
       webview.removeEventListener('dom-ready', handleDomReady);
+      webview.removeEventListener('did-navigate', handleDidNavigate as any);
+      webview.removeEventListener('did-navigate-in-page', handleDidNavigate as any);
       window.removeEventListener('message', handleMessage);
     };
   }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
@@ -465,6 +536,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         webpreferences="contextIsolation=yes, nodeIntegration=no"
         allowpopups={true}
         security="true"
+        style={{ pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const }}
         key={`webview-${forceReload}`} // 강제 리렌더링을 위한 key
       />
     </div>

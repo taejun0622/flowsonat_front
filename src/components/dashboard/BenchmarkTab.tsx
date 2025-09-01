@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useInstagram } from '@/contexts/InstagramContext';
+import { useNavigate } from 'react-router-dom';
 
 
 import { InstagramService } from '@/api/services/InstagramService';
@@ -38,6 +39,7 @@ import {
 } from '@/api';
 
 export const BenchmarkTab = () => {
+  const navigate = useNavigate();
   const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
   const [suggestions, setSuggestions] = React.useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -249,11 +251,8 @@ export const BenchmarkTab = () => {
   };
 
   const handleAddMyFollowersToBenchmark = async () => {
-    toast({
-      title: "Feature Removed",
-      description: "Instagram automation features have been removed.",
-      variant: "default",
-    });
+    // Open full-screen WebView manager in minimal mode; extension can handle follower actions there
+    navigate('/webview?minimal=1');
   };
 
   const openEditDialog = (benchmark: BenchmarkResponse) => {

@@ -14,7 +14,6 @@ export const DashboardPage = () => {
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
   const { openWebView } = useWebView();
   const navigate = useNavigate();
-  const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
 
@@ -53,7 +52,8 @@ export const DashboardPage = () => {
   }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
   const handleStartAutomation = () => {
-    setShowAutomationOverlay(true);
+    // Open full-screen WebView manager in minimal mode
+    navigate('/webview?minimal=1');
   };
 
   const handleRefresh = () => {
@@ -146,18 +146,7 @@ export const DashboardPage = () => {
         </div>
       </main>
 
-      {/* Instagram Automation Overlay */}
-      {showAutomationOverlay && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-2xl font-bold mb-4">Instagram Automation</h2>
-            <p className="mb-4">Automation features have been removed.</p>
-            <Button onClick={() => setShowAutomationOverlay(false)}>
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* No overlay needed; Execute opens WebView */}
     </div>
   );
 };

@@ -124,7 +124,8 @@ export const useInstagramWebView = () => {
     if (isLoggedIn) {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
-        state: isConnected ? 'instagram_logged_in' : 'instagram_logged_out_server_unregistered',
+        // If logged-in on Instagram but not server-registered yet, reflect 'login_detected'
+        state: isConnected ? 'instagram_logged_in' : 'instagram_login_detected',
         isInstagramLoggedIn: true,
         isServerRegistered: isConnected,
         username: sessionData?.username,

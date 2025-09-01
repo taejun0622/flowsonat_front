@@ -121,31 +121,11 @@ export const InstagramWebViewScripts = {
             // 로그인 상태 판단 (쿠키 기반)
             var isLoggedInByCookies = !!(dsUserId && !hasPsnZero);
             
-            // DOM 기반 로그인 상태 확인 (보조 방법)
-            var isLoggedInByDOM = (
-              !document.querySelector('button[type="submit"]') ||
-              document.querySelector('a[href*="/accounts/activity/"]') ||
-              document.querySelector('a[href*="/accounts/edit/"]') ||
-              document.querySelector('a[href*="/direct/"]') ||
-              document.querySelector('main[role="main"]') ||
-              document.querySelector('div[role="button"][tabindex="0"]') ||
-              !document.querySelector('form[method="post"]')
-            );
-            
-            // DOM 요소 확인
-            console.log('DOM elements check:');
-            console.log('- Login button:', !!document.querySelector('button[type="submit"]'));
-            console.log('- Profile link:', !!document.querySelector('a[href*="/accounts/activity/"]'));
-            console.log('- Settings link:', !!document.querySelector('a[href*="/accounts/edit/"]'));
-            console.log('- Main content:', !!document.querySelector('main[role="main"]'));
-            console.log('- Login form:', !!document.querySelector('form[method="post"]'));
-            
-            // 최종 로그인 상태 판단: 쿠키 기반만 신뢰 (DOM 휴리스틱은 오탐 가능성 높음)
+            // 최종 로그인 상태 판단: 쿠키 기반만 사용
             var isLoggedIn = isLoggedInByCookies;
             
             console.log('Final result:', {
               isLoggedInByCookies: isLoggedInByCookies,
-              isLoggedInByDOM: isLoggedInByDOM,
               isLoggedIn: isLoggedIn,
               dsUserId: dsUserId,
               hasSessionId: !!sessionId,
@@ -160,7 +140,6 @@ export const InstagramWebViewScripts = {
               data: { 
                 isLoggedIn: isLoggedIn,
                 isLoggedInByCookies: isLoggedInByCookies,
-                isLoggedInByDOM: isLoggedInByDOM,
                 dsUserId: dsUserId,
                 hasSessionId: !!sessionId,
                 psnCookies: psnCookies.map(function(c) {
@@ -210,7 +189,6 @@ export const InstagramWebViewScripts = {
                 username: username || 'instagram_user',
                 isLoggedIn: true,
                 isLoggedInByCookies: isLoggedInByCookies,
-                isLoggedInByDOM: isLoggedInByDOM,
                 dsUserId: dsUserId,
                 hasSessionId: !!sessionId,
                 psnCookies: psnCookies.map(function(c) {

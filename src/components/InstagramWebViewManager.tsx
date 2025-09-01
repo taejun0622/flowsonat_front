@@ -10,10 +10,12 @@ import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramWebViewManagerProps {
   className?: string;
+  minimal?: boolean; // hide headers/menus for clean webview
 }
 
 export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = ({ 
-  className = "" 
+  className = "",
+  minimal = false
 }) => {
   const navigate = useNavigate();
   const { disconnectAccount } = useInstagram();
@@ -79,6 +81,68 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     setIsLoading(false);
   }, []);
 
+  // Extension active when IG is logged in AND server-registered
+  const extensionActive = webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered;
+  
+  // Extension 활성화 상태 로깅
+  console.log('🎯 InstagramWebViewManager - Extension 상태:', {
+    webViewStatusState: webViewStatus.state,
+    extensionActive,
+    isInstagramLoggedIn: webViewStatus.isInstagramLoggedIn,
+    isServerRegistered: webViewStatus.isServerRegistered
+  });
+
+  // Mouse control passthrough to extension while blocking native input
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!extensionActive || !webviewApiRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    webviewApiRef.current.moveCursor(x, y);
+    e.preventDefault();
+    e.stopPropagation();
+  }, [extensionActive]);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (!extensionActive || !webviewApiRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    webviewApiRef.current.click(x, y);
+    e.preventDefault();
+    e.stopPropagation();
+  }, [extensionActive]);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!extensionActive || !webviewApiRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    webviewApiRef.current.doubleClick(x, y);
+    e.preventDefault();
+    e.stopPropagation();
+  }, [extensionActive]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!extensionActive || !webviewApiRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    webviewApiRef.current.click(x, y, 'right');
+    e.preventDefault();
+    e.stopPropagation();
+  }, [extensionActive]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!extensionActive || !webviewApiRef.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    webviewApiRef.current.scroll(x, y, e.deltaX, e.deltaY);
+    e.preventDefault();
+    e.stopPropagation();
+  }, [extensionActive]);
+
   // Instagram 로그인 감지 핸들러
   const handleInstagramLogin = useCallback((sessionData: any) => {
     handleInstagramLoginDetected(sessionData);
@@ -116,80 +180,82 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-md border-b border-black/30">
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleGoBack}
-            className="text-white hover:bg-black/20"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          
-          <div className="h-4 w-px bg-white/20" />
-          
-          <div className="flex items-center space-x-2">
-            {isCheckingStatus && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
-            <span className="text-sm font-medium text-white">
-              {uiConfig.title}
-            </span>
+      {/* Header, Status, and Actions hidden in minimal mode */}
+      {!minimal && (
+        <>
+          <div className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-md border-b border-black/30">
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleGoBack}
+                className="text-white hover:bg-black/20"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              
+              <div className="h-4 w-px bg-white/20" />
+              
+              <div className="flex items-center space-x-2">
+                {isCheckingStatus && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
+                <span className="text-sm font-medium text-white">
+                  {uiConfig.title}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="text-white hover:bg-black/20"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="text-white hover:bg-black/20"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </div>
 
-      {/* Status Bar */}
-      {uiConfig.showStatusBar && (
-        <div className={`px-4 py-2 border-b ${getStatusBarClass()}`}>
-          <div className="flex items-center space-x-2">
-            {renderStatusIcon()}
-            <span className="text-sm font-medium">
-              {uiConfig.description}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="flex items-center justify-between p-4 bg-black/10 border-b border-black/20">
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={() => handleActionClick(uiConfig.primaryAction.action)}
-            variant={uiConfig.primaryAction.variant || 'default'}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-          >
-            {uiConfig.primaryAction.label}
-          </Button>
-          
-          {uiConfig.secondaryAction && (
-            <Button
-              onClick={() => handleActionClick(uiConfig.secondaryAction!.action)}
-              variant={uiConfig.secondaryAction.variant || 'outline'}
-              className="border-black/30 text-white hover:bg-black/20"
-            >
-              {uiConfig.secondaryAction.label}
-            </Button>
+          {uiConfig.showStatusBar && (
+            <div className={`px-4 py-2 border-b ${getStatusBarClass()}`}>
+              <div className="flex items-center space-x-2">
+                {renderStatusIcon()}
+                <span className="text-sm font-medium">
+                  {uiConfig.description}
+                </span>
+              </div>
+            </div>
           )}
-        </div>
-        
-        <div className="text-xs text-white/60">
-          {webViewStatus.lastChecked.toLocaleTimeString()}
-        </div>
-      </div>
+
+          <div className="flex items-center justify-between p-4 bg-black/10 border-b border-black/20">
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => handleActionClick(uiConfig.primaryAction.action)}
+                variant={uiConfig.primaryAction.variant || 'default'}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              >
+                {uiConfig.primaryAction.label}
+              </Button>
+              
+              {uiConfig.secondaryAction && (
+                <Button
+                  onClick={() => handleActionClick(uiConfig.secondaryAction!.action)}
+                  variant={uiConfig.secondaryAction.variant || 'outline'}
+                  className="border-black/30 text-white hover:bg-black/20"
+                >
+                  {uiConfig.secondaryAction.label}
+                </Button>
+              )}
+            </div>
+            
+            <div className="text-xs text-white/60">
+              {webViewStatus.lastChecked.toLocaleTimeString()}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* WebView Container */}
       <div className="flex-1 relative">
@@ -201,8 +267,25 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         onInstagramLogin={handleInstagramLogin}
         onLoginStatusCheck={handleInstagramStatusCheck}
         instagramState={webViewStatus.state}
+        enableExtension={extensionActive}
+        disablePointerEvents={extensionActive}
         className="w-full h-full"
       />
+
+        {/* Interaction layer: blocks native input and drives extension */}
+        {extensionActive && (
+          <div
+            className="absolute inset-0 z-30 bg-transparent"
+            onMouseMove={handleMouseMove}
+            onMouseDown={handleClick}
+            onMouseUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={handleContextMenu}
+            onWheel={handleWheel}
+            aria-hidden="true"
+          />
+        )}
         
         {isLoading && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -214,22 +297,26 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         )}
       </div>
 
-      {/* Modals */}
-      <InstagramUsernameConfirmModal
-        open={modalState.showConfirmModal}
-        username={modalState.detectedUsername || ''}
-        sessionData={modalState.detectedSessionData}
-        onConfirm={handleConfirmConnection}
-        onCancel={handleManualUsername}
-      />
-      
-      <InstagramManualUsernameModal
-        open={modalState.showManualModal}
-        sessionData={modalState.detectedSessionData}
-        onConfirm={handleManualUsernameConfirm}
-        onSecondary={handleClearAndExit}
-        secondaryLabel="Disconnect"
-      />
+      {/* Modals (hidden in minimal mode) */}
+      {!minimal && (
+        <>
+          <InstagramUsernameConfirmModal
+            open={modalState.showConfirmModal}
+            username={modalState.detectedUsername || ''}
+            sessionData={modalState.detectedSessionData}
+            onConfirm={handleConfirmConnection}
+            onCancel={handleManualUsername}
+          />
+          
+          <InstagramManualUsernameModal
+            open={modalState.showManualModal}
+            sessionData={modalState.detectedSessionData}
+            onConfirm={handleManualUsernameConfirm}
+            onSecondary={handleClearAndExit}
+            secondaryLabel="Disconnect"
+          />
+        </>
+      )}
     </div>
   );
 };
