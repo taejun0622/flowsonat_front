@@ -12,7 +12,7 @@ interface InstagramContextType {
   connectAccount: () => void;
   disconnectAccount: () => Promise<void>;
   refreshConnection: () => Promise<void>;
-  saveInstagramSession: (sessionData: any) => Promise<void>;
+  saveInstagramSession: (sessionData: any) => Promise<InstagramConnectResponse>;
 }
 
 const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
@@ -75,24 +75,48 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
 
   const saveInstagramSession = async (sessionData: any) => {
     try {
+      console.log('Saving Instagram session data:', sessionData);
+      
+      // 세션 데이터에서 username 추출
+      const username = sessionData?.username;
+      
+      if (!username) {
+        throw new Error('Username not found in session data');
+      }
+      
       // Instagram 세션 정보를 서버에 저장
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(sessionData?.username || 'instagram_user')
+        username: String(username)
       });
       
       setInstagramAccount(response);
       
+      // 추가 세션 정보를 로컬에 저장 (선택사항)
+      const extendedSessionData = {
+        ...sessionData,
+        connectedAt: new Date().toISOString(),
+        accountId: response.id
+      };
+      
+      // 로컬 스토리지에 세션 정보 저장 (개발용)
+      if (process.env.NODE_ENV === 'development') {
+        localStorage.setItem('instagram_session_data', JSON.stringify(extendedSessionData));
+      }
+      
       toast({
         title: "Instagram connected",
-        description: `Successfully connected to Instagram account @${sessionData?.username || 'unknown'}.`,
+        description: `Successfully connected to Instagram account @${username}.`,
       });
+      
+      return response;
     } catch (error: any) {
       console.error('Failed to save Instagram session:', error);
       toast({
         title: "Connection failed",
-        description: "Failed to save Instagram session.",
+        description: error.message || "Failed to save Instagram session.",
         variant: "destructive",
       });
+      throw error;
     }
   };
 

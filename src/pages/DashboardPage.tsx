@@ -1,18 +1,17 @@
 import React from 'react';
-import { User, Settings, BarChart3, CreditCard, Bot, RefreshCw, ExternalLink } from 'lucide-react';
+import { User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
-import { WebViewLauncher } from '@/components/WebViewLauncher';
 import { useWebView } from '@/hooks/useWebView';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
-  const { openWebView, openInBrowser, isElectron } = useWebView();
+  const { openWebView } = useWebView();
   const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
@@ -47,6 +46,11 @@ export const DashboardPage = () => {
   const handleRefresh = () => {
     // Refresh Instagram connection status
     checkConnection();
+  };
+
+  const handleConnectInstagram = () => {
+    // Open Instagram login page in webview
+    openWebView('https://www.instagram.com/accounts/login/');
   };
 
   // Show loading when checking connection status
@@ -93,7 +97,7 @@ export const DashboardPage = () => {
 
           {/* Tabs */}
           <Tabs defaultValue="benchmark" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-black/10 backdrop-blur-sm border border-black/20">
+            <TabsList className="grid w-full grid-cols-3 bg-black/10 backdrop-blur-sm border border-black/20">
               <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Benchmark
@@ -101,10 +105,6 @@ export const DashboardPage = () => {
               <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Billing
-              </TabsTrigger>
-              <TabsTrigger value="webview" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                WebView
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <Settings className="h-4 w-4 mr-2" />
@@ -122,67 +122,11 @@ export const DashboardPage = () => {
               <BillingTab />
             </TabsContent>
 
-            {/* WebView Tab */}
-            <TabsContent value="webview" className="mt-6">
-              <div className="bg-black/10 backdrop-blur-sm border border-black/20 rounded-lg p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">WebView Examples</h3>
-                <p className="text-gray-300 mb-6">
-                  Test the full-screen webview functionality. These buttons will open websites in a webview that fills the entire Electron window.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <WebViewLauncher 
-                    url="https://www.google.com"
-                    variant="outline"
-                    className="border-black/20 text-white hover:bg-black/10"
-                  >
-                    Open Google
-                  </WebViewLauncher>
-                  
-                  <WebViewLauncher 
-                    url="https://www.github.com"
-                    variant="outline"
-                    className="border-black/20 text-white hover:bg-black/10"
-                  >
-                    Open GitHub
-                  </WebViewLauncher>
-                  
-                  <WebViewLauncher 
-                    url="https://www.instagram.com"
-                    variant="outline"
-                    className="border-black/20 text-white hover:bg-black/10"
-                  >
-                    Open Instagram
-                  </WebViewLauncher>
-                  
-                  <Button
-                    onClick={() => openInBrowser('https://www.google.com')}
-                    variant="outline"
-                    className="border-black/20 text-white hover:bg-black/10"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open in Browser
-                  </Button>
-                </div>
-                
-                {isElectron && (
-                  <div className="mt-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-                    <p className="text-green-300 text-sm">
-                      ✓ Running in Electron - WebView functionality available
-                    </p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
             {/* Settings Tab */}
             <TabsContent value="settings" className="mt-6">
               <SettingsTab 
                 isConnected={isConnected}
-                onConnectInstagram={() => {
-                  // Instagram connection is now handled through the API only
-                  console.log('Instagram connection requested');
-                }}
+                onConnectInstagram={handleConnectInstagram}
               />
             </TabsContent>
           </Tabs>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut } from 'lucide-react';
+import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut, ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useToast } from '@/hooks/use-toast';
 import { UsersService } from '@/api/services/UsersService';
+import { WebViewLauncher } from '@/components/WebViewLauncher';
 
 interface SettingsTabProps {
   isConnected: boolean;
@@ -181,52 +182,65 @@ export const SettingsTab = ({
                 </div>
                 <div className="flex gap-2">
                   {!isConnected ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={onConnectInstagram} 
-                      className="border-white/20 text-white hover:bg-white/10"
-                      disabled={instagramLoading}
-                    >
-                      {instagramLoading ? 'Connecting...' : 'Connect Instagram'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <WebViewLauncher 
+                        url="https://www.instagram.com/accounts/login/"
+                        variant="outline"
+                        size="sm"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Connect Instagram
+                      </WebViewLauncher>
+                    </div>
                   ) : (
-                    <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                        >
-                          Disconnect
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-white">Disconnect Instagram</DialogTitle>
-                          <DialogDescription className="text-gray-300">
-                            Are you sure you want to disconnect your Instagram account? 
-                            This will remove all connection data.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex justify-end gap-2 mt-4">
+                    <div className="flex gap-2">
+                      <WebViewLauncher 
+                        url="https://www.instagram.com"
+                        variant="outline"
+                        size="sm"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Instagram
+                      </WebViewLauncher>
+                      <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+                        <DialogTrigger asChild>
                           <Button 
                             variant="outline" 
-                            onClick={() => setDisconnectDialogOpen(false)}
-                            className="border-black/30 text-white hover:bg-black/20"
+                            size="sm" 
+                            className="border-red-500/20 text-red-400 hover:bg-red-500/10"
                           >
-                            Cancel
+                            Disconnect
                           </Button>
-                          <Button 
-                            variant="destructive" 
-                            onClick={handleDisconnectInstagram}
-                            disabled={instagramLoading}
-                          >
-                            {instagramLoading ? 'Disconnecting...' : 'Disconnect'}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                        </DialogTrigger>
+                        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
+                          <DialogHeader>
+                            <DialogTitle className="text-white">Disconnect Instagram</DialogTitle>
+                            <DialogDescription className="text-gray-300">
+                              Are you sure you want to disconnect your Instagram account? 
+                              This will remove all connection data.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex justify-end gap-2 mt-4">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setDisconnectDialogOpen(false)}
+                              className="border-black/30 text-white hover:bg-black/20"
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              onClick={handleDisconnectInstagram}
+                              disabled={instagramLoading}
+                            >
+                              {instagramLoading ? 'Disconnecting...' : 'Disconnect'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   )}
                 </div>
               </div>
