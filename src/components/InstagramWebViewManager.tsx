@@ -159,10 +159,28 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     console.log('[HUD] closeModal result:', ok);
   }, []);
 
-  const clickActionButton = useCallback(async (label: string) => {
-    console.log('[HUD] clickActionButton', label);
-    const ok = await webviewApiRef.current?.clickByText(label);
-    console.log('[HUD] clickActionButton result:', ok);
+  const clickFollow = useCallback(async () => {
+    console.log('[HUD] clickFollow');
+    const ok = await webviewApiRef.current?.clickFollowButton();
+    console.log('[HUD] clickFollow result:', {ok});
+  }, []);
+
+  const clickFollowing = useCallback(async () => {
+    console.log('[HUD] clickFollowing');
+    const ok = await webviewApiRef.current?.clickFollowingButton();
+    console.log('[HUD] clickFollowing result:', {ok});
+  }, []);
+
+  const clickRequested = useCallback(async () => {
+    console.log('[HUD] clickRequested');
+    const ok = await webviewApiRef.current?.clickRequestedButton();
+    console.log('[HUD] clickRequested result:', {ok});
+  }, []);
+
+  const clickUnfollow = useCallback(async () => {
+    console.log('[HUD] clickUnfollow');
+    const ok = await webviewApiRef.current?.clickUnfollowButton();
+    console.log('[HUD] clickUnfollow result:', {ok});
   }, []);
 
   // Extension 활성화 상태 로깅
@@ -357,10 +375,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
               <div className="grid grid-cols-1 gap-2">
                 <Button size="sm" variant="outline" onClick={closeModal}>Close Modal</Button>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Button size="sm" onClick={() => clickActionButton('Follow')}>Follow</Button>
-                <Button size="sm" onClick={() => clickActionButton('Following')}>Following</Button>
-                <Button size="sm" onClick={() => clickActionButton('Requested')}>Requested</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" onClick={clickFollow}>Follow</Button>
+                <Button size="sm" onClick={clickUnfollow}>Unfollow</Button>
+                <Button size="sm" onClick={clickFollowing}>Following</Button>
+                <Button size="sm" onClick={clickRequested}>Requested</Button>
               </div>
             </div>
           )}

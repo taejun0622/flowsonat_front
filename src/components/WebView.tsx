@@ -25,6 +25,10 @@ export interface WebViewHandle {
   pressEscape: () => Promise<boolean>;
   clickFollowers: () => Promise<boolean>;
   clickFollowing: () => Promise<boolean>;
+  clickFollowButton: () => Promise<boolean>;
+  clickFollowingButton: () => Promise<boolean>;
+  clickRequestedButton: () => Promise<boolean>;
+  clickUnfollowButton: () => Promise<boolean>;
 }
 
 interface WebViewProps {
@@ -536,6 +540,71 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWING');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    clickFollowButton: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'follow');
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_FOLLOW_BUTTON');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    clickFollowingButton: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'following');
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_FOLLOWING_BUTTON');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    clickRequestedButton: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'requested');
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_REQUESTED_BUTTON');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    clickUnfollowButton: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            // Instagram shows a confirmation dialog. This will click the first "Unfollow" button.
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'unfollow');
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_UNFOLLOW_BUTTON');
         const res = await webviewRef.current.executeJavaScript(js);
         return !!res;
       }
