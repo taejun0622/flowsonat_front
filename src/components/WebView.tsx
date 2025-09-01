@@ -29,10 +29,25 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
+  const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
 
   useEffect(() => {
     setCurrentSrc(src);
   }, [src]);
+
+  // Instagram disconnect 후 강제 리렌더링 이벤트 감지
+  useEffect(() => {
+    const handleForceReload = () => {
+      console.log('🔄 WebView 강제 리렌더링 이벤트 감지');
+      setForceReload(prev => prev + 1);
+    };
+
+    window.addEventListener('instagram-webview-force-reload', handleForceReload);
+    
+    return () => {
+      window.removeEventListener('instagram-webview-force-reload', handleForceReload);
+    };
+  }, []);
 
   useImperativeHandle(ref, () => ({
     reload: () => {
@@ -109,6 +124,13 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           webview.executeJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript());
         }, 2000); // 2초 지연
       }
+      
+      // Instagram 로그인 페이지에서 강제 리렌더링 트리거
+      if (isInstagram && src.includes('/accounts/login/')) {
+        setTimeout(() => {
+          setForceReload(prev => prev + 1);
+        }, 1000);
+      }
     };
 
     const handleMessage = (event: any) => {
@@ -173,6 +195,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         webpreferences="contextIsolation=yes, nodeIntegration=no"
         allowpopups={true}
         security="true"
+        key={`webview-${forceReload}`} // 강제 리렌더링을 위한 key
       />
     </div>
   );

@@ -443,6 +443,17 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       }
 
       console.log('🎉 disconnectAccount 함수 완료!');
+      
+      // WebView 강제 리렌더링을 위한 이벤트 발생
+      setTimeout(() => {
+        try {
+          window.dispatchEvent(new CustomEvent('instagram-webview-force-reload'));
+          console.log('🔄 WebView 강제 리렌더링 이벤트 발생');
+        } catch (e) {
+          console.warn('WebView 강제 리렌더링 이벤트 발생 실패:', e);
+        }
+      }, 1000);
+      
       toast({
         title: "Instagram disconnected",
         description: "Successfully disconnected from Instagram. All local data has been cleared.",
