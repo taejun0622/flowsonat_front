@@ -34,8 +34,8 @@ function createWindow() {
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false
+      webSecurity: false, // 임시로 CORS 우회
+      allowRunningInsecureContent: true // 임시로 허용
     },
   })
 

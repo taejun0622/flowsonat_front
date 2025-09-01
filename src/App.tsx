@@ -18,7 +18,8 @@ import { EmailVerificationPage } from '@/pages/auth/EmailVerificationPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 
 // WebView
-import { WebViewPage } from '@/pages/WebViewPage';
+import WebViewPage from '@/pages/WebViewPage';
+import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage';
 
 function App() {
   return (
@@ -56,6 +57,16 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <WebViewPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Instagram Connection Flow Route */}
+                <Route
+                  path="/instagram-connection-flow"
+                  element={
+                    <ProtectedRoute>
+                      <InstagramConnectionFlowPage />
                     </ProtectedRoute>
                   }
                 />

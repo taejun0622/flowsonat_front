@@ -15,7 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 interface InstagramManualUsernameModalProps {
   open: boolean;
   sessionData: any;
-  onConfirm: (username: string, sessionData: any) => void;
+  onConfirm: (username: string) => void;
   onCancel: () => void;
   onDisconnect: () => void;
 }
@@ -44,11 +44,7 @@ export const InstagramManualUsernameModal = ({
 
   const handleConfirm = () => {
     if (isValid) {
-      const updatedSessionData = {
-        ...sessionData,
-        username: username
-      };
-      onConfirm(username, updatedSessionData);
+      onConfirm(username);
     }
   };
 
@@ -64,7 +60,7 @@ export const InstagramManualUsernameModal = ({
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Instagram className="h-5 w-5 text-pink-500" />
-            Enter Instagram Username
+            Connect Your Instagram Account Manually
           </DialogTitle>
           <DialogDescription className="text-gray-300">
             Please enter your Instagram username manually to complete the connection.

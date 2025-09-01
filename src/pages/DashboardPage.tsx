@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -12,6 +13,7 @@ export const DashboardPage = () => {
   const { user } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
   const { openWebView } = useWebView();
+  const navigate = useNavigate();
   const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);

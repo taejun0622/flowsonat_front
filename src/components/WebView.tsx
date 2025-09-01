@@ -20,6 +20,85 @@ export const WebView: React.FC<WebViewProps> = ({
   const webviewRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [lastCheckTime, setLastCheckTime] = useState(0);
+
+  // 주기적으로 Instagram 로그인 상태 확인
+  useEffect(() => {
+    if (!webviewRef.current || !src.includes('instagram.com')) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (now - lastCheckTime < 3000) return; // 3초마다 체크
+      
+      setLastCheckTime(now);
+      
+      webviewRef.current.executeJavaScript(`
+        (function() {
+          try {
+            function getCookie(name) {
+              var value = ' ' + document.cookie;
+              var parts = value.split(' ' + name + '=');
+              if (parts.length === 2) return parts.pop().split(';').shift();
+              return null;
+            }
+            
+            var dsUserId = getCookie('ds_user_id');
+            var sessionId = getCookie('sessionid');
+            
+            var isLoggedIn = !!dsUserId;
+            
+            if (isLoggedIn) {
+              var username = 'user_' + dsUserId;
+              
+              var sessionData = {
+                username: username,
+                isLoggedIn: true,
+                dsUserId: dsUserId,
+                hasSessionId: !!sessionId,
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                cookies: document.cookie
+              };
+              
+              return JSON.stringify({
+                type: 'INSTAGRAM_LOGIN_SUCCESS',
+                data: sessionData
+              });
+            }
+            
+            return JSON.stringify({
+              type: 'INSTAGRAM_LOGIN_STATUS_CHECK',
+              data: { isLoggedIn: false }
+            });
+          } catch (error) {
+            return JSON.stringify({
+              type: 'ERROR',
+              error: error.message
+            });
+          }
+        })();
+      `).then((result: string) => {
+        try {
+          const data = JSON.parse(result);
+          console.log('Periodic check result:', data);
+          
+          if (data.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+            console.log('Instagram login detected via periodic check:', data.data);
+            onInstagramLogin?.(data.data);
+          } else if (data.type === 'INSTAGRAM_LOGIN_STATUS_CHECK') {
+            console.log('Instagram login status check via periodic check:', data.data);
+            onLoginStatusCheck?.(data.data.isLoggedIn);
+          }
+        } catch (error) {
+          console.error('Error parsing periodic check result:', error);
+        }
+      }).catch((error: any) => {
+        console.error('Error in periodic check:', error);
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -47,213 +126,197 @@ export const WebView: React.FC<WebViewProps> = ({
         // Instagram 로그인 상태 감지 스크립트 주입
         webview.executeJavaScript(`
           (function() {
-            // Instagram 로그인 상태 감지 함수
-            function checkInstagramLogin() {
-              try {
-                console.log('=== Instagram Login Check Debug ===');
-                console.log('Document cookie:', document.cookie);
-                console.log('Document cookie length:', document.cookie.length);
-                
-                // 쿠키에서 로그인 상태 확인 (가장 정확한 방법)
-                function getCookie(name) {
-                  const value = \` \${document.cookie}\`;
-                  const parts = value.split(\` \${name}=\`);
-                  if (parts.length === 2) return parts.pop().split(';').shift();
-                  return null;
-                }
-                
-                // 모든 쿠키를 배열로 가져오기
-                function getAllCookies() {
-                  const cookies = document.cookie.split(';').map(cookie => {
-                    const [name, value] = cookie.trim().split('=');
-                    return { name, value };
+            try {
+              // Instagram 로그인 상태 감지 함수
+              function checkInstagramLogin() {
+                try {
+                  console.log('=== Instagram Login Check Debug ===');
+                  
+                  // 쿠키에서 로그인 상태 확인
+                  function getCookie(name) {
+                    var value = ' ' + document.cookie;
+                    var parts = value.split(' ' + name + '=');
+                    if (parts.length === 2) return parts.pop().split(';').shift();
+                    return null;
+                  }
+                  
+                  // 모든 쿠키를 배열로 가져오기
+                  function getAllCookies() {
+                    var cookies = document.cookie.split(';').map(function(cookie) {
+                      var parts = cookie.trim().split('=');
+                      return { name: parts[0], value: parts[1] || '' };
+                    });
+                    return cookies;
+                  }
+                  
+                  // 핵심 로그인 쿠키 확인
+                  var dsUserId = getCookie('ds_user_id');
+                  var sessionId = getCookie('sessionid');
+                  
+                  console.log('ds_user_id:', dsUserId);
+                  console.log('sessionid:', sessionId ? 'EXISTS' : 'NOT FOUND');
+                  
+                  // ps_n 쿠키들 확인
+                  var allCookies = getAllCookies();
+                  var psnCookies = allCookies.filter(function(cookie) {
+                    return cookie.name === 'ps_n';
                   });
-                  console.log('All cookies:', cookies);
-                  return cookies;
-                }
-                
-                // 핵심 로그인 쿠키 확인
-                const dsUserId = getCookie('ds_user_id');
-                const sessionId = getCookie('sessionid');
-                
-                console.log('ds_user_id:', dsUserId);
-                console.log('sessionid:', sessionId ? 'EXISTS' : 'NOT FOUND');
-                
-                // ps_n 쿠키들 확인
-                const allCookies = getAllCookies();
-                const psnCookies = allCookies.filter(cookie => cookie.name === 'ps_n');
-                const hasPsnZero = psnCookies.some(cookie => cookie.value === '0');
-                const hasPsnOne = psnCookies.some(cookie => cookie.value === '1');
-                
-                console.log('ps_n cookies:', psnCookies);
-                console.log('hasPsnZero:', hasPsnZero);
-                console.log('hasPsnOne:', hasPsnOne);
-                
-                // 로그인 상태 판단 (쿠키 기반)
-                // ds_user_id가 있으면 로그인 상태로 판단 (sessionid는 선택사항)
-                // Facebook의 ps_n=0이 있으면 로그아웃 상태
-                const isLoggedInByCookies = !!(dsUserId && !hasPsnZero);
-                
-                // DOM 기반 로그인 상태 확인 (보조 방법)
-                const isLoggedInByDOM = (
-                  // 로그인 버튼이 없거나
-                  !document.querySelector('button[type="submit"]') ||
-                  // 프로필 링크가 있거나
-                  document.querySelector('a[href*="/accounts/activity/"]') ||
-                  // 설정 링크가 있거나
-                  document.querySelector('a[href*="/accounts/edit/"]') ||
-                  // 알림 아이콘이 있거나
-                  document.querySelector('a[href*="/accounts/activity/"]') ||
-                  // 메시지 아이콘이 있거나
-                  document.querySelector('a[href*="/direct/"]') ||
-                  // 홈 피드가 로드되었거나
-                  document.querySelector('main[role="main"]') ||
-                  // 스토리 섹션이 있거나
-                  document.querySelector('div[role="button"][tabindex="0"]') ||
-                  // 로그인 폼이 없거나
-                  !document.querySelector('form[method="post"]')
-                );
-                
-                // DOM 요소 확인
-                console.log('DOM elements check:');
-                console.log('- Login button:', !!document.querySelector('button[type="submit"]'));
-                console.log('- Profile link:', !!document.querySelector('a[href*="/accounts/activity/"]'));
-                console.log('- Settings link:', !!document.querySelector('a[href*="/accounts/edit/"]'));
-                console.log('- Main content:', !!document.querySelector('main[role="main"]'));
-                console.log('- Login form:', !!document.querySelector('form[method="post"]'));
-                
-                // 최종 로그인 상태 판단 (쿠키 우선, DOM 보조)
-                const isLoggedIn = isLoggedInByCookies || isLoggedInByDOM;
-                
-                console.log('Final result:', {
-                  isLoggedInByCookies,
-                  isLoggedInByDOM,
-                  isLoggedIn,
-                  dsUserId,
-                  hasSessionId: !!sessionId,
-                  psnCookies: psnCookies.map(c => \`\${c.name}=\${c.value}\`),
-                  hasPsnZero,
-                  hasPsnOne
-                });
-                console.log('=== End Debug ===');
-                
-                // 로그인 상태 체크 콜백 호출
-                window.parent.postMessage({
-                  type: 'INSTAGRAM_LOGIN_STATUS_CHECK',
-                  data: { 
+                  var hasPsnZero = psnCookies.some(function(cookie) {
+                    return cookie.value === '0';
+                  });
+                  var hasPsnOne = psnCookies.some(function(cookie) {
+                    return cookie.value === '1';
+                  });
+                  
+                  console.log('ps_n cookies:', psnCookies);
+                  console.log('hasPsnZero:', hasPsnZero);
+                  console.log('hasPsnOne:', hasPsnOne);
+                  
+                  // 로그인 상태 판단 (쿠키 기반)
+                  var isLoggedInByCookies = !!(dsUserId && !hasPsnZero);
+                  
+                  // DOM 기반 로그인 상태 확인 (보조 방법)
+                  var isLoggedInByDOM = (
+                    !document.querySelector('button[type="submit"]') ||
+                    document.querySelector('a[href*="/accounts/activity/"]') ||
+                    document.querySelector('a[href*="/accounts/edit/"]') ||
+                    document.querySelector('a[href*="/direct/"]') ||
+                    document.querySelector('main[role="main"]') ||
+                    document.querySelector('div[role="button"][tabindex="0"]') ||
+                    !document.querySelector('form[method="post"]')
+                  );
+                  
+                  // DOM 요소 확인
+                  console.log('DOM elements check:');
+                  console.log('- Login button:', !!document.querySelector('button[type="submit"]'));
+                  console.log('- Profile link:', !!document.querySelector('a[href*="/accounts/activity/"]'));
+                  console.log('- Settings link:', !!document.querySelector('a[href*="/accounts/edit/"]'));
+                  console.log('- Main content:', !!document.querySelector('main[role="main"]'));
+                  console.log('- Login form:', !!document.querySelector('form[method="post"]'));
+                  
+                  // 최종 로그인 상태 판단
+                  var isLoggedIn = isLoggedInByCookies || isLoggedInByDOM;
+                  
+                  console.log('Final result:', {
+                    isLoggedInByCookies: isLoggedInByCookies,
+                    isLoggedInByDOM: isLoggedInByDOM,
                     isLoggedIn: isLoggedIn,
-                    isLoggedInByCookies: isLoggedInByCookies,
-                    isLoggedInByDOM: isLoggedInByDOM,
                     dsUserId: dsUserId,
                     hasSessionId: !!sessionId,
-                    psnCookies: psnCookies.map(c => \`\${c.name}=\${c.value}\`),
-                    hasPsnZero,
-                    hasPsnOne,
-                    debugInfo: {
-                      documentCookie: document.cookie,
-                      cookieLength: document.cookie.length,
-                      allCookies: allCookies.map(c => \`\${c.name}=\${c.value}\`)
-                    }
-                  }
-                }, '*');
-                
-                if (isLoggedIn) {
-                  // 사용자 정보 추출
-                  let username = null;
+                    hasPsnZero: hasPsnZero,
+                    hasPsnOne: hasPsnOne
+                  });
+                  console.log('=== End Debug ===');
                   
-                  // 1. 쿠키에서 사용자 ID 추출
-                  if (dsUserId) {
-                    username = dsUserId; // 실제로는 API 호출로 username을 가져와야 함
-                  }
-                  
-                  // 2. DOM에서 username 추출 (보조 방법)
-                  if (!username) {
-                    username = (
-                      // 프로필 링크에서 username 추출
-                      (() => {
-                        const profileLink = document.querySelector('a[href*="/' + window.location.pathname.split('/')[1] + '/"]');
-                        if (profileLink) {
-                          const href = profileLink.getAttribute('href');
-                          const match = href.match(/\\/([^\\/]+)\\//);
-                          return match ? match[1] : null;
-                        }
-                        return null;
-                      })() ||
-                      // 또는 다른 방법으로 username 찾기
-                      (() => {
-                        const metaTags = document.querySelectorAll('meta[property="og:url"]');
-                        for (let meta of metaTags) {
-                          const content = meta.getAttribute('content');
-                          if (content && content.includes('instagram.com/')) {
-                            const match = content.match(/instagram\\.com\\/([^\\/]+)/);
-                            return match ? match[1] : null;
-                          }
-                        }
-                        return null;
-                      })()
-                    );
-                  }
-                  
-                  // 세션 정보 수집
-                  const sessionData = {
-                    username: username || 'instagram_user',
-                    isLoggedIn: true,
-                    isLoggedInByCookies: isLoggedInByCookies,
-                    isLoggedInByDOM: isLoggedInByDOM,
-                    dsUserId: dsUserId,
-                    hasSessionId: !!sessionId,
-                    psnCookies: psnCookies.map(c => \`\${c.name}=\${c.value}\`),
-                    hasPsnZero,
-                    hasPsnOne,
-                    timestamp: new Date().toISOString(),
-                    url: window.location.href,
-                    cookies: document.cookie,
-                    userAgent: navigator.userAgent
-                  };
-                  
-                  // 부모 창에 메시지 전송
+                  // 로그인 상태 체크 콜백 호출
                   window.parent.postMessage({
-                    type: 'INSTAGRAM_LOGIN_SUCCESS',
-                    data: sessionData
+                    type: 'INSTAGRAM_LOGIN_STATUS_CHECK',
+                    data: { 
+                      isLoggedIn: isLoggedIn,
+                      isLoggedInByCookies: isLoggedInByCookies,
+                      isLoggedInByDOM: isLoggedInByDOM,
+                      dsUserId: dsUserId,
+                      hasSessionId: !!sessionId,
+                      psnCookies: psnCookies.map(function(c) {
+                        return c.name + '=' + c.value;
+                      }),
+                      hasPsnZero: hasPsnZero,
+                      hasPsnOne: hasPsnOne
+                    }
                   }, '*');
                   
-                  return true;
+                  console.log('About to check isLoggedIn condition:', isLoggedIn);
+                  
+                  if (isLoggedIn) {
+                    console.log('isLoggedIn is true, proceeding with username extraction...');
+                    
+                    // 사용자 정보 추출
+                    var username = null;
+                    
+                    // 1. 쿠키에서 사용자 ID 추출 (fallback)
+                    if (dsUserId) {
+                      username = 'user_' + dsUserId;
+                      console.log('Username from dsUserId:', username);
+                    }
+                    
+                    // 2. DOM에서 username 추출 시도
+                    if (!username) {
+                      console.log('Trying to extract username from DOM...');
+                      var profileLinks = document.querySelectorAll('a[href*="/"]');
+                      for (var i = 0; i < profileLinks.length; i++) {
+                        var link = profileLinks[i];
+                        var href = link.getAttribute('href');
+                        if (href && href.includes('/')) {
+                          var pathParts = href.split('/').filter(function(part) {
+                            return part.length > 0;
+                          });
+                          if (pathParts.length > 0) {
+                            var potentialUsername = pathParts[0];
+                            // username 유효성 검사 (숫자가 아닌 문자열)
+                            if (potentialUsername && !/^\\d+$/.test(potentialUsername) && potentialUsername.length > 1) {
+                              username = potentialUsername;
+                              console.log('Username found from DOM:', username);
+                              break;
+                            }
+                          }
+                        }
+                      }
+                    }
+                    
+                    // 세션 정보 수집
+                    var sessionData = {
+                      username: username || 'instagram_user',
+                      isLoggedIn: true,
+                      isLoggedInByCookies: isLoggedInByCookies,
+                      isLoggedInByDOM: isLoggedInByDOM,
+                      dsUserId: dsUserId,
+                      hasSessionId: !!sessionId,
+                      psnCookies: psnCookies.map(function(c) {
+                        return c.name + '=' + c.value;
+                      }),
+                      hasPsnZero: hasPsnZero,
+                      hasPsnOne: hasPsnOne,
+                      timestamp: new Date().toISOString(),
+                      url: window.location.href,
+                      cookies: document.cookie,
+                      userAgent: navigator.userAgent
+                    };
+                    
+                    console.log('Extracted username:', username);
+                    console.log('Session data:', sessionData);
+                    console.log('About to send postMessage...');
+                    
+                    // 부모 창에 메시지 전송
+                    window.parent.postMessage({
+                      type: 'INSTAGRAM_LOGIN_SUCCESS',
+                      data: sessionData
+                    }, '*');
+                    
+                    console.log('postMessage sent successfully!');
+                  } else {
+                    console.log('isLoggedIn is false, not sending postMessage');
+                  }
+                } catch (error) {
+                  console.error('Error in checkInstagramLogin:', error);
                 }
-                
-                return false;
-              } catch (error) {
-                console.error('Instagram login check error:', error);
-                return false;
               }
-            }
-            
-            // 초기 체크
-            const initialResult = checkInstagramLogin();
-            
-            // URL 변경 감지
-            let lastUrl = window.location.href;
-            const observer = new MutationObserver(() => {
-              if (window.location.href !== lastUrl) {
-                lastUrl = window.location.href;
-                setTimeout(checkInstagramLogin, 1000); // URL 변경 후 1초 대기
-              }
-            });
-            
-            observer.observe(document.body, {
-              childList: true,
-              subtree: true
-            });
-            
-            // 주기적으로 체크 (5초마다)
-            setInterval(checkInstagramLogin, 5000);
-            
-            // 페이지 로드 완료 후 체크
-            if (document.readyState === 'complete') {
-              setTimeout(checkInstagramLogin, 2000);
-            } else {
-              window.addEventListener('load', () => {
+              
+              // 초기 체크
+              checkInstagramLogin();
+              
+              // 주기적으로 체크 (5초마다)
+              setInterval(checkInstagramLogin, 5000);
+              
+              // 페이지 로드 완료 후 체크
+              if (document.readyState === 'complete') {
                 setTimeout(checkInstagramLogin, 2000);
-              });
+              } else {
+                window.addEventListener('load', function() {
+                  setTimeout(checkInstagramLogin, 2000);
+                });
+              }
+            } catch (error) {
+              console.error('Error in Instagram login detection script:', error);
             }
           })();
         `);
@@ -261,6 +324,8 @@ export const WebView: React.FC<WebViewProps> = ({
     };
 
     const handleMessage = (event: any) => {
+      console.log('WebView message received:', event);
+      
       if (event.data && event.data.type === 'INSTAGRAM_LOGIN_SUCCESS') {
         console.log('Instagram login detected:', event.data.data);
         onInstagramLogin?.(event.data.data);
