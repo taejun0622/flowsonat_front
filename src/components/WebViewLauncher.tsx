@@ -9,6 +9,7 @@ interface WebViewLauncherProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
+  showIcon?: boolean;
 }
 
 export const WebViewLauncher: React.FC<WebViewLauncherProps> = ({
@@ -16,7 +17,8 @@ export const WebViewLauncher: React.FC<WebViewLauncherProps> = ({
   children,
   variant = 'default',
   size = 'default',
-  className = ''
+  className = '',
+  showIcon = true
 }) => {
   const navigate = useNavigate();
 
@@ -32,7 +34,7 @@ export const WebViewLauncher: React.FC<WebViewLauncherProps> = ({
       onClick={handleOpenWebView}
       className={`flex items-center space-x-2 ${className}`}
     >
-      <ExternalLink className="h-4 w-4" />
+      {showIcon && <ExternalLink className="h-4 w-4" />}
       {children || 'Open in WebView'}
     </Button>
   );

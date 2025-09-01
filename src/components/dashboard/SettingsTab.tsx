@@ -22,7 +22,7 @@ export const SettingsTab = ({
   onConnectInstagram
 }: SettingsTabProps) => {
   const { user, logout } = useAuth();
-  const { disconnectAccount, isLoading: instagramLoading } = useInstagram();
+  const { instagramAccount, disconnectAccount, isLoading: instagramLoading } = useInstagram();
   const { toast } = useToast();
   
   const [profileDialogOpen, setProfileDialogOpen] = React.useState(false);
@@ -151,7 +151,18 @@ export const SettingsTab = ({
                   <div>
                     <div className="font-medium text-white">Connection Status</div>
                     <div className="text-sm text-gray-300">
-                      {isConnected ? 'Connected to Instagram' : 'Not connected to Instagram'}
+                      {isConnected ? (
+                        <>
+                          Connected to Instagram
+                          {instagramAccount?.username && (
+                            <span className="text-blue-400 ml-1">
+                              (@{instagramAccount.username})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        'Not connected to Instagram'
+                      )}
                     </div>
                   </div>
                 </div>
@@ -162,6 +173,7 @@ export const SettingsTab = ({
                         url="https://www.instagram.com/accounts/login/"
                         variant="outline"
                         size="sm"
+                        showIcon={false}
                         className="border-white/20 text-white hover:bg-white/10"
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
@@ -170,15 +182,6 @@ export const SettingsTab = ({
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <WebViewLauncher 
-                        url="https://www.instagram.com"
-                        variant="outline"
-                        size="sm"
-                        className="border-white/20 text-white hover:bg-white/10"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open Instagram
-                      </WebViewLauncher>
                       <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
                         <DialogTrigger asChild>
                           <Button 
