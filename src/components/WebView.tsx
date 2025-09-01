@@ -3,6 +3,21 @@ import { InstagramWebViewScripts } from './InstagramWebViewLogic';
 
 export interface WebViewHandle {
   reload: () => void;
+  activateExtension: () => void;
+  deactivateExtension: () => void;
+  moveCursor: (x: number, y: number) => void;
+  click: (x: number, y: number, button?: 'left' | 'right') => void;
+  doubleClick: (x: number, y: number) => void;
+  startDrag: (x: number, y: number) => void;
+  dragMove: (x: number, y: number) => void;
+  endDrag: () => void;
+  scroll: (x: number, y: number, deltaX: number, deltaY: number) => void;
+  findScrollableAreas: () => Promise<any[]>;
+  findClickableElements: () => Promise<any[]>;
+  findElementByText: (text: string) => Promise<any[]>;
+  findElementBySelector: (selector: string) => Promise<any[]>;
+  getElementInfo: (x: number, y: number) => Promise<any>;
+  takeScreenshot: () => Promise<any>;
 }
 
 interface WebViewProps {
@@ -13,6 +28,7 @@ interface WebViewProps {
   onLoginStatusCheck?: (isLoggedIn: boolean) => void;
   className?: string;
   instagramState?: string; // Instagram 상태 추가
+  enableExtension?: boolean; // 확장프로그램 활성화 여부
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -22,7 +38,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   onInstagramLogin,
   onLoginStatusCheck,
   className = "",
-  instagramState
+  instagramState,
+  enableExtension = false
 }, ref) => {
   const webviewRef = useRef<any>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -30,6 +47,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [hasError, setHasError] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
   const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
+  const [extensionActive, setExtensionActive] = useState(false);
 
   useEffect(() => {
     setCurrentSrc(src);
@@ -49,11 +67,245 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     };
   }, []);
 
+  // 확장프로그램 활성화 상태 변경 감지
+  useEffect(() => {
+    if (enableExtension && instagramState === 'instagram_logged_in_server_registered') {
+      // Instagram 로그인 + 서버 저장된 상태에서만 확장프로그램 활성화
+      setExtensionActive(true);
+    } else {
+      setExtensionActive(false);
+    }
+  }, [enableExtension, instagramState]);
+
   useImperativeHandle(ref, () => ({
     reload: () => {
       if (webviewRef.current) {
         webviewRef.current.reload();
       }
+    },
+    activateExtension: () => {
+      if (webviewRef.current) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_ACTIVATE'
+          }, '*');
+        `);
+        setExtensionActive(true);
+      }
+    },
+    deactivateExtension: () => {
+      if (webviewRef.current) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_DEACTIVATE'
+          }, '*');
+        `);
+        setExtensionActive(false);
+      }
+    },
+    moveCursor: (x: number, y: number) => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_MOVE_CURSOR',
+            data: { x: ${x}, y: ${y} }
+          }, '*');
+        `);
+      }
+    },
+    click: (x: number, y: number, button: 'left' | 'right' = 'left') => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_CLICK',
+            data: { x: ${x}, y: ${y}, button: '${button}' }
+          }, '*');
+        `);
+      }
+    },
+    doubleClick: (x: number, y: number) => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_DOUBLE_CLICK',
+            data: { x: ${x}, y: ${y} }
+          }, '*');
+        `);
+      }
+    },
+    startDrag: (x: number, y: number) => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_DRAG_START',
+            data: { x: ${x}, y: ${y} }
+          }, '*');
+        `);
+      }
+    },
+    dragMove: (x: number, y: number) => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_DRAG_MOVE',
+            data: { x: ${x}, y: ${y} }
+          }, '*');
+        `);
+      }
+    },
+    endDrag: () => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_DRAG_END'
+          }, '*');
+        `);
+      }
+    },
+    scroll: (x: number, y: number, deltaX: number, deltaY: number) => {
+      if (webviewRef.current && extensionActive) {
+        webviewRef.current.executeJavaScript(`
+          window.postMessage({
+            type: 'FLOWSONAT_SCROLL',
+            data: { x: ${x}, y: ${y}, deltaX: ${deltaX}, deltaY: ${deltaY} }
+          }, '*');
+        `);
+      }
+    },
+    findScrollableAreas: async () => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_FIND_SCROLLABLE_AREAS'
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_SCROLLABLE_AREAS_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return [];
+    },
+    findClickableElements: async () => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_FIND_CLICKABLE_ELEMENTS'
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_CLICKABLE_ELEMENTS_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return [];
+    },
+    findElementByText: async (text: string) => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_FIND_ELEMENT_BY_TEXT',
+              data: { text: '${text}' }
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_ELEMENT_BY_TEXT_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return [];
+    },
+    findElementBySelector: async (selector: string) => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_FIND_ELEMENT_BY_SELECTOR',
+              data: { selector: '${selector}' }
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_ELEMENT_BY_SELECTOR_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return [];
+    },
+    getElementInfo: async (x: number, y: number) => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_GET_ELEMENT_INFO',
+              data: { x: ${x}, y: ${y} }
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_ELEMENT_INFO_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return null;
+    },
+    takeScreenshot: async () => {
+      if (webviewRef.current && extensionActive) {
+        return new Promise((resolve) => {
+          webviewRef.current.executeJavaScript(`
+            window.postMessage({
+              type: 'FLOWSONAT_TAKE_SCREENSHOT'
+            }, '*');
+            
+            // Listen for response
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message) {
+              if (message.type === 'FLOWSONAT_SCREENSHOT_RESULT') {
+                window.postMessage = originalPostMessage;
+                return JSON.stringify(message.data);
+              }
+              return originalPostMessage.apply(this, arguments);
+            };
+          `);
+        });
+      }
+      return null;
     }
   }));
 
@@ -131,6 +383,18 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           setForceReload(prev => prev + 1);
         }, 1000);
       }
+
+      // 확장프로그램이 활성화되어 있고 Instagram 로그인 + 서버 저장된 상태라면 확장프로그램 활성화
+      if (isInstagram && extensionActive && instagramState === 'instagram_logged_in_server_registered') {
+        setTimeout(() => {
+          webview.executeJavaScript(`
+            // 확장프로그램 컨텐츠 스크립트 주입
+            if (!window.flowsonatController) {
+              ${getExtensionContentScript()}
+            }
+          `);
+        }, 1000);
+      }
     };
 
     const handleMessage = (event: any) => {
@@ -156,7 +420,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       webview.removeEventListener('dom-ready', handleDomReady);
       window.removeEventListener('message', handleMessage);
     };
-  }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src]);
+  }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
 
   return (
     <div className={`w-full h-full relative ${className}`}>
@@ -186,6 +450,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           </div>
         </div>
       )}
+
+      {extensionActive && (
+        <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium z-20">
+          🎮 Extension Active
+        </div>
+      )}
       
       <webview
         ref={webviewRef}
@@ -200,3 +470,495 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     </div>
   );
 });
+
+// 확장프로그램 컨텐츠 스크립트를 문자열로 반환하는 함수
+function getExtensionContentScript(): string {
+  return `
+    // FlowSonat Instagram Controller - Injected Content Script
+    class FlowSonatController {
+      constructor() {
+        this.isActive = false;
+        this.cursor = null;
+        this.overlay = null;
+        this.statusIndicator = null;
+        this.currentPosition = { x: 0, y: 0 };
+        this.isClicking = false;
+        this.isDragging = false;
+        this.dragStart = null;
+        this.scrollableAreas = [];
+        this.clickableElements = [];
+        
+        this.init();
+      }
+
+      init() {
+        console.log('🚀 FlowSonat Instagram Controller initialized');
+        this.createCursor();
+        this.createOverlay();
+        this.createStatusIndicator();
+        this.setupMessageListener();
+        this.scanPage();
+      }
+
+      createCursor() {
+        this.cursor = document.createElement('div');
+        this.cursor.className = 'flowsonat-cursor';
+        this.cursor.innerHTML = \`
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="11" fill="url(#glow)" opacity="0.3"/>
+            <path d="M12 2L20 12L12 22L4 12L12 2Z" fill="url(#gradient)" stroke="white" stroke-width="1.5"/>
+            <path d="M12 4L18 12L12 20L6 12L12 4Z" fill="url(#highlight)" opacity="0.7"/>
+            <circle cx="12" cy="12" r="2" fill="white"/>
+            <defs>
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+              </linearGradient>
+              <linearGradient id="highlight" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+                <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.2" />
+              </linearGradient>
+              <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.8" />
+                <stop offset="100%" style="stop-color:#667eea;stop-opacity:0" />
+              </radialGradient>
+            </defs>
+          </svg>
+        \`;
+        document.body.appendChild(this.cursor);
+      }
+
+      createOverlay() {
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'flowsonat-overlay';
+        this.overlay.style.display = 'none';
+        document.body.appendChild(this.overlay);
+      }
+
+      createStatusIndicator() {
+        this.statusIndicator = document.createElement('div');
+        this.statusIndicator.className = 'flowsonat-status';
+        this.statusIndicator.textContent = 'FlowSonat Controller Ready';
+        document.body.appendChild(this.statusIndicator);
+      }
+
+      setupMessageListener() {
+        window.addEventListener('message', (event) => {
+          if (event.source !== window) return;
+          
+          const { type, data } = event.data;
+          
+          switch (type) {
+            case 'FLOWSONAT_ACTIVATE':
+              this.activate();
+              break;
+            case 'FLOWSONAT_DEACTIVATE':
+              this.deactivate();
+              break;
+            case 'FLOWSONAT_MOVE_CURSOR':
+              this.moveCursor(data.x, data.y);
+              break;
+            case 'FLOWSONAT_CLICK':
+              this.click(data.x, data.y, data.button || 'left');
+              break;
+            case 'FLOWSONAT_DOUBLE_CLICK':
+              this.doubleClick(data.x, data.y);
+              break;
+            case 'FLOWSONAT_RIGHT_CLICK':
+              this.rightClick(data.x, data.y);
+              break;
+            case 'FLOWSONAT_DRAG_START':
+              this.startDrag(data.x, data.y);
+              break;
+            case 'FLOWSONAT_DRAG_MOVE':
+              this.dragMove(data.x, data.y);
+              break;
+            case 'FLOWSONAT_DRAG_END':
+              this.endDrag();
+              break;
+            case 'FLOWSONAT_SCROLL':
+              this.scroll(data.x, data.y, data.deltaX, data.deltaY);
+              break;
+            case 'FLOWSONAT_FIND_SCROLLABLE_AREAS':
+              this.findScrollableAreas();
+              break;
+            case 'FLOWSONAT_FIND_CLICKABLE_ELEMENTS':
+              this.findClickableElements();
+              break;
+            case 'FLOWSONAT_FIND_ELEMENT_BY_TEXT':
+              this.findElementByText(data.text);
+              break;
+            case 'FLOWSONAT_FIND_ELEMENT_BY_SELECTOR':
+              this.findElementBySelector(data.selector);
+              break;
+            case 'FLOWSONAT_GET_ELEMENT_INFO':
+              this.getElementInfo(data.x, data.y);
+              break;
+            case 'FLOWSONAT_TAKE_SCREENSHOT':
+              this.takeScreenshot();
+              break;
+          }
+        });
+      }
+
+      activate() {
+        this.isActive = true;
+        this.overlay.style.display = 'block';
+        document.body.classList.add('flowsonat-overlay-active');
+        this.cursor.style.display = 'block';
+        this.updateStatus('Controller Active');
+        console.log('✅ FlowSonat Controller activated');
+      }
+
+      deactivate() {
+        this.isActive = false;
+        this.overlay.style.display = 'none';
+        document.body.classList.remove('flowsonat-overlay-active');
+        this.cursor.style.display = 'none';
+        this.updateStatus('Controller Inactive');
+        console.log('❌ FlowSonat Controller deactivated');
+      }
+
+      moveCursor(x, y) {
+        if (!this.isActive) return;
+        
+        this.currentPosition = { x, y };
+        this.cursor.style.left = \`\${x}px\`;
+        this.cursor.style.top = \`\${y}px\`;
+        
+        // Check if hovering over clickable element
+        const element = document.elementFromPoint(x, y);
+        if (element && this.isClickable(element)) {
+          this.cursor.classList.add('hovering');
+        } else {
+          this.cursor.classList.remove('hovering');
+        }
+      }
+
+      click(x, y, button = 'left') {
+        if (!this.isActive) return;
+        
+        this.moveCursor(x, y);
+        this.cursor.classList.add('clicking');
+        
+        const element = document.elementFromPoint(x, y);
+        if (element) {
+          const event = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: button === 'right' ? 2 : 0,
+            buttons: button === 'right' ? 2 : 1,
+            clientX: x,
+            clientY: y
+          });
+          
+          element.dispatchEvent(event);
+        }
+        
+        setTimeout(() => {
+          this.cursor.classList.remove('clicking');
+        }, 150);
+      }
+
+      doubleClick(x, y) {
+        if (!this.isActive) return;
+        
+        this.moveCursor(x, y);
+        this.cursor.classList.add('clicking');
+        
+        const element = document.elementFromPoint(x, y);
+        if (element) {
+          const event = new MouseEvent('dblclick', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: x,
+            clientY: y
+          });
+          
+          element.dispatchEvent(event);
+        }
+        
+        setTimeout(() => {
+          this.cursor.classList.remove('clicking');
+        }, 150);
+      }
+
+      rightClick(x, y) {
+        this.click(x, y, 'right');
+      }
+
+      startDrag(x, y) {
+        if (!this.isActive) return;
+        
+        this.isDragging = true;
+        this.dragStart = { x, y };
+        this.cursor.classList.add('clicking');
+      }
+
+      dragMove(x, y) {
+        if (!this.isActive || !this.isDragging) return;
+        
+        this.moveCursor(x, y);
+        
+        const element = document.elementFromPoint(x, y);
+        if (element) {
+          const event = new MouseEvent('mousemove', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: x,
+            clientY: y,
+            buttons: 1
+          });
+          
+          element.dispatchEvent(event);
+        }
+      }
+
+      endDrag() {
+        if (!this.isActive) return;
+        
+        this.isDragging = false;
+        this.dragStart = null;
+        this.cursor.classList.remove('clicking');
+      }
+
+      scroll(x, y, deltaX, deltaY) {
+        if (!this.isActive) return;
+        
+        this.moveCursor(x, y);
+        
+        const element = document.elementFromPoint(x, y);
+        if (element) {
+          const event = new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            deltaX: deltaX || 0,
+            deltaY: deltaY || 0,
+            clientX: x,
+            clientY: y
+          });
+          
+          element.dispatchEvent(event);
+        }
+      }
+
+      findScrollableAreas() {
+        const scrollableElements = [];
+        
+        // Find elements with overflow scroll
+        const elements = document.querySelectorAll('*');
+        elements.forEach(element => {
+          const style = window.getComputedStyle(element);
+          if (style.overflow === 'scroll' || style.overflow === 'auto' || 
+              style.overflowY === 'scroll' || style.overflowY === 'auto') {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              scrollableElements.push({
+                element: element,
+                rect: rect,
+                selector: this.getElementSelector(element)
+              });
+            }
+          }
+        });
+        
+        this.scrollableAreas = scrollableElements;
+        this.highlightScrollableAreas();
+        
+        return scrollableElements;
+      }
+
+      findClickableElements() {
+        const clickableElements = [];
+        
+        // Find buttons, links, and other clickable elements
+        const selectors = [
+          'button', 'a', 'input[type="button"]', 'input[type="submit"]',
+          '[role="button"]', '[onclick]', '[data-testid*="button"]',
+          '[class*="btn"]', '[class*="button"]'
+        ];
+        
+        selectors.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(element => {
+            if (this.isClickable(element)) {
+              const rect = element.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                clickableElements.push({
+                  element: element,
+                  rect: rect,
+                  selector: this.getElementSelector(element),
+                  text: element.textContent?.trim() || '',
+                  type: element.tagName.toLowerCase()
+                });
+              }
+            }
+          });
+        });
+        
+        this.clickableElements = clickableElements;
+        this.highlightClickableElements();
+        
+        return clickableElements;
+      }
+
+      findElementByText(text) {
+        const elements = document.querySelectorAll('*');
+        const matches = [];
+        
+        elements.forEach(element => {
+          if (element.textContent?.includes(text)) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              matches.push({
+                element: element,
+                rect: rect,
+                selector: this.getElementSelector(element),
+                text: element.textContent?.trim() || ''
+              });
+            }
+          }
+        });
+        
+        return matches;
+      }
+
+      findElementBySelector(selector) {
+        const elements = document.querySelectorAll(selector);
+        const matches = [];
+        
+        elements.forEach(element => {
+          const rect = element.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            matches.push({
+              element: element,
+              rect: rect,
+              selector: this.getElementSelector(element),
+              text: element.textContent?.trim() || ''
+            });
+          }
+        });
+        
+        return matches;
+      }
+
+      getElementInfo(x, y) {
+        const element = document.elementFromPoint(x, y);
+        if (!element) return null;
+        
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        
+        return {
+          tagName: element.tagName,
+          className: element.className,
+          id: element.id,
+          text: element.textContent?.trim() || '',
+          selector: this.getElementSelector(element),
+          rect: rect,
+          isClickable: this.isClickable(element),
+          isScrollable: style.overflow === 'scroll' || style.overflow === 'auto',
+          attributes: this.getElementAttributes(element)
+        };
+      }
+
+      takeScreenshot() {
+        // This would require additional permissions and implementation
+        // For now, return the current viewport info
+        return {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          url: window.location.href
+        };
+      }
+
+      // Helper methods
+      isClickable(element) {
+        const style = window.getComputedStyle(element);
+        return style.pointerEvents !== 'none' && 
+               style.cursor !== 'default' &&
+               element.offsetWidth > 0 &&
+               element.offsetHeight > 0;
+      }
+
+      getElementSelector(element) {
+        if (element.id) {
+          return \`#\${element.id}\`;
+        }
+        
+        if (element.className) {
+          const classes = element.className.split(' ').filter(c => c.trim());
+          if (classes.length > 0) {
+            return \`\${element.tagName.toLowerCase()}.\${classes.join('.')}\`;
+          }
+        }
+        
+        return element.tagName.toLowerCase();
+      }
+
+      getElementAttributes(element) {
+        const attributes = {};
+        for (let attr of element.attributes) {
+          attributes[attr.name] = attr.value;
+        }
+        return attributes;
+      }
+
+      highlightScrollableAreas() {
+        // Remove existing indicators
+        document.querySelectorAll('.flowsonat-scrollable-indicator').forEach(el => el.remove());
+        
+        this.scrollableAreas.forEach(area => {
+          const indicator = document.createElement('div');
+          indicator.className = 'flowsonat-scrollable-indicator';
+          indicator.style.left = \`\${area.rect.left}px\`;
+          indicator.style.top = \`\${area.rect.top}px\`;
+          indicator.style.width = \`\${area.rect.width}px\`;
+          indicator.style.height = \`\${area.rect.height}px\`;
+          document.body.appendChild(indicator);
+        });
+      }
+
+      highlightClickableElements() {
+        // Remove existing indicators
+        document.querySelectorAll('.flowsonat-clickable-indicator').forEach(el => el.remove());
+        
+        this.clickableElements.forEach(item => {
+          const indicator = document.createElement('div');
+          indicator.className = 'flowsonat-clickable-indicator';
+          indicator.style.left = \`\${item.rect.left}px\`;
+          indicator.style.top = \`\${item.rect.top}px\`;
+          indicator.style.width = \`\${item.rect.width}px\`;
+          indicator.style.height = \`\${item.rect.height}px\`;
+          document.body.appendChild(indicator);
+        });
+      }
+
+      updateStatus(message) {
+        this.statusIndicator.textContent = message;
+        this.statusIndicator.classList.remove('hidden');
+        
+        setTimeout(() => {
+          this.statusIndicator.classList.add('hidden');
+        }, 3000);
+      }
+
+      scanPage() {
+        // Initial scan for scrollable and clickable elements
+        setTimeout(() => {
+          this.findScrollableAreas();
+          this.findClickableElements();
+        }, 2000);
+      }
+    }
+
+    // Initialize the controller
+    window.flowsonatController = new FlowSonatController();
+  `;
+}

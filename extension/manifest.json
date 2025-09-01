@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "FlowSonat Instagram Controller",
+  "version": "1.0.0",
+  "description": "Instagram WebView mouse control extension for FlowSonat",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.instagram.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["cursor.svg", "cursor.png"],
+      "matches": ["https://www.instagram.com/*"]
+    }
+  ],
+  "action": {
+    "default_title": "FlowSonat Controller",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}
