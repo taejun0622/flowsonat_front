@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, ipcMain, webContents, session } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
-import path from 'node:path'
+import path from 'path'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -25,7 +25,6 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
-let instagramAuthWindow: BrowserWindow | null
 
 function createWindow() {
   win = new BrowserWindow({
@@ -35,8 +34,8 @@ function createWindow() {
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false
+      webSecurity: false, // 임시로 CORS 우회
+      allowRunningInsecureContent: true // 임시로 허용
     },
   })
 
@@ -79,158 +78,72 @@ app.on('activate', () => {
   }
 })
 
-// Instagram OAuth IPC handlers
-ipcMain.handle('open-instagram-login', async (event, url: string) => {
-  if (instagramAuthWindow) {
-    instagramAuthWindow.focus()
-    return
-  }
-
-  instagramAuthWindow = new BrowserWindow({
-    width: 600,
-    height: 700,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false
-    },
-    parent: win || undefined,
-    modal: true,
-    show: false
-  })
-
-  instagramAuthWindow.once('ready-to-show', () => {
-    instagramAuthWindow?.show()
-  })
-
-  instagramAuthWindow.on('closed', () => {
-    instagramAuthWindow = null
-  })
-
-  // Instagram 로그인 성공을 감지하기 위한 URL 변경 리스너
-  instagramAuthWindow.webContents.on('did-navigate', (event, navigationUrl) => {
-    // Instagram 로그인 성공 후 리다이렉트되는 URL 패턴을 확인
-    if (navigationUrl.includes('instagram.com') && !navigationUrl.includes('login')) {
-      // 로그인 성공으로 간주
-      win?.webContents.send('instagram-login-success', {
-        url: navigationUrl,
-        cookies: instagramAuthWindow?.webContents.session.cookies.get({})
-      })
-      instagramAuthWindow?.close()
+// When installing the app, create a shortcut on the desktop.
+// Only run on Windows where electron-squirrel-startup is available
+if (process.platform === 'win32') {
+  try {
+    if (require('electron-squirrel-startup')) {
+      app.quit()
     }
+  } catch (error) {
+    // electron-squirrel-startup not available, continue normally
+  }
+}
+
+app.whenReady().then(() => {
+  createWindow()
+
+  /** 인스타 도메인 한정 전체 정리 */
+  async function clearInstagramData(partition = 'persist:ig') {
+    const sess = session.fromPartition(partition)
+
+    // 1) origin 기반 스토리지/캐시류 삭제 (확장된 목록)
+    await sess.clearStorageData({
+      origin: 'https://www.instagram.com',
+      storages: [
+        'cookies',
+        'localstorage',
+        'indexdb',
+        'serviceworkers',
+        'cachestorage',
+        'websql',
+        'filesystem',
+      ],
+      quotas: ['temporary', 'syncable'],
+    })
+
+    // 2) 도메인 기반 쿠키 완전 삭제 (.instagram.com 하위 모두)
+    const cookies = await sess.cookies.get({ domain: '.instagram.com' })
+    const removalPromises = cookies
+      .filter(c => !!c.domain && !!c.path)
+      .map(c => {
+        const protocol = c.secure ? 'https' : 'http'
+        const domain = (c.domain as string).replace(/^\./, '')
+        const path = c.path as string
+        return sess.cookies.remove(`${protocol}://${domain}${path}`, c.name)
+      })
+    await Promise.all(removalPromises)
+
+    // 3) 인증 캐시(HTTP auth)도 정리
+    await sess.clearAuthCache()
+
+    // 4) 변경사항이 디스크에 기록되도록 강제
+    await sess.cookies.flushStore()
+    await sess.clearCache()
+  }
+
+  /** Renderer 요청: 인스타 세션 삭제 */
+  ipcMain.handle('ig:clear-session', async () => {
+    await clearInstagramData('persist:ig')
+    return true
   })
 
-  await instagramAuthWindow.loadURL(url)
-})
-
-ipcMain.handle('close-instagram-login', () => {
-  if (instagramAuthWindow) {
-    instagramAuthWindow.close()
-    instagramAuthWindow = null
-  }
-})
-
-ipcMain.handle('get-instagram-cookies', async () => {
-  if (!instagramAuthWindow) {
-    throw new Error('Instagram window not found')
-  }
-
-  try {
-    // Instagram 창의 쿠키를 가져오기
-    const cookies = await instagramAuthWindow.webContents.session.cookies.get({
-      domain: '.instagram.com'
-    })
-    
-    // 쿠키를 객체로 변환
-    const cookieObject: { [key: string]: string } = {}
-    cookies.forEach(cookie => {
-      cookieObject[cookie.name] = cookie.value
-    })
-    
-    return cookieObject
-  } catch (error) {
-    console.error('Error getting Instagram cookies:', error)
-    throw error
-  }
-})
-
-// Clear Instagram cookies and storage (used on disconnect)
-ipcMain.handle('clear-instagram-session', async () => {
-  try {
-    // Clear both default session and Instagram partition session
-    const defaultSession = session.defaultSession
-    const instagramSession = session.fromPartition('instagram-main-session')
-
-    // Clear cookies for instagram domains from default session
-    const defaultCookies = await defaultSession.cookies.get({})
-    const defaultTargets = defaultCookies.filter(c => c.domain && c.domain.includes('instagram.com'))
-    await Promise.all(
-      defaultTargets.map(c =>
-        defaultSession.cookies.remove(
-          `${c.secure ? 'https' : 'http'}://${c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
-          c.name
-        )
-      )
-    )
-
-    // Clear cookies from Instagram partition session
-    const instagramCookies = await instagramSession.cookies.get({})
-    const instagramTargets = instagramCookies.filter(c => c.domain && c.domain.includes('instagram.com'))
-    await Promise.all(
-      instagramTargets.map(c =>
-        instagramSession.cookies.remove(
-          `${c.secure ? 'https' : 'http'}://${c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain}${c.path}`,
-          c.name
-        )
-      )
-    )
-
-    // Clear storage data scoped to Instagram origins from both sessions
-    const clearForOrigins = async (sessionInstance: Electron.Session, origin: string) => {
-      await sessionInstance.clearStorageData({
-        origin,
-        storages: [
-          'cookies',
-          'localstorage',
-          'indexdb',
-          'cachestorage',
-          'serviceworkers',
-          'websql',
-          'filesystem',
-          'shadercache'
-        ]
-      })
+  /** Renderer 요청: 인스타 세션 삭제 및 리로드 */
+  ipcMain.handle('ig:disconnect-and-reload', async () => {
+    await clearInstagramData('persist:ig')
+    if (win) {
+      win.webContents.send('ig:reload-webview')
     }
-
-    await Promise.all([
-      clearForOrigins(defaultSession, 'https://www.instagram.com'),
-      clearForOrigins(defaultSession, 'https://instagram.com'),
-      clearForOrigins(instagramSession, 'https://www.instagram.com'),
-      clearForOrigins(instagramSession, 'https://instagram.com')
-    ])
-
-    console.log('Instagram session cleared from both default and partition sessions')
-    return { success: true }
-  } catch (error) {
-    console.error('Failed to clear Instagram session:', error)
-    return { success: false, error: String(error) }
-  }
+    return true
+  })
 })
-
-// Execute JavaScript in Instagram window
-ipcMain.handle('execute-instagram-javascript', async (event, script: string) => {
-  if (!instagramAuthWindow) {
-    throw new Error('Instagram window not found')
-  }
-
-  try {
-    const result = await instagramAuthWindow.webContents.executeJavaScript(script)
-    return result
-  } catch (error) {
-    console.error('Error executing JavaScript in Instagram window:', error)
-    throw error
-  }
-})
-
-app.whenReady().then(createWindow)

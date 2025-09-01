@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut } from 'lucide-react';
+import { Settings, Target, User, Lock, Mail, Eye, EyeOff, LogOut, ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,94 +10,59 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useToast } from '@/hooks/use-toast';
 import { UsersService } from '@/api/services/UsersService';
+import { WebViewLauncher } from '@/components/WebViewLauncher';
 
 interface SettingsTabProps {
   isConnected: boolean;
-  onConnectInstagram: () => void;
+  onConnectInstagram?: () => void;
 }
 
-interface PasswordChangeForm {
-  newPassword: string;
-  confirmPassword: string;
-}
-
-interface ProfileForm {
-  email: string;
-}
-
-export const SettingsTab = ({ 
-  isConnected, 
-  onConnectInstagram 
+export const SettingsTab = ({
+  isConnected,
+  onConnectInstagram
 }: SettingsTabProps) => {
   const { user, logout } = useAuth();
   const { instagramAccount, disconnectAccount, isLoading: instagramLoading } = useInstagram();
   const { toast } = useToast();
-
-  // Dialog states
-  const [passwordDialogOpen, setPasswordDialogOpen] = React.useState(false);
+  
   const [profileDialogOpen, setProfileDialogOpen] = React.useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = React.useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = React.useState(false);
-
-  // Form states
-  const [passwordForm, setPasswordForm] = React.useState<PasswordChangeForm>({
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showNewPassword, setShowNewPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
+  const [profileForm, setProfileForm] = React.useState({
+    email: user?.email || ''
+  });
+  
+  const [passwordForm, setPasswordForm] = React.useState({
+    currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-  const [profileForm, setProfileForm] = React.useState<ProfileForm>({
-    email: user?.email || ''
-  });
 
-  // UI states
-  const [showPasswords, setShowPasswords] = React.useState({
-    new: false,
-    confirm: false
-  });
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "New password and confirm password must be the same.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (passwordForm.newPassword.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "New password must be at least 8 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      setIsSubmitting(true);
-      
-      // Update user with new password
       await UsersService.updateUserApiV1UsersUserIdPut(user?.id || '', {
-        password: passwordForm.newPassword
+        email: profileForm.email
       });
-
+      
       toast({
-        title: "Password updated",
-        description: "Your password has been successfully changed.",
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
       });
-
-      setPasswordDialogOpen(false);
-      setPasswordForm({
-        newPassword: '',
-        confirmPassword: ''
-      });
-    } catch (error: any) {
-      console.error('Password change error:', error);
+      
+      setProfileDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to update profile:', error);
       toast({
-        title: "Password change failed",
-        description: error.message || "Failed to change password.",
+        title: "Update Failed",
+        description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -105,27 +70,41 @@ export const SettingsTab = ({
     }
   };
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "New password and confirm password do not match.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
     
     try {
-      setIsSubmitting(true);
-      
       await UsersService.updateUserApiV1UsersUserIdPut(user?.id || '', {
-        email: profileForm.email
+        password: passwordForm.newPassword
       });
-
+      
       toast({
-        title: "Profile updated",
-        description: "Your profile has been successfully updated.",
+        title: "Password Updated",
+        description: "Your password has been updated successfully.",
       });
-
-      setProfileDialogOpen(false);
-    } catch (error: any) {
-      console.error('Profile update error:', error);
+      
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setPasswordDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to update password:', error);
       toast({
-        title: "Profile update failed",
-        description: error.message || "Failed to update profile.",
+        title: "Update Failed",
+        description: "Failed to update password. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -137,20 +116,22 @@ export const SettingsTab = ({
     try {
       await disconnectAccount();
       setDisconnectDialogOpen(false);
+      toast({
+        title: "Instagram Disconnected",
+        description: "Your Instagram account has been disconnected.",
+      });
     } catch (error) {
-      console.error('Disconnect error:', error);
+      console.error('Failed to disconnect Instagram:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect Instagram account.",
+        variant: "destructive",
+      });
     }
   };
 
-  const togglePasswordVisibility = (field: 'new' | 'confirm') => {
-    setShowPasswords((prev: { new: boolean; confirm: boolean }) => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
-
   return (
-            <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+    <Card className="bg-black/10 backdrop-blur-sm border-black/20">
       <CardHeader>
         <CardTitle className="flex items-center text-white">
           <Settings className="h-5 w-5 mr-2" />
@@ -170,63 +151,74 @@ export const SettingsTab = ({
                   <div>
                     <div className="font-medium text-white">Connection Status</div>
                     <div className="text-sm text-gray-300">
-                      {isConnected ? 'Connected to Instagram' : 'Not connected to Instagram'}
+                      {isConnected ? (
+                        <>
+                          Connected to Instagram
+                          {instagramAccount?.username && (
+                            <span className="text-blue-400 ml-1">
+                              (@{instagramAccount.username})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        'Not connected to Instagram'
+                      )}
                     </div>
-                    {instagramAccount && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        Connected as: {instagramAccount.username || 'Unknown'}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   {!isConnected ? (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={onConnectInstagram} 
-                      className="border-white/20 text-white hover:bg-white/10"
-                      disabled={instagramLoading}
-                    >
-                      {instagramLoading ? 'Connecting...' : 'Connect Instagram'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <WebViewLauncher 
+                        url="https://www.instagram.com/accounts/login/"
+                        variant="outline"
+                        size="sm"
+                        showIcon={false}
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Connect Instagram
+                      </WebViewLauncher>
+                    </div>
                   ) : (
-                    <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                        >
-                          Disconnect
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-white">Disconnect Instagram</DialogTitle>
-                          <DialogDescription className="text-gray-300">
-                            Are you sure you want to disconnect your Instagram account? 
-                            This will remove all connection data.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex justify-end gap-2 mt-4">
+                    <div className="flex gap-2">
+                      <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+                        <DialogTrigger asChild>
                           <Button 
                             variant="outline" 
-                            onClick={() => setDisconnectDialogOpen(false)}
-                            className="border-black/30 text-white hover:bg-black/20"
+                            size="sm" 
+                            className="border-red-500/20 text-red-400 hover:bg-red-500/10"
                           >
-                            Cancel
+                            Disconnect
                           </Button>
-                          <Button 
-                            variant="destructive" 
-                            onClick={handleDisconnectInstagram}
-                            disabled={instagramLoading}
-                          >
-                            {instagramLoading ? 'Disconnecting...' : 'Disconnect'}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                        </DialogTrigger>
+                        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
+                          <DialogHeader>
+                            <DialogTitle className="text-white">Disconnect Instagram</DialogTitle>
+                            <DialogDescription className="text-gray-300">
+                              Are you sure you want to disconnect your Instagram account? 
+                              This will remove all connection data.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex justify-end gap-2 mt-4">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setDisconnectDialogOpen(false)}
+                              className="border-black/30 text-white hover:bg-black/20"
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              onClick={handleDisconnectInstagram}
+                              disabled={instagramLoading}
+                            >
+                              {instagramLoading ? 'Disconnecting...' : 'Disconnect'}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   )}
                 </div>
               </div>
@@ -267,7 +259,7 @@ export const SettingsTab = ({
                             id="email"
                             type="email"
                             value={profileForm.email}
-                            onChange={(e: any) => setProfileForm((prev: ProfileForm) => ({ ...prev, email: e.target.value }))}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileForm({ email: e.target.value })}
                             className="pl-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter your email"
                             required
@@ -316,16 +308,16 @@ export const SettingsTab = ({
                         Choose a new password
                       </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <form onSubmit={handlePasswordUpdate} className="space-y-4">
                       <div>
                         <Label htmlFor="newPassword" className="text-white">New Password</Label>
                         <div className="relative">
                           <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                           <Input
                             id="newPassword"
-                            type={showPasswords.new ? "text" : "password"}
+                            type={showNewPassword ? "text" : "password"}
                             value={passwordForm.newPassword}
-                            onChange={(e: any) => setPasswordForm((prev: PasswordChangeForm) => ({ ...prev, newPassword: e.target.value }))}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                             className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Enter new password"
                             required
@@ -335,9 +327,9 @@ export const SettingsTab = ({
                             variant="ghost"
                             size="sm"
                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => togglePasswordVisibility('new')}
+                            onClick={() => setShowNewPassword(!showNewPassword)}
                           >
-                            {showPasswords.new ? (
+                            {showNewPassword ? (
                               <EyeOff className="h-4 w-4 text-gray-400" />
                             ) : (
                               <Eye className="h-4 w-4 text-gray-400" />
@@ -351,9 +343,9 @@ export const SettingsTab = ({
                           <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                           <Input
                             id="confirmPassword"
-                            type={showPasswords.confirm ? "text" : "password"}
+                            type={showConfirmPassword ? "text" : "password"}
                             value={passwordForm.confirmPassword}
-                            onChange={(e: any) => setPasswordForm((prev: PasswordChangeForm) => ({ ...prev, confirmPassword: e.target.value }))}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                             className="pl-10 pr-10 bg-black/20 border-black/30 text-white focus:border-white/30"
                             placeholder="Confirm new password"
                             required
@@ -363,9 +355,9 @@ export const SettingsTab = ({
                             variant="ghost"
                             size="sm"
                             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => togglePasswordVisibility('confirm')}
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           >
-                            {showPasswords.confirm ? (
+                            {showConfirmPassword ? (
                               <EyeOff className="h-4 w-4 text-gray-400" />
                             ) : (
                               <Eye className="h-4 w-4 text-gray-400" />

@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge, shell } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -23,17 +23,10 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // ...
 })
 
-// Instagram API
-contextBridge.exposeInMainWorld('electronAPI', {
-  openInstagramLogin: (url: string) => ipcRenderer.invoke('open-instagram-login', url),
-  closeInstagramLogin: () => ipcRenderer.invoke('close-instagram-login'),
-  onInstagramLoginSuccess: (callback: (data: any) => void) => {
-    ipcRenderer.on('instagram-login-success', (event, data) => callback(data))
+contextBridge.exposeInMainWorld('IG', {
+  clearSession: () => ipcRenderer.invoke('ig:clear-session'),
+  disconnectAndReload: () => ipcRenderer.invoke('ig:disconnect-and-reload'),
+  onReloadRequest: (cb: () => void) => {
+    ipcRenderer.on('ig:reload-webview', cb)
   },
-  onInstagramLoginError: (callback: (error: string) => void) => {
-    ipcRenderer.on('instagram-login-error', (event, error) => callback(error))
-  },
-  getInstagramCookies: () => ipcRenderer.invoke('get-instagram-cookies'),
-  clearInstagramSession: () => ipcRenderer.invoke('clear-instagram-session'),
-  executeInstagramJavaScript: (script: string) => ipcRenderer.invoke('execute-instagram-javascript', script)
 })

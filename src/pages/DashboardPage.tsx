@@ -1,23 +1,23 @@
 import React from 'react';
 import { User, Settings, BarChart3, CreditCard, Bot, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
-import { InstagramWebView } from '@/components/InstagramWebView';
-import { InstagramAutomationOverlay } from '@/components/InstagramAutomationOverlay';
+import { useWebView } from '@/hooks/useWebView';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
-  const [showInstagramWebView, setShowInstagramWebView] = React.useState(false);
-  const [showAutomationOverlay, setShowAutomationOverlay] = React.useState(false);
+  const { openWebView } = useWebView();
+  const navigate = useNavigate();
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
 
-  // Check Instagram connection status when entering dashboard (run only once)
+  // Check Instagram connection status when entering dashboard and handle auto-navigation
   React.useEffect(() => {
     const checkInstagramConnection = async () => {
       if (!user || hasCheckedConnection || isCheckingConnection) return;
@@ -38,44 +38,32 @@ export const DashboardPage = () => {
     if (user && !hasCheckedConnection && !isCheckingConnection) {
       checkInstagramConnection();
     }
-  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]); // Prevent duplicate execution
+  }, [user, checkConnection, hasCheckedConnection, isCheckingConnection]);
 
-  // Automatically show Instagram WebView when Instagram is not connected
+  // Auto-navigate to Instagram WebView based on connection status
   React.useEffect(() => {
-    if (!isCheckingConnection && !isConnected && user && hasCheckedConnection) {
-      console.log('Instagram not connected, showing Instagram WebView');
-      setShowInstagramWebView(true);
+    if (!hasCheckedConnection || isCheckingConnection) return;
+
+    // 로그아웃 상태면 바로 Instagram WebView로 이동
+    if (!isConnected) {
+      console.log('Instagram not connected, navigating to WebView...');
+      navigate('/webview');
     }
-  }, [isCheckingConnection, isConnected, user, hasCheckedConnection]);
-
-  const handleLoginSuccess = async (sessionData: any) => {
-    try {
-      // Save Instagram session information to server (통합된 로직 사용)
-      await saveInstagramSession(sessionData);
-      
-      // Update connection status
-      await checkConnection();
-    } catch (error: any) {
-      console.error('Failed to save Instagram session:', error);
-      // 에러 처리는 saveInstagramSession 내부에서 이미 처리됨
-    }
-  };
-
-  const handleCloseInstagramWebView = () => {
-    setShowInstagramWebView(false);
-  };
-
-  const handleConnectInstagram = () => {
-    setShowInstagramWebView(true);
-  };
+  }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
   const handleStartAutomation = () => {
-    setShowAutomationOverlay(true);
+    // Open full-screen WebView manager in minimal mode
+    navigate('/webview?minimal=1');
   };
 
   const handleRefresh = () => {
     // Refresh Instagram connection status
     checkConnection();
+  };
+
+  const handleConnectInstagram = () => {
+    // Open Instagram login page in webview
+    openWebView('https://www.instagram.com/accounts/login/');
   };
 
   // Show loading when checking connection status
@@ -123,15 +111,15 @@ export const DashboardPage = () => {
           {/* Tabs */}
           <Tabs defaultValue="benchmark" className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-black/10 backdrop-blur-sm border border-black/20">
-                              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <BarChart3 className="h-4 w-4 mr-2" />
                 Benchmark
               </TabsTrigger>
-                              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="billing" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <CreditCard className="h-4 w-4 mr-2" />
                 Billing
               </TabsTrigger>
-                              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
+              <TabsTrigger value="settings" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </TabsTrigger>
@@ -158,25 +146,7 @@ export const DashboardPage = () => {
         </div>
       </main>
 
-      {/* Instagram WebView */}
-      {showInstagramWebView && (
-        <InstagramWebView
-          onClose={handleCloseInstagramWebView}
-          onLoginSuccess={handleLoginSuccess}
-          onAutomationReady={(username: string) => {
-            console.log('Automation ready for username:', username);
-          }}
-          initialUrl="https://www.instagram.com/accounts/login/"
-          showInstructions={true}
-        />
-      )}
-
-      {/* Instagram Automation Overlay */}
-      {showAutomationOverlay && (
-        <InstagramAutomationOverlay
-          onClose={() => setShowAutomationOverlay(false)}
-        />
-      )}
+      {/* No overlay needed; Execute opens WebView */}
     </div>
   );
 };
