@@ -9,6 +9,8 @@ import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { collectFollowingToBenchmark, FollowingCollectorResult } from '@/services/followingCollectorService';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
+import { InstagramService } from '@/api/services/InstagramService';
+import { HealthEnum, StatusEnum } from '@/api';
 
 interface InstagramWebViewManagerProps {
   className?: string;
@@ -202,28 +204,32 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     setAutomationResult(null);
 
     try {
-      // For now, we'll use a mock benchmark
-      // In real implementation, you would get the actual benchmark from props or context
-      const mockBenchmark = {
-        id: 'mock-benchmark',
-        user_id: 'mock-user-id',
-        ig_id: 'mock-ig-id',
-        ig: { 
-          id: 'mock-ig-id',
-          username: instagramAccount.username,
-          status: 'ACTIVE' as any,
-          created_at: new Date().toISOString()
-        },
-        status: 'ACTIVE' as any,
-        health: 'HEALTHY' as any,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      // Get actual benchmark data from API
+      setAutomationStatus('Fetching benchmark data...');
+      const benchmarksResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
+      
+      // Find the benchmark for the current Instagram account
+      const userBenchmark = benchmarksResponse.benchmarks.find(
+        benchmark => benchmark.ig?.username === instagramAccount.username
+      );
+      
+      if (!userBenchmark) {
+        throw new Error(`No benchmark found for Instagram account: ${instagramAccount.username}`);
+      }
+      
+      if (userBenchmark.status !== StatusEnum.ACTIVE) {
+        throw new Error(`Benchmark is not active. Current status: ${userBenchmark.status}`);
+      }
+      
+      if (userBenchmark.health !== HealthEnum.HEALTHY) {
+        throw new Error(`Benchmark is not healthy. Current health: ${userBenchmark.health}`);
+      }
 
+      setAutomationStatus('Starting automation with real benchmark data...');
       const result: AutomationResult = await executeAutomation(
         webviewApiRef.current,
         instagramAccount.username,
-        mockBenchmark,
+        userBenchmark,
         {
           scrollDelay: 2000,
           pageLoadDelay: 3000,

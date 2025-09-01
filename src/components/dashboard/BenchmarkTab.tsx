@@ -528,14 +528,14 @@ export const BenchmarkTab = () => {
                               </p>
                             </div>
                             <div className="flex items-center space-x-4">
-                              <div className="text-center">
+                              {/* <div className="text-center">
                                 <span className="text-xs text-gray-400">Status</span>
                                 <p className={`text-sm font-medium ${getStatusColor(benchmark.status)}`}>
                                   {benchmark.status}
                                 </p>
-                              </div>
-                              <div className="text-center">
-                                <span className="text-xs text-gray-400">Health</span>
+                              </div> */}
+                              <div className="text-center" style={{ padding:'0px 20px'}}>
+                                {/* <span className="text-xs text-gray-400">Health</span> */}
                                 <p className={`text-sm font-medium ${getHealthColor(benchmark.health)}`}>
                                   {benchmark.health || 'Unknown'}
                                 </p>
