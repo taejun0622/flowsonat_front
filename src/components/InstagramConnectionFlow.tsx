@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
-import { WebView } from './WebView';
+import { WebView, WebViewHandle } from './WebView';
 import { useInstagramWebView } from '@/hooks/useInstagramWebView';
 import { Button } from '@/components/ui/button';
 import { InstagramUsernameConfirmModal } from './InstagramUsernameConfirmModal';
 import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
+import { useInstagram } from '@/contexts/InstagramContext';
 
 interface InstagramConnectionFlowProps {
   className?: string;
@@ -15,8 +16,10 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
   className = "" 
 }) => {
   const navigate = useNavigate();
+  const { disconnectAccount } = useInstagram();
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
+  const webviewApiRef = useRef<WebViewHandle>(null);
   
   const {
     webViewStatus,
@@ -42,6 +45,20 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
     setIsLoading(true);
     // WebView가 자동으로 새로고침됨
   }, []);
+
+  const handleClearAndExit = useCallback(async () => {
+    try {
+      await webviewApiRef.current?.clearInstagramData();
+    } catch (e) {
+      console.warn('Failed to clear instagram data in webview, continuing', e);
+    }
+    try {
+      localStorage.removeItem('instagram_session_data');
+    } catch (e) {
+      console.warn('Failed to clear local instagram_session_data', e);
+    }
+    navigate('/dashboard');
+  }, [navigate]);
 
   // 액션 버튼 클릭 핸들러
   const handleActionClick = useCallback(async (action: string) => {
@@ -150,6 +167,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
       {/* WebView Container */}
       <div className="flex-1 relative">
         <WebView
+          ref={webviewApiRef}
           src={currentUrl}
           onLoad={handleWebViewLoad}
           onError={handleWebViewError}
@@ -181,8 +199,8 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
         open={modalState.showManualModal}
         sessionData={modalState.detectedSessionData}
         onConfirm={handleManualUsernameConfirm}
-        onCancel={handleCancelConnection}
-        onDisconnect={handleCancelConnection}
+        onSecondary={handleClearAndExit}
+        secondaryLabel="Cancel"
       />
     </div>
   );

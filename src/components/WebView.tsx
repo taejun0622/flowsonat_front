@@ -1,4 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+
+export interface WebViewHandle {
+  clearInstagramData: () => Promise<void>;
+}
 
 interface WebViewProps {
   src: string;
@@ -9,18 +13,63 @@ interface WebViewProps {
   className?: string;
 }
 
-export const WebView: React.FC<WebViewProps> = ({ 
+export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
   src, 
   onLoad, 
   onError, 
   onInstagramLogin,
   onLoginStatusCheck,
   className = "" 
-}) => {
+}, ref) => {
   const webviewRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
+
+  useImperativeHandle(ref, () => ({
+    clearInstagramData: async () => {
+      if (!webviewRef.current) return;
+      try {
+        await webviewRef.current.executeJavaScript(`(function() {
+          try {
+            function deleteCookie(name, domain, path) {
+              var cookieBase = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; ';
+              var pathPart = 'path=' + (path || '/') + '; ';
+              var domainPart = domain ? ('domain=' + domain + '; ') : '';
+              document.cookie = cookieBase + pathPart + domainPart;
+            }
+            
+            var host = window.location.hostname;
+            var domains = [host, '.instagram.com', 'instagram.com'];
+            var paths = ['/', '/accounts', '/accounts/login', '/accounts/logout'];
+            
+            var cookies = document.cookie.split(';').map(function(c){return c.trim().split('=')[0];});
+            var targets = cookies.length ? cookies : ['ds_user_id','sessionid','csrftoken','mid','ig_did','ig_nrcb','ps_n'];
+            
+            for (var i=0; i<targets.length; i++) {
+              var name = targets[i];
+              for (var d=0; d<domains.length; d++) {
+                for (var p=0; p<paths.length; p++) {
+                  deleteCookie(name, domains[d], paths[p]);
+                }
+              }
+              // Try without domain as well
+              deleteCookie(name, null, '/');
+            }
+            
+            try { localStorage.clear(); } catch(e){}
+            try { sessionStorage.clear(); } catch(e){}
+            
+            return JSON.stringify({ ok: true, cleared: targets });
+          } catch(e) {
+            return JSON.stringify({ ok: false, error: e.message });
+          }
+        })();`);
+      } catch (e) {
+        console.error('Failed clearing instagram data in webview:', e);
+      }
+    }
+  }), []);
 
   // 주기적으로 Instagram 로그인 상태 확인
   useEffect(() => {
@@ -387,4 +436,4 @@ export const WebView: React.FC<WebViewProps> = ({
       />
     </div>
   );
-};
+});
