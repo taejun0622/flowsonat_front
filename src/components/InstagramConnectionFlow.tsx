@@ -19,6 +19,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
   const { disconnectAccount } = useInstagram();
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
+  const [webviewKey, setWebviewKey] = useState(0);
   const webviewApiRef = useRef<WebViewHandle>(null);
   
   const {
@@ -40,25 +41,16 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
     navigate('/dashboard');
   }, [navigate]);
 
-  // 새로고침 핸들러
-  const handleRefresh = useCallback(() => {
-    setIsLoading(true);
-    // WebView가 자동으로 새로고침됨
+  // Listen for reload requests from the main process
+  React.useEffect(() => {
+    if (window.IG) {
+      const unsubscribe = window.IG.onReloadRequest(() => {
+        console.log('Reload request received from main process. Remounting webview.');
+        setWebviewKey(prevKey => prevKey + 1);
+      });
+      // return unsubscribe; // This will cause an error because ipcRenderer.on returns void
+    }
   }, []);
-
-  const handleClearAndExit = useCallback(async () => {
-    try {
-      await webviewApiRef.current?.clearInstagramData();
-    } catch (e) {
-      console.warn('Failed to clear instagram data in webview, continuing', e);
-    }
-    try {
-      localStorage.removeItem('instagram_session_data');
-    } catch (e) {
-      console.warn('Failed to clear local instagram_session_data', e);
-    }
-    navigate('/dashboard');
-  }, [navigate]);
 
   // 액션 버튼 클릭 핸들러
   const handleActionClick = useCallback(async (action: string) => {
@@ -77,6 +69,12 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
   const handleWebViewError = useCallback((error: any) => {
     console.error('WebView error:', error);
     setIsLoading(false);
+  }, []);
+
+  // 새로고침 핸들러
+  const handleRefresh = useCallback(() => {
+    setIsLoading(true);
+    webviewApiRef.current?.reload();
   }, []);
 
   // Instagram 로그인 감지 핸들러
@@ -167,6 +165,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
       {/* WebView Container */}
       <div className="flex-1 relative">
         <WebView
+          key={webviewKey}
           ref={webviewApiRef}
           src={currentUrl}
           onLoad={handleWebViewLoad}
@@ -199,7 +198,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
         open={modalState.showManualModal}
         sessionData={modalState.detectedSessionData}
         onConfirm={handleManualUsernameConfirm}
-        onSecondary={handleClearAndExit}
+        onSecondary={handleCancelConnection}
         secondaryLabel="Cancel"
       />
     </div>

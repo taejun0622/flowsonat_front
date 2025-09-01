@@ -366,6 +366,16 @@ export const useInstagramWebView = () => {
   const handleAction = useCallback(async (action: InstagramWebViewAction) => {
     switch (action) {
       case 'connect_instagram':
+        // Proactively clear any residual Instagram data before starting a new login
+        try {
+          // If running in Electron, clear known Instagram sessions (default + persisted partitions)
+          // Passing undefined lets main clear default + known partitions even without a webview id
+          // @ts-ignore
+          if ((window as any).electronAPI?.clearInstagramDataForWebContents) {
+            // @ts-ignore
+            await (window as any).electronAPI.clearInstagramDataForWebContents(undefined)
+          }
+        } catch {/* non-blocking */}
         // Instagram 로그인 페이지로 이동
         return 'https://www.instagram.com/accounts/login/';
         

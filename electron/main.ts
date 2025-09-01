@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, webContents, session } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'path'
@@ -92,4 +92,63 @@ if (process.platform === 'win32') {
 
 app.whenReady().then(() => {
   createWindow()
+
+  /** 인스타 도메인 한정 전체 정리 */
+  async function clearInstagramData(partition = 'persist:ig') {
+    const sess = session.fromPartition(partition)
+
+    // 1) origin 기반 스토리지/캐시류 삭제 (확장된 목록)
+    await sess.clearStorageData({
+      origins: [
+        'https://www.instagram.com',
+        'https://instagram.com',
+        'https://m.instagram.com',
+        'https://i.instagram.com',
+        'https://static.cdninstagram.com',
+      ],
+      storages: [
+        'cookies',
+        'localstorage',
+        'indexdb',
+        'serviceworkers',
+        'caches',
+        'websql',
+        'filesystem',
+      ],
+      quotas: ['temporary', 'persistent', 'syncable'],
+    })
+
+    // 2) 도메인 기반 쿠키 완전 삭제 (.instagram.com 하위 모두)
+    const cookies = await sess.cookies.get({ domain: '.instagram.com' })
+    await Promise.all(
+      cookies.map(c =>
+        sess.cookies.remove(
+          `http${c.secure ? 's' : ''}://${c.domain.replace(/^\./, '')}${c.path}`,
+          c.name
+        )
+      )
+    )
+
+    // 3) 인증 캐시(HTTP auth)도 정리
+    await sess.clearAuthCache({ type: 'password' })
+
+    // 4) 변경사항이 디스크에 기록되도록 강제
+    await sess.cookies.flushStore()
+    await sess.clearCache()
+  }
+
+  /** Renderer 요청: 인스타 세션 삭제 */
+  ipcMain.handle('ig:clear-session', async () => {
+    await clearInstagramData('persist:ig')
+    return true
+  })
+
+  /** Renderer 요청: 인스타 세션 삭제 및 리로드 */
+  ipcMain.handle('ig:disconnect-and-reload', async () => {
+    await clearInstagramData('persist:ig')
+    if (win) {
+      win.webContents.send('ig:reload-webview')
+    }
+    return true
+  })
 })

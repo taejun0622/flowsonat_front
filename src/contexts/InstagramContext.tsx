@@ -127,7 +127,13 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       setIsLoading(true);
       await InstagramService.disconnectInstagramAccountApiV1InstagramMeDelete();
       setInstagramAccount(null);
-      
+
+      // Clear the webview session and trigger reload
+      if (window.IG) {
+        await window.IG.disconnectAndReload();
+        console.log('Instagram webview session cleared and reload triggered.');
+      }
+
       toast({
         title: "Instagram disconnected",
         description: "Successfully disconnected from Instagram.",

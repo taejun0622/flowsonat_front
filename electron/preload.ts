@@ -23,19 +23,10 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // ...
 })
 
-// Electron API for webview functionality
-contextBridge.exposeInMainWorld('electronAPI', {
-  // Open external URL in default browser
-  openExternal: (url: string) => {
-    shell.openExternal(url)
+contextBridge.exposeInMainWorld('IG', {
+  clearSession: () => ipcRenderer.invoke('ig:clear-session'),
+  disconnectAndReload: () => ipcRenderer.invoke('ig:disconnect-and-reload'),
+  onReloadRequest: (cb: () => void) => {
+    ipcRenderer.on('ig:reload-webview', cb)
   },
-  
-  // Get app version
-  getVersion: () => process.versions.app,
-  
-  // Get platform
-  getPlatform: () => process.platform,
-  
-  // Check if running in Electron
-  isElectron: true
 })
