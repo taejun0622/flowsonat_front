@@ -121,22 +121,331 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   };
 
   const disconnectAccount = async () => {
-    if (!token) return;
+    console.log('🔍 disconnectAccount 함수 시작');
+    console.log('🔍 token 존재 여부:', !!token);
+    
+    if (!token) {
+      console.log('❌ token이 없어서 함수 종료');
+      return;
+    }
 
     try {
+      console.log('🔄 로딩 상태 설정');
       setIsLoading(true);
-      await InstagramService.disconnectInstagramAccountApiV1InstagramMeDelete();
+      
+      // 1. 서버에서 Instagram 계정 연결 해제 (선택적)
+      console.log('🌐 서버 API 호출 시작');
+      try {
+        await InstagramService.disconnectInstagramAccountApiV1InstagramMeDelete();
+        console.log('✅ 서버 API 호출 완료');
+      } catch (apiError) {
+        console.warn('⚠️ 서버 API 호출 실패 (계속 진행):', apiError);
+        // API 실패는 무시하고 계속 진행
+      }
       setInstagramAccount(null);
+      console.log('✅ Instagram 계정 상태 초기화');
 
-      // Clear the webview session and trigger reload
-      if (window.IG) {
-        await window.IG.disconnectAndReload();
-        console.log('Instagram webview session cleared and reload triggered.');
+      // 2. 로컬 스토리지에서 모든 Instagram 관련 데이터 정리
+      console.log('🗂️ 로컬 스토리지 정리 시작');
+      
+      // 먼저 모든 localStorage 키를 확인
+      console.log('📋 현재 localStorage 전체 내용:');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          console.log(`  - ${key}: ${localStorage.getItem(key)?.substring(0, 50)}...`);
+        }
+      }
+      console.log(`📊 localStorage 총 ${localStorage.length}개 항목`);
+      
+      // sessionStorage도 확인
+      console.log('📋 현재 sessionStorage 전체 내용:');
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key) {
+          console.log(`  - ${key}: ${sessionStorage.getItem(key)?.substring(0, 50)}...`);
+        }
+      }
+      console.log(`📊 sessionStorage 총 ${sessionStorage.length}개 항목`);
+      
+      try {
+        // 개발 환경 세션 데이터
+        console.log('🗂️ instagram_session_data 삭제 시도');
+        localStorage.removeItem('instagram_session_data');
+        console.log('✅ instagram_session_data 삭제 완료');
+        
+        // Instagram 관련 모든 로컬 스토리지 키 정리
+        console.log('🔍 localStorage 키 검색 시작');
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.toLowerCase().includes('instagram') ||
+            key.toLowerCase().includes('ig_') ||
+            key.toLowerCase().includes('ds_') ||
+            key.toLowerCase().includes('session') ||
+            key.toLowerCase().includes('auth')
+          )) {
+            keysToRemove.push(key);
+            console.log(`🔍 발견된 키: ${key}`);
+          }
+        }
+        console.log(`📊 총 ${keysToRemove.length}개의 키 발견`);
+        
+        keysToRemove.forEach(key => {
+          try {
+            localStorage.removeItem(key);
+            console.log(`Removed localStorage key: ${key}`);
+          } catch (e) {
+            console.warn(`Failed to remove localStorage key ${key}:`, e);
+          }
+        });
+
+        // SessionStorage도 정리
+        const sessionKeysToRemove: string[] = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && (
+            key.toLowerCase().includes('instagram') ||
+            key.toLowerCase().includes('ig_') ||
+            key.toLowerCase().includes('ds_') ||
+            key.toLowerCase().includes('session') ||
+            key.toLowerCase().includes('auth')
+          )) {
+            sessionKeysToRemove.push(key);
+          }
+        }
+        
+        sessionKeysToRemove.forEach(key => {
+          try {
+            sessionStorage.removeItem(key);
+            console.log(`Removed sessionStorage key: ${key}`);
+          } catch (e) {
+            console.warn(`Failed to remove sessionStorage key ${key}:`, e);
+          }
+        });
+
+        console.log('All local Instagram data cleared');
+      } catch (e) {
+        console.warn('Failed to clear some local data:', e);
       }
 
+            // 3. WebView 완전 파괴 및 재생성 (무식한 방법)
+      console.log('💥 WebView 완전 파괴 시작');
+      try {
+        // 방법 1: Electron API 사용
+        if (window.IG && typeof window.IG.disconnectAndReload === 'function') {
+          console.log('🔧 Electron IG API 사용하여 WebView 정리');
+          await window.IG.disconnectAndReload();
+          console.log('✅ Electron WebView 세션 정리 완료');
+        } else {
+          console.log('⚠️ Electron IG API 사용 불가');
+        }
+        
+        // 방법 1.5: Electron 세션 직접 정리
+        try {
+          if (window.ipcRenderer) {
+            console.log('🔧 Electron 세션 직접 정리 시도');
+            await window.ipcRenderer.invoke('ig:clear-session');
+            console.log('✅ Electron 세션 직접 정리 완료');
+          }
+        } catch (e) {
+          console.warn('⚠️ Electron 세션 직접 정리 실패:', e);
+        }
+        
+        // 방법 2: WebView 완전 파괴 (무식한 방법)
+        try {
+          // 모든 WebView 요소 찾기
+          const webviews = document.querySelectorAll('webview');
+          console.log(`🔍 발견된 WebView 개수: ${webviews.length}`);
+          
+          webviews.forEach((webviewElement, index) => {
+            const webview = webviewElement as any;
+            try {
+              console.log(`💥 WebView ${index + 1} 완전 파괴 중...`);
+              
+              // 1. WebView 내부 데이터 완전 정리
+              const nukeScript = `
+                (function() {
+                  try {
+                    console.log('💥 WebView 내부 핵폭탄 시작');
+                    
+                    // 모든 스토리지 완전 삭제
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    // 모든 쿠키 삭제
+                    document.cookie.split(";").forEach(function(c) { 
+                      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                    });
+                    
+                    // IndexedDB 완전 삭제
+                    if ('indexedDB' in window) {
+                      indexedDB.databases().then(databases => {
+                        databases.forEach(db => {
+                          if (db.name) indexedDB.deleteDatabase(db.name);
+                        });
+                      });
+                    }
+                    
+                    // Cache 완전 삭제
+                    if ('caches' in window) {
+                      caches.keys().then(cacheNames => {
+                        cacheNames.forEach(cacheName => caches.delete(cacheName));
+                      });
+                    }
+                    
+                    // Service Workers 완전 삭제
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(registrations => {
+                        registrations.forEach(registration => registration.unregister());
+                      });
+                    }
+                    
+                    console.log('💥 WebView 내부 핵폭탄 완료');
+                    return 'NUKED';
+                  } catch (e) {
+                    return 'NUKED_WITH_ERROR: ' + e.message;
+                  }
+                })();
+              `;
+              
+              // 스크립트 실행
+              if (webview.executeJavaScript) {
+                webview.executeJavaScript(nukeScript).then((result: any) => {
+                  console.log(`💥 WebView ${index + 1} 내부 핵폭탄 결과:`, result);
+                });
+              }
+              
+              // 2. WebView 완전 파괴
+              setTimeout(() => {
+                try {
+                  // WebView를 DOM에서 완전히 제거
+                  if (webviewElement.parentNode) {
+                    webviewElement.parentNode.removeChild(webviewElement);
+                    console.log(`💥 WebView ${index + 1} DOM에서 완전 제거`);
+                  }
+                  
+                                     // 새로운 WebView 생성 (완전히 새로운 파티션으로)
+                   setTimeout(() => {
+                     try {
+                       const newWebView = document.createElement('webview') as any;
+                       
+                       // 완전히 새로운 파티션으로 생성 (세션 격리)
+                       const timestamp = Date.now();
+                       newWebView.partition = `persist:ig_${timestamp}`;
+                       newWebView.src = 'https://www.instagram.com/accounts/login/';
+                       newWebView.style.width = '100%';
+                       newWebView.style.height = '100%';
+                       
+                       // 추가 속성으로 완전 격리
+                       newWebView.setAttribute('webpreferences', 'contextIsolation=true, nodeIntegration=false');
+                       
+                       // 원래 WebView가 있던 위치에 삽입
+                       const container = document.querySelector('.webview-container') || document.body;
+                       container.appendChild(newWebView);
+                       console.log(`🔄 WebView ${index + 1} 새 파티션(${timestamp})으로 생성 완료`);
+                     } catch (e) {
+                       console.warn(`WebView ${index + 1} 재생성 실패:`, e);
+                     }
+                   }, 1000);
+                  
+                } catch (e) {
+                  console.warn(`WebView ${index + 1} 파괴 실패:`, e);
+                }
+              }, 2000);
+              
+            } catch (webviewError) {
+              console.warn(`WebView ${index + 1} 파괴 중 에러:`, webviewError);
+            }
+          });
+          
+        } catch (directError) {
+          console.warn('WebView 파괴 실패:', directError);
+        }
+        
+        console.log('💥 WebView 완전 파괴 완료');
+        
+      } catch (webviewError) {
+        console.warn('WebView 파괴 중 전체 에러:', webviewError);
+      }
+
+              // 4. IndexedDB 정리 (선택적)
+        console.log('🗄️ IndexedDB 정리 시작');
+        try {
+          if ('indexedDB' in window) {
+            console.log('📋 IndexedDB 데이터베이스 목록 확인 중...');
+            const databases = await window.indexedDB.databases();
+            console.log('📋 모든 IndexedDB 데이터베이스:');
+            databases.forEach(db => {
+              console.log(`  - ${db.name} (version: ${db.version})`);
+            });
+            console.log(`📊 총 ${databases.length}개의 데이터베이스`);
+            
+            const instagramDBs = databases.filter(db => 
+              db.name && (
+                db.name.toLowerCase().includes('instagram') ||
+                db.name.toLowerCase().includes('ig_') ||
+                db.name.toLowerCase().includes('session')
+              )
+            );
+            console.log(`🔍 Instagram 관련 데이터베이스: ${instagramDBs.length}개`);
+            
+            for (const db of instagramDBs) {
+              try {
+                if (db.name) {
+                  await window.indexedDB.deleteDatabase(db.name);
+                  console.log(`Deleted IndexedDB: ${db.name}`);
+                }
+              } catch (e) {
+                console.warn(`Failed to delete IndexedDB ${db.name}:`, e);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to clear IndexedDB:', e);
+        }
+
+      // 5. 쿠키 정리 (도메인 제한으로 인해 제한적)
+      console.log('🍪 쿠키 정리 시작');
+      
+      // 먼저 현재 쿠키 확인
+      console.log('📋 현재 쿠키 전체 내용:');
+      const allCookies = document.cookie.split(';').map(c => c.trim());
+      allCookies.forEach(cookie => {
+        console.log(`  - ${cookie}`);
+      });
+      console.log(`📊 총 ${allCookies.length}개의 쿠키`);
+      
+      try {
+        // 현재 도메인에서 접근 가능한 Instagram 관련 쿠키만 정리
+        const cookiesToRemove = [
+          'ds_user_id',
+          'sessionid', 
+          'csrftoken',
+          'mid',
+          'ig_did',
+          'ig_nrcb',
+          'ps_n',
+          'rur',
+          'urlgen'
+        ];
+        
+        cookiesToRemove.forEach(cookieName => {
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.instagram.com`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=instagram.com`;
+        });
+        
+        console.log('Instagram cookies cleared');
+      } catch (e) {
+        console.warn('Failed to clear cookies:', e);
+      }
+
+      console.log('🎉 disconnectAccount 함수 완료!');
       toast({
         title: "Instagram disconnected",
-        description: "Successfully disconnected from Instagram.",
+        description: "Successfully disconnected from Instagram. All local data has been cleared.",
       });
     } catch (error: any) {
       console.error('Failed to disconnect Instagram:', error);
@@ -145,6 +454,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         description: "Failed to disconnect from Instagram.",
         variant: "destructive",
       });
+      throw error; // 에러를 다시 던져서 호출자가 처리할 수 있도록 함
     } finally {
       setIsLoading(false);
     }

@@ -47,18 +47,18 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   // Clear cookies/session in the WebView and disconnect app session, then go dashboard
   const handleClearAndExit = useCallback(async () => {
+    console.log('🔍 handleClearAndExit 함수 시작');
     try {
-      await webviewApiRef.current?.clearInstagramData();
+      // InstagramContext의 disconnectAccount 함수 호출
+      await disconnectAccount();
+      console.log('✅ disconnectAccount 완료');
     } catch (e) {
-      console.warn('Failed to clear instagram data in webview, continuing', e);
+      console.error('Failed to disconnect Instagram account:', e);
     }
-    try {
-      localStorage.removeItem('instagram_session_data');
-    } catch (e) {
-      console.warn('Failed to clear local instagram_session_data', e);
-    }
+    
+    // 대시보드로 이동
     navigate('/dashboard');
-  }, [navigate]);
+  }, [navigate, disconnectAccount]);
 
   // 액션 버튼 클릭 핸들러
   const handleActionClick = useCallback(async (action: string) => {
