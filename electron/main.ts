@@ -111,26 +111,27 @@ app.whenReady().then(() => {
         'localstorage',
         'indexdb',
         'serviceworkers',
-        'caches',
+        'cachestorage',
         'websql',
         'filesystem',
       ],
-      quotas: ['temporary', 'persistent', 'syncable'],
+      quotas: ['temporary', 'syncable'],
     })
 
     // 2) 도메인 기반 쿠키 완전 삭제 (.instagram.com 하위 모두)
     const cookies = await sess.cookies.get({ domain: '.instagram.com' })
-    await Promise.all(
-      cookies.map(c =>
-        sess.cookies.remove(
-          `http${c.secure ? 's' : ''}://${c.domain.replace(/^\./, '')}${c.path}`,
-          c.name
-        )
-      )
-    )
+    const removalPromises = cookies
+      .filter(c => !!c.domain && !!c.path)
+      .map(c => {
+        const protocol = c.secure ? 'https' : 'http'
+        const domain = (c.domain as string).replace(/^\./, '')
+        const path = c.path as string
+        return sess.cookies.remove(`${protocol}://${domain}${path}`, c.name)
+      })
+    await Promise.all(removalPromises)
 
     // 3) 인증 캐시(HTTP auth)도 정리
-    await sess.clearAuthCache({ type: 'password' })
+    await sess.clearAuthCache()
 
     // 4) 변경사항이 디스크에 기록되도록 강제
     await sess.cookies.flushStore()

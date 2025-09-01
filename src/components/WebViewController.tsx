@@ -234,10 +234,10 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
         {isExtensionEnabled && (
           <div
             className="absolute top-4 right-4 z-20 w-80 bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg backdrop-blur p-3 space-y-2"
-            onMouseDown={(e) => { e.stopPropagation(); }}
-            onMouseUp={(e) => { e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); }}
-            onWheel={(e) => { e.stopPropagation(); }}
+            onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
+            onMouseUp={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
+            onClick={(e: React.MouseEvent<HTMLDivElement>) => { e.stopPropagation(); }}
+            onWheel={(e: React.WheelEvent<HTMLDivElement>) => { e.stopPropagation(); }}
           >
             <div className="text-sm font-medium mb-1">Extension Test HUD</div>
             <div className="grid grid-cols-3 gap-2">
@@ -257,7 +257,7 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
               <Input
                 placeholder="Text to click..."
                 value={testText}
-                onChange={(e) => setTestText(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTestText(e.target.value)}
               />
               <Button size="sm" onClick={() => testText && handleClickByText(testText)}>Go</Button>
             </div>

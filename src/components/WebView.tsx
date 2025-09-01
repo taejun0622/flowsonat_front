@@ -12,6 +12,7 @@ export interface WebViewHandle {
   dragMove: (x: number, y: number) => void;
   endDrag: () => void;
   scroll: (x: number, y: number, deltaX: number, deltaY: number) => void;
+  scrollForemost: (deltaY: number) => Promise<boolean>;
   findScrollableAreas: () => Promise<any[]>;
   findClickableElements: () => Promise<any[]>;
   findElementByText: (text: string) => Promise<any[]>;
@@ -22,6 +23,8 @@ export interface WebViewHandle {
   typeText: (text: string) => Promise<boolean>;
   pressEnter: () => Promise<boolean>;
   pressEscape: () => Promise<boolean>;
+  clickFollowers: () => Promise<boolean>;
+  clickFollowing: () => Promise<boolean>;
 }
 
 interface WebViewProps {
@@ -117,12 +120,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
 
   useImperativeHandle(ref, () => ({
     reload: () => {
-      if (webviewRef.current) {
+      if (webviewRef.current && isDomReady) {
         webviewRef.current.reload();
       }
     },
     activateExtension: () => {
-      if (webviewRef.current) {
+      if (webviewRef.current && isDomReady) {
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_ACTIVATE'
@@ -132,7 +135,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     deactivateExtension: () => {
-      if (webviewRef.current) {
+      if (webviewRef.current && isDomReady) {
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_DEACTIVATE'
@@ -142,18 +145,22 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     moveCursor: (x: number, y: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         console.log('[WebView] MOVE_CURSOR', { x, y });
-        webviewRef.current.executeJavaScript(`
-          window.postMessage({
-            type: 'FLOWSONAT_MOVE_CURSOR',
-            data: { x: ${x}, y: ${y} }
-          }, '*');
-        `);
+        webviewRef.current.executeJavaScript(`(() => { try {
+          if (window.flowsonatController) {
+            window.flowsonatController.injectStyles?.();
+            window.flowsonatController.activate?.();
+            window.flowsonatController.moveCursor(${x}, ${y});
+          } else {
+            window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');
+            window.postMessage({ type: 'FLOWSONAT_MOVE_CURSOR', data: { x: ${x}, y: ${y} } }, '*');
+          }
+          return true; } catch(e){ return false; } })();`);
       }
     },
     click: (x: number, y: number, button: 'left' | 'right' = 'left') => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         console.log('[WebView] CLICK', { x, y, button });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
@@ -164,7 +171,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     doubleClick: (x: number, y: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         console.log('[WebView] DOUBLE_CLICK', { x, y });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
@@ -175,7 +182,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     startDrag: (x: number, y: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_DRAG_START',
@@ -185,7 +192,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     dragMove: (x: number, y: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_DRAG_MOVE',
@@ -195,7 +202,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     endDrag: () => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_DRAG_END'
@@ -204,25 +211,36 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     },
     scroll: (x: number, y: number, deltaX: number, deltaY: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         console.log('[WebView] SCROLL', { x, y, deltaX, deltaY });
-        webviewRef.current.executeJavaScript(`
-          window.postMessage({
-            type: 'FLOWSONAT_SCROLL',
-            data: { x: ${x}, y: ${y}, deltaX: ${deltaX}, deltaY: ${deltaY} }
-          }, '*');
-        `);
+        webviewRef.current.executeJavaScript(`(() => { try {
+          if (window.flowsonatController) {
+            window.flowsonatController.injectStyles?.();
+            window.flowsonatController.activate?.();
+            window.flowsonatController.moveCursor(${x}, ${y});
+            const el = document.elementFromPoint(${x}, ${y});
+            if (el) el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaX: ${deltaX||0}, deltaY: ${deltaY||0}, clientX: ${x}, clientY: ${y} }));
+          } else {
+            window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');
+            window.postMessage({ type: 'FLOWSONAT_SCROLL', data: { x: ${x}, y: ${y}, deltaX: ${deltaX}, deltaY: ${deltaY} } }, '*');
+          }
+          return true; } catch(e){ return false; } })();`);
       }
     },
     findScrollableAreas: async () => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const js = `(() => {
           try {
             if (!window.flowsonatController || !window.flowsonatController.findScrollableAreas) return '[]';
             const areas = window.flowsonatController.findScrollableAreas() || [];
             const safe = areas.map(a => ({
               selector: a.selector || null,
-              rect: a.rect ? { left: a.rect.left, top: a.rect.top, width: a.rect.width, height: a.rect.height } : null
+              rect: a.rect ? { left: a.rect.left, top: a.rect.top, width: a.rect.width, height: a.rect.height } : null,
+              zIndex: (typeof a.zIndex === 'number' ? a.zIndex : 0),
+              visible: !!a.visible,
+              order: (typeof a.order === 'number' ? a.order : 0),
+              centerX: typeof a.centerX === 'number' ? a.centerX : (a.rect ? (a.rect.left + a.rect.width/2) : 0),
+              centerY: typeof a.centerY === 'number' ? a.centerY : (a.rect ? (a.rect.top + a.rect.height/2) : 0)
             }));
             return JSON.stringify(safe);
           } catch (e) { return '[]'; }
@@ -234,7 +252,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return [];
     },
     findClickableElements: async () => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const js = `(() => {
           try {
             if (!window.flowsonatController || !window.flowsonatController.findClickableElements) return '[]';
@@ -255,7 +273,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return [];
     },
     findElementByText: async (text: string) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const encoded = JSON.stringify(text);
         const js = `(() => {
           try {
@@ -276,7 +294,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return [];
     },
     findElementBySelector: async (selector: string) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const encoded = JSON.stringify(selector);
         const js = `(() => {
           try {
@@ -296,8 +314,68 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
       return [];
     },
+    scrollForemost: async (deltaY: number) => {
+      if (webviewRef.current && extensionActive && isDomReady) {
+        const js = `(() => {
+          try {
+            const delta = ${deltaY};
+            // 1) Find the foremost scrollable ancestor along the visual stack at viewport center
+            const cx = Math.floor(window.innerWidth / 2);
+            const cy = Math.floor(window.innerHeight / 2);
+            const stack = document.elementsFromPoint ? document.elementsFromPoint(cx, cy) : [];
+            const isScrollable = (el) => {
+              try {
+                const cs = getComputedStyle(el);
+                const ov = cs.overflow + ' ' + cs.overflowX + ' ' + cs.overflowY;
+                if (!(ov.includes('auto') || ov.includes('scroll'))) return false;
+                if (cs.pointerEvents === 'none' || cs.visibility === 'hidden' || cs.display === 'none') return false;
+                return (el.scrollHeight > el.clientHeight + 1);
+            } catch (e) { return false; }
+            };
+            let targetEl = null;
+            for (const topEl of stack) {
+              let cur = topEl;
+              while (cur && cur !== document.body) {
+                if (isScrollable(cur)) { targetEl = cur; break; }
+                cur = cur.parentElement;
+              }
+              if (targetEl) break;
+            }
+            // 2) Fallback: choose best from all scrollables by zIndex/area if none under center
+            if (!targetEl) {
+              const all = Array.from(document.querySelectorAll('*'));
+              let best = null;
+              for (const el of all) {
+                if (!isScrollable(el)) continue;
+                const r = el.getBoundingClientRect();
+                const cs = getComputedStyle(el);
+                let zi = parseInt(cs.zIndex); if (isNaN(zi)) zi = 0;
+                const area = r.width * r.height;
+                if (!best || zi > best.zi || (zi === best.zi && area > best.area)) {
+                  best = { el, r, zi, area };
+                }
+              }
+              if (best) targetEl = best.el;
+            }
+            if (!targetEl) { window.scrollBy(0, delta); return true; }
+            const r = targetEl.getBoundingClientRect();
+            const px = r.left + r.width/2;
+            const py = r.top + r.height/2;
+            if (window.flowsonatController) { window.flowsonatController.moveCursor(px, py); }
+            try { targetEl.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: delta, clientX: px, clientY: py })); } catch (e) {}
+            try { targetEl.scrollTop += delta; } catch (e) {}
+            return true;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] SCROLL_FOREMOST', { deltaY });
+        await webviewRef.current.executeJavaScript(`try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}`);
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
     getElementInfo: async (x: number, y: number) => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const js = `(() => {
           try {
             if (!window.flowsonatController || !window.flowsonatController.getElementInfo) return 'null';
@@ -324,7 +402,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return null;
     },
     takeScreenshot: async () => {
-      if (webviewRef.current && extensionActive) {
+      if (webviewRef.current && extensionActive && isDomReady) {
         const js = `(() => {
           try {
             if (!window.flowsonatController || !window.flowsonatController.takeScreenshot) {
@@ -426,6 +504,42 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         return !!res;
       }
       return false;
+    },
+    clickFollowers: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const byHref = document.querySelector('a[href$="/followers/"]') || document.querySelector('a[href*="followers"]');
+            if (byHref) { byHref.click(); return true; }
+            const candidates = Array.from(document.querySelectorAll('a, button, [role="button"], div, span'));
+            const found = candidates.find(el => ((el.innerText||el.textContent||'').toLowerCase().includes('followers')));
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_FOLLOWERS');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    clickFollowing: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const byHref = document.querySelector('a[href$="/following/"]') || document.querySelector('a[href*="following"]');
+            if (byHref) { byHref.click(); return true; }
+            const candidates = Array.from(document.querySelectorAll('a, button, [role="button"], div, span'));
+            const found = candidates.find(el => ((el.innerText||el.textContent||'').toLowerCase().includes('following')));
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] CLICK_FOLLOWING');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
     }
   }));
 
@@ -523,6 +637,13 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
               ${getExtensionContentScript()}
             }
             console.log('[Injected] window.flowsonatController exists?', !!window.flowsonatController);
+            try {
+              if (window.flowsonatController) {
+                if (window.flowsonatController.injectStyles) window.flowsonatController.injectStyles();
+                if (window.flowsonatController.activate) window.flowsonatController.activate();
+                window.flowsonatController.moveCursor(Math.floor(window.innerWidth/2), Math.floor(window.innerHeight/2));
+              }
+            } catch (e) {}
           `);
           // Ensure controller is activated after injection
           setTimeout(() => {
@@ -631,11 +752,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
 });
 
 // 확장프로그램 컨텐츠 스크립트를 문자열로 반환하는 함수
-function getExtensionContentScript(): string {
-  return `
-    // FlowSonat Instagram Controller - Injected Content Script
-    class FlowSonatController {
-      constructor() {
+  function getExtensionContentScript(): string {
+    return `
+      // FlowSonat Instagram Controller - Injected Content Script
+      class FlowSonatController {
+        constructor() {
         this.isActive = false;
         this.cursor = null;
         this.overlay = null;
@@ -655,9 +776,26 @@ function getExtensionContentScript(): string {
         this.createCursor();
         this.createOverlay();
         this.createStatusIndicator();
-        this.setupMessageListener();
-        this.scanPage();
-      }
+          this.setupMessageListener();
+          this.scanPage();
+        }
+
+        injectStyles() {
+          try {
+            if (document.getElementById('flowsonat-style')) return;
+            const style = document.createElement('style');
+            style.id = 'flowsonat-style';
+            style.textContent = \`
+              .flowsonat-cursor { position: fixed; width: 24px; height: 24px; pointer-events: none; z-index: 2147483646; transform: translate(-50%, -50%); transition: all 0.1s ease-out; }
+              .flowsonat-cursor.clicking { transform: translate(-50%, -50%) scale(0.9); }
+              .flowsonat-overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: transparent; z-index: 2147483645; pointer-events: none; }
+              .flowsonat-scrollable-indicator { position: absolute; border: 2px solid #667eea; background: rgba(102,126,234,0.1); border-radius: 8px; pointer-events:none; z-index:2147483644; }
+              .flowsonat-clickable-indicator { position: absolute; border: 2px solid #10b981; background: rgba(16,185,129,0.1); border-radius:4px; pointer-events:none; z-index:2147483643; }
+              .flowsonat-status { position: fixed; top: 20px; right: 20px; background: rgba(0,0,0,0.8); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; z-index:2147483647; pointer-events:none; }
+            \`;
+            document.head.appendChild(style);
+          } catch {}
+        }
 
       createCursor() {
         this.cursor = document.createElement('div');
@@ -762,14 +900,14 @@ function getExtensionContentScript(): string {
         });
       }
 
-      activate() {
-        this.isActive = true;
-        this.overlay.style.display = 'block';
-        document.body.classList.add('flowsonat-overlay-active');
-        this.cursor.style.display = 'block';
-        this.updateStatus('Controller Active');
-        console.log('✅ FlowSonat Controller activated');
-      }
+        activate() {
+          this.isActive = true;
+          this.overlay.style.display = 'block';
+          document.body.classList.add('flowsonat-overlay-active');
+          this.cursor.style.display = 'block';
+          this.updateStatus('Controller Active');
+          console.log('✅ FlowSonat Controller activated');
+        }
 
       deactivate() {
         this.isActive = false;
@@ -909,27 +1047,34 @@ function getExtensionContentScript(): string {
 
       findScrollableAreas() {
         const scrollableElements = [];
-        
+        let order = 0;
         // Find elements with overflow scroll
         const elements = document.querySelectorAll('*');
         elements.forEach(element => {
           const style = window.getComputedStyle(element);
-          if (style.overflow === 'scroll' || style.overflow === 'auto' || 
-              style.overflowY === 'scroll' || style.overflowY === 'auto') {
+          const ov = style.overflow + ' ' + style.overflowX + ' ' + style.overflowY;
+          if (ov.includes('scroll') || ov.includes('auto')) {
             const rect = element.getBoundingClientRect();
             if (rect.width > 0 && rect.height > 0) {
+              const ziRaw = style.zIndex;
+              const zIndex = Number.isNaN(parseInt(ziRaw)) ? 0 : parseInt(ziRaw);
+              const centerX = rect.left + rect.width / 2;
+              const centerY = rect.top + rect.height / 2;
+              const visible = style.visibility !== 'hidden' && style.display !== 'none';
               scrollableElements.push({
                 element: element,
                 rect: rect,
-                selector: this.getElementSelector(element)
+                selector: this.getElementSelector(element),
+                zIndex: zIndex,
+                visible: visible,
+                order: order++,
+                centerX,
+                centerY
               });
             }
           }
         });
-        
         this.scrollableAreas = scrollableElements;
-        this.highlightScrollableAreas();
-        
         return scrollableElements;
       }
 
@@ -960,10 +1105,8 @@ function getExtensionContentScript(): string {
             }
           });
         });
-        
         this.clickableElements = clickableElements;
-        this.highlightClickableElements();
-        
+        // Removed visual highlighting of structure
         return clickableElements;
       }
 
@@ -1071,35 +1214,9 @@ function getExtensionContentScript(): string {
         return attributes;
       }
 
-      highlightScrollableAreas() {
-        // Remove existing indicators
-        document.querySelectorAll('.flowsonat-scrollable-indicator').forEach(el => el.remove());
-        
-        this.scrollableAreas.forEach(area => {
-          const indicator = document.createElement('div');
-          indicator.className = 'flowsonat-scrollable-indicator';
-          indicator.style.left = \`\${area.rect.left}px\`;
-          indicator.style.top = \`\${area.rect.top}px\`;
-          indicator.style.width = \`\${area.rect.width}px\`;
-          indicator.style.height = \`\${area.rect.height}px\`;
-          document.body.appendChild(indicator);
-        });
-      }
-
-      highlightClickableElements() {
-        // Remove existing indicators
-        document.querySelectorAll('.flowsonat-clickable-indicator').forEach(el => el.remove());
-        
-        this.clickableElements.forEach(item => {
-          const indicator = document.createElement('div');
-          indicator.className = 'flowsonat-clickable-indicator';
-          indicator.style.left = \`\${item.rect.left}px\`;
-          indicator.style.top = \`\${item.rect.top}px\`;
-          indicator.style.width = \`\${item.rect.width}px\`;
-          indicator.style.height = \`\${item.rect.height}px\`;
-          document.body.appendChild(indicator);
-        });
-      }
+      // No-op highlighting to keep API compatibility but hide visuals
+      highlightScrollableAreas() {}
+      highlightClickableElements() {}
 
       updateStatus(message) {
         this.statusIndicator.textContent = message;
@@ -1121,5 +1238,6 @@ function getExtensionContentScript(): string {
 
     // Initialize the controller
     window.flowsonatController = new FlowSonatController();
-  `;
-}
+    window.flowsonatController.injectStyles();
+    `;
+  }
