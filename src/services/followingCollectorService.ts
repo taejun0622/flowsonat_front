@@ -107,15 +107,12 @@ export class FollowingCollectorService {
     const following: string[] = [];
     let unchangedScrolls = 0;
     const maxUnchangedScrolls = 5;
-    let scrollAttempts = 0;
-    const maxScrollAttempts = 50;
     let prevSnapshot = '';
 
     console.log('[Following Collection] Starting following collection...');
 
-    while (unchangedScrolls < maxUnchangedScrolls && scrollAttempts < maxScrollAttempts) {
-      scrollAttempts++;
-      console.log(`[Following Collection] Attempt ${scrollAttempts}: Current following: ${following.length}`);
+    while (unchangedScrolls < maxUnchangedScrolls) {
+      console.log(`[Following Collection] Current following: ${following.length}`);
 
       try {
         await this.delay(1000);

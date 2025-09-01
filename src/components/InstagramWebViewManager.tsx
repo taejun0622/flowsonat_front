@@ -227,7 +227,6 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         {
           scrollDelay: 2000,
           pageLoadDelay: 3000,
-          maxIterations: 10, // Limit for testing
           onProgress: (current: number, total: number, status: string) => {
             setAutomationProgress({ current, total });
             setAutomationStatus(status);

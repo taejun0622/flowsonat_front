@@ -4,7 +4,6 @@ import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnu
 export interface AutomationOptions {
   scrollDelay?: number;
   pageLoadDelay?: number;
-  maxIterations?: number;
   onProgress?: (current: number, total: number, status: string) => void;
   onAction?: (action: string, target: string, result: boolean) => void;
 }
@@ -38,7 +37,6 @@ export class AutomationService {
   private options: {
     scrollDelay: number;
     pageLoadDelay: number;
-    maxIterations: number;
     onProgress?: (current: number, total: number, status: string) => void;
     onAction?: (action: string, target: string, result: boolean) => void;
   };
@@ -55,7 +53,6 @@ export class AutomationService {
     this.options = {
       scrollDelay: options.scrollDelay || 1000,
       pageLoadDelay: options.pageLoadDelay || 3000,
-      maxIterations: options.maxIterations || 50,
       onProgress: options.onProgress,
       onAction: options.onAction
     };
@@ -490,15 +487,12 @@ export class AutomationService {
     const usernames: string[] = [];
     let unchangedScrolls = 0;
     const maxUnchangedScrolls = 5;
-    let scrollAttempts = 0;
-    const maxScrollAttempts = 50;
     let prevSnapshot = '';
 
     console.log('[Automation] Starting username collection with scrolling...');
 
-    while (unchangedScrolls < maxUnchangedScrolls && scrollAttempts < maxScrollAttempts) {
-      scrollAttempts++;
-      console.log(`[Automation] Attempt ${scrollAttempts}: Current usernames: ${usernames.length}`);
+    while (unchangedScrolls < maxUnchangedScrolls) {
+      console.log(`[Automation] Current usernames: ${usernames.length}`);
 
       try {
         await this.delay(1000);
