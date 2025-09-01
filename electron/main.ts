@@ -99,13 +99,7 @@ app.whenReady().then(() => {
 
     // 1) origin 기반 스토리지/캐시류 삭제 (확장된 목록)
     await sess.clearStorageData({
-      origins: [
-        'https://www.instagram.com',
-        'https://instagram.com',
-        'https://m.instagram.com',
-        'https://i.instagram.com',
-        'https://static.cdninstagram.com',
-      ],
+      origin: 'https://www.instagram.com',
       storages: [
         'cookies',
         'localstorage',
