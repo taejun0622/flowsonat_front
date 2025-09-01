@@ -18,6 +18,10 @@ export interface WebViewHandle {
   findElementBySelector: (selector: string) => Promise<any[]>;
   getElementInfo: (x: number, y: number) => Promise<any>;
   takeScreenshot: () => Promise<any>;
+  clickByText: (text: string) => Promise<boolean>;
+  typeText: (text: string) => Promise<boolean>;
+  pressEnter: () => Promise<boolean>;
+  pressEscape: () => Promise<boolean>;
 }
 
 interface WebViewProps {
@@ -139,6 +143,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     moveCursor: (x: number, y: number) => {
       if (webviewRef.current && extensionActive) {
+        console.log('[WebView] MOVE_CURSOR', { x, y });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_MOVE_CURSOR',
@@ -149,6 +154,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     click: (x: number, y: number, button: 'left' | 'right' = 'left') => {
       if (webviewRef.current && extensionActive) {
+        console.log('[WebView] CLICK', { x, y, button });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_CLICK',
@@ -159,6 +165,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     doubleClick: (x: number, y: number) => {
       if (webviewRef.current && extensionActive) {
+        console.log('[WebView] DOUBLE_CLICK', { x, y });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_DOUBLE_CLICK',
@@ -198,6 +205,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     scroll: (x: number, y: number, deltaX: number, deltaY: number) => {
       if (webviewRef.current && extensionActive) {
+        console.log('[WebView] SCROLL', { x, y, deltaX, deltaY });
         webviewRef.current.executeJavaScript(`
           window.postMessage({
             type: 'FLOWSONAT_SCROLL',
@@ -208,138 +216,216 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     findScrollableAreas: async () => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_FIND_SCROLLABLE_AREAS'
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_SCROLLABLE_AREAS_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
-            };
-          `);
-        });
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.findScrollableAreas) return '[]';
+            const areas = window.flowsonatController.findScrollableAreas() || [];
+            const safe = areas.map(a => ({
+              selector: a.selector || null,
+              rect: a.rect ? { left: a.rect.left, top: a.rect.top, width: a.rect.width, height: a.rect.height } : null
+            }));
+            return JSON.stringify(safe);
+          } catch (e) { return '[]'; }
+        })();`;
+        console.log('[WebView] FIND_SCROLLABLE_AREAS');
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] FIND_SCROLLABLE_AREAS result', parsed?.length); return parsed; } catch { return []; }
       }
       return [];
     },
     findClickableElements: async () => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_FIND_CLICKABLE_ELEMENTS'
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_CLICKABLE_ELEMENTS_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
-            };
-          `);
-        });
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.findClickableElements) return '[]';
+            const els = window.flowsonatController.findClickableElements() || [];
+            const safe = els.map(e => ({
+              selector: e.selector || null,
+              text: e.text || '',
+              type: e.type || null,
+              rect: e.rect ? { left: e.rect.left, top: e.rect.top, width: e.rect.width, height: e.rect.height } : null
+            }));
+            return JSON.stringify(safe);
+          } catch (e) { return '[]'; }
+        })();`;
+        console.log('[WebView] FIND_CLICKABLE_ELEMENTS');
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] FIND_CLICKABLE_ELEMENTS result', parsed?.length); return parsed; } catch { return []; }
       }
       return [];
     },
     findElementByText: async (text: string) => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_FIND_ELEMENT_BY_TEXT',
-              data: { text: '${text}' }
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_ELEMENT_BY_TEXT_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
-            };
-          `);
-        });
+        const encoded = JSON.stringify(text);
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.findElementByText) return '[]';
+            const els = window.flowsonatController.findElementByText(${encoded}) || [];
+            const safe = els.map(e => ({
+              selector: e.selector || null,
+              text: e.text || '',
+              rect: e.rect ? { left: e.rect.left, top: e.rect.top, width: e.rect.width, height: e.rect.height } : null
+            }));
+            return JSON.stringify(safe);
+          } catch (e) { return '[]'; }
+        })();`;
+        console.log('[WebView] FIND_ELEMENT_BY_TEXT', { text });
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_TEXT result', parsed?.length); return parsed; } catch { return []; }
       }
       return [];
     },
     findElementBySelector: async (selector: string) => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_FIND_ELEMENT_BY_SELECTOR',
-              data: { selector: '${selector}' }
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_ELEMENT_BY_SELECTOR_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
-            };
-          `);
-        });
+        const encoded = JSON.stringify(selector);
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.findElementBySelector) return '[]';
+            const els = window.flowsonatController.findElementBySelector(${encoded}) || [];
+            const safe = els.map(e => ({
+              selector: e.selector || null,
+              text: e.text || '',
+              rect: e.rect ? { left: e.rect.left, top: e.rect.top, width: e.rect.width, height: e.rect.height } : null
+            }));
+            return JSON.stringify(safe);
+          } catch (e) { return '[]'; }
+        })();`;
+        console.log('[WebView] FIND_ELEMENT_BY_SELECTOR', { selector });
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_SELECTOR result', parsed?.length); return parsed; } catch { return []; }
       }
       return [];
     },
     getElementInfo: async (x: number, y: number) => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_GET_ELEMENT_INFO',
-              data: { x: ${x}, y: ${y} }
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_ELEMENT_INFO_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.getElementInfo) return 'null';
+            const info = window.flowsonatController.getElementInfo(${x}, ${y});
+            if (!info) return 'null';
+            const safe = {
+              tagName: info.tagName,
+              className: info.className,
+              id: info.id,
+              text: info.text,
+              selector: info.selector,
+              rect: info.rect ? { left: info.rect.left, top: info.rect.top, width: info.rect.width, height: info.rect.height } : null,
+              isClickable: !!info.isClickable,
+              isScrollable: !!info.isScrollable,
+              attributes: info.attributes || {}
             };
-          `);
-        });
+            return JSON.stringify(safe);
+          } catch (e) { return 'null'; }
+        })();`;
+        console.log('[WebView] GET_ELEMENT_INFO', { x, y });
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] GET_ELEMENT_INFO result', parsed); return parsed; } catch { return null; }
       }
       return null;
     },
     takeScreenshot: async () => {
       if (webviewRef.current && extensionActive) {
-        return new Promise((resolve) => {
-          webviewRef.current.executeJavaScript(`
-            window.postMessage({
-              type: 'FLOWSONAT_TAKE_SCREENSHOT'
-            }, '*');
-            
-            // Listen for response
-            const originalPostMessage = window.postMessage;
-            window.postMessage = function(message) {
-              if (message.type === 'FLOWSONAT_SCREENSHOT_RESULT') {
-                window.postMessage = originalPostMessage;
-                return JSON.stringify(message.data);
-              }
-              return originalPostMessage.apply(this, arguments);
-            };
-          `);
-        });
+        const js = `(() => {
+          try {
+            if (!window.flowsonatController || !window.flowsonatController.takeScreenshot) {
+              return JSON.stringify({ width: window.innerWidth, height: window.innerHeight, scrollX: window.scrollX, scrollY: window.scrollY, url: window.location.href });
+            }
+            const data = window.flowsonatController.takeScreenshot();
+            return JSON.stringify(data);
+          } catch (e) {
+            return JSON.stringify({ width: window.innerWidth, height: window.innerHeight, scrollX: window.scrollX, scrollY: window.scrollY, url: window.location.href });
+          }
+        })();`;
+        console.log('[WebView] TAKE_SCREENSHOT');
+        const res = await webviewRef.current.executeJavaScript(js);
+        try { const parsed = JSON.parse(res); console.log('[WebView] TAKE_SCREENSHOT result', parsed); return parsed; } catch { return null; }
       }
       return null;
+    },
+    clickByText: async (text: string) => {
+      if (webviewRef.current && extensionActive) {
+        const encoded = JSON.stringify(text);
+        const js = `(() => {
+          try {
+            const matchText = (el) => (el.innerText || el.textContent || '').trim();
+            const target = ${encoded}.toLowerCase();
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, div, span'));
+            const found = candidates.find(el => {
+              const t = matchText(el).toLowerCase();
+              if (!t) return false;
+              return t === target || t.includes(target);
+            });
+            if (found) { found.click(); return true; }
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    typeText: async (text: string) => {
+      if (webviewRef.current && extensionActive) {
+        const encoded = JSON.stringify(text);
+        const js = `(() => {
+          try {
+            const el = document.activeElement;
+            if (!el) return false;
+            const isInput = ['INPUT','TEXTAREA'].includes(el.tagName) || el.isContentEditable;
+            if (!isInput) return false;
+            if (el.isContentEditable) {
+              el.textContent = (el.textContent || '') + ${encoded};
+            } else {
+              const v = (el.value || '') + ${encoded};
+              el.value = v;
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] TYPE_TEXT');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    pressEnter: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const el = document.activeElement;
+            if (!el) return false;
+            const ev = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+            el.dispatchEvent(ev);
+            const evUp = new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+            el.dispatchEvent(evUp);
+            return true;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] PRESS_ENTER');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
+    },
+    pressEscape: async () => {
+      if (webviewRef.current && extensionActive) {
+        const js = `(() => {
+          try {
+            const el = document.activeElement || document.body;
+            const ev = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+            el.dispatchEvent(ev);
+            const evUp = new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true });
+            el.dispatchEvent(evUp);
+            return true;
+          } catch (e) { return false; }
+        })();`;
+        console.log('[WebView] PRESS_ESCAPE');
+        const res = await webviewRef.current.executeJavaScript(js);
+        return !!res;
+      }
+      return false;
     }
   }));
 
@@ -398,7 +484,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       onError?.(event);
     };
 
-    const handleDomReady = () => {
+  const handleDomReady = () => {
       setIsLoading(false);
       setIsDomReady(true);
       
@@ -436,6 +522,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             if (!window.flowsonatController) {
               ${getExtensionContentScript()}
             }
+            console.log('[Injected] window.flowsonatController exists?', !!window.flowsonatController);
           `);
           // Ensure controller is activated after injection
           setTimeout(() => {
@@ -604,6 +691,8 @@ function getExtensionContentScript(): string {
         this.overlay = document.createElement('div');
         this.overlay.className = 'flowsonat-overlay';
         this.overlay.style.display = 'none';
+        // Ensure overlay never intercepts hit-testing so elementFromPoint finds real targets
+        this.overlay.style.pointerEvents = 'none';
         document.body.appendChild(this.overlay);
       }
 

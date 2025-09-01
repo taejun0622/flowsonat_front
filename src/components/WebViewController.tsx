@@ -27,6 +27,7 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
   const [clickableElements, setClickableElements] = useState<any[]>([]);
   const [scrollableAreas, setScrollableAreas] = useState<any[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
+  const [testText, setTestText] = useState<string>('');
 
   // Enable extension when IG is logged in (server registered assumed by container)
   const shouldEnableExtension = instagramState === 'instagram_logged_in';
@@ -188,6 +189,21 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
     }
   };
 
+  // Test HUD actions
+  const handleClickByText = async (text: string) => {
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    try {
+      await webviewRef.current.clickByText(text);
+      toast({ title: 'ClickByText', description: `Tried: ${text}` });
+    } catch {}
+  };
+
+  const handleScrollStep = (dy: number) => {
+    if (!webviewRef.current || !isExtensionEnabled) return;
+    const { x, y } = cursorPosition;
+    webviewRef.current.scroll(x, y, 0, dy);
+  };
+
   return (
     <div className="flex h-full">
       {/* WebView Area */}
@@ -212,6 +228,45 @@ export const WebViewController: React.FC<WebViewControllerProps> = ({
             onContextMenu={handleRightClick}
             onWheel={handleScroll}
           />
+        )}
+
+        {/* Test HUD Overlay */}
+        {isExtensionEnabled && (
+          <div
+            className="absolute top-4 right-4 z-20 w-80 bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg backdrop-blur p-3 space-y-2"
+            onMouseDown={(e) => { e.stopPropagation(); }}
+            onMouseUp={(e) => { e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); }}
+            onWheel={(e) => { e.stopPropagation(); }}
+          >
+            <div className="text-sm font-medium mb-1">Extension Test HUD</div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button size="sm" variant="outline" onClick={() => findClickableElements()}>Find Btns</Button>
+              <Button size="sm" variant="outline" onClick={() => findScrollableAreas()}>Find Scroll</Button>
+              <Button size="sm" variant="outline" onClick={() => getElementInfo()}>Elem Info</Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button size="sm" onClick={() => handleClickByText('Follow')}>Follow</Button>
+              <Button size="sm" onClick={() => handleClickByText('Following')}>Following</Button>
+              <Button size="sm" onClick={() => handleClickByText('Unfollow')}>Unfollow</Button>
+              <Button size="sm" variant="secondary" onClick={() => handleClickByText('Requested')}>Requested</Button>
+              <Button size="sm" variant="secondary" onClick={() => handleClickByText('followers')}>followers</Button>
+              <Button size="sm" variant="secondary" onClick={() => handleClickByText('following')}>following</Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Text to click..."
+                value={testText}
+                onChange={(e) => setTestText(e.target.value)}
+              />
+              <Button size="sm" onClick={() => testText && handleClickByText(testText)}>Go</Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button size="sm" variant="outline" onClick={() => handleScrollStep(-250)}>Scroll Up</Button>
+              <div className="text-center text-xs text-gray-600 dark:text-gray-400 py-1">x{cursorPosition.x} y{cursorPosition.y}</div>
+              <Button size="sm" variant="outline" onClick={() => handleScrollStep(250)}>Scroll Down</Button>
+            </div>
+          </div>
         )}
       </div>
 

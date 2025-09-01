@@ -4,6 +4,7 @@ import { ArrowLeft, RefreshCw, CheckCircle, AlertCircle, Info, Loader2 } from 'l
 import { WebView, WebViewHandle } from './WebView';
 import { useInstagramWebView } from '@/hooks/useInstagramWebView';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { InstagramUsernameConfirmModal } from './InstagramUsernameConfirmModal';
 import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
@@ -80,10 +81,99 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     console.error('WebView error:', error);
     setIsLoading(false);
   }, []);
+  
+  // Whether to block native input (overlay + pointer-events: none)
+  const [blockNativeInput, setBlockNativeInput] = useState<boolean>(true);
+  const toggleBlockNative = useCallback(() => {
+    const next = !blockNativeInput;
+    console.log('[HUD] toggle blockNativeInput ->', next);
+    setBlockNativeInput(next);
+  }, [blockNativeInput]);
 
   // Extension active when IG is logged in AND server-registered
-  const extensionActive = webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered;
-  
+  // Temporary dev override: ?forceExtension=1 to force-enable HUD/overlay
+  const forceExtension = (() => {
+    try { return new URLSearchParams(window.location.search).get('forceExtension') === '1'; } catch { return false; }
+  })();
+  const extensionActive = (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) || forceExtension;
+
+  // HUD state
+  const [testText, setTestText] = useState<string>('');
+  const [typeTextInput, setTypeTextInput] = useState<string>('');
+  const [usernameInput, setUsernameInput] = useState<string>('');
+  const handleClickByText = useCallback(async (text: string) => {
+    if (!webviewApiRef.current || !extensionActive) return;
+    try {
+      console.log('[HUD] clickByText start:', text);
+      const ok = await webviewApiRef.current.clickByText(text);
+      console.log('[HUD] clickByText done:', { text, ok });
+    } catch (err) {
+      console.error('[HUD] clickByText error:', err);
+    }
+  }, [extensionActive]);
+  const handleScrollStep = useCallback((dy: number) => {
+    if (!webviewApiRef.current || !extensionActive) return;
+    // Use center of container for scroll if no recent mouse event
+    const container = document.getElementById('ig-webview-container');
+    const rect = container?.getBoundingClientRect();
+    const x = rect ? rect.width / 2 : 500;
+    const y = rect ? rect.height / 2 : 400;
+    webviewApiRef.current.scroll(x, y, 0, dy);
+  }, [extensionActive]);
+
+  const handleOpenProfile = useCallback(() => {
+    const raw = (usernameInput || '').trim();
+    if (!raw) return;
+    const username = raw.replace(/^@/, '');
+    const profileUrl = `https://www.instagram.com/${username}/`;
+    console.log('[HUD] navigate: open profile', { username, profileUrl });
+    setCurrentUrl(profileUrl);
+  }, [usernameInput]);
+
+  const openFollowersModal = useCallback(async () => {
+    console.log('[HUD] openFollowersModal');
+    const ok = await webviewApiRef.current?.clickByText('followers');
+    console.log('[HUD] openFollowersModal result:', ok);
+  }, []);
+
+  const openFollowingModal = useCallback(async () => {
+    console.log('[HUD] openFollowingModal');
+    const ok = await webviewApiRef.current?.clickByText('following');
+    console.log('[HUD] openFollowingModal result:', ok);
+  }, []);
+
+  const scrollPrimaryArea = useCallback(async (deltaY: number) => {
+    if (!webviewApiRef.current) return;
+    console.log('[HUD] scrollPrimaryArea start', { deltaY });
+    const areas = await webviewApiRef.current.findScrollableAreas();
+    if (!areas || areas.length === 0) {
+      console.log('[HUD] no scrollable areas found');
+      return;
+    }
+    // Pick the largest area by height *or* the one covering center
+    const bySize = [...areas].sort((a: any, b: any) => (b.rect?.height || 0) - (a.rect?.height || 0));
+    const primary = bySize[0];
+    const x = (primary.rect.left || 0) + (primary.rect.width || 0) / 2;
+    const y = (primary.rect.top || 0) + (primary.rect.height || 0) / 2;
+    console.log('[HUD] scrollPrimaryArea moveCursor to', { x, y });
+    webviewApiRef.current.moveCursor(x, y);
+    setTimeout(() => {
+      webviewApiRef.current?.scroll(x, y, 0, deltaY);
+    }, 80);
+  }, []);
+
+  const closeModal = useCallback(async () => {
+    console.log('[HUD] closeModal via Escape');
+    const ok = await webviewApiRef.current?.pressEscape();
+    console.log('[HUD] closeModal result:', ok);
+  }, []);
+
+  const clickActionButton = useCallback(async (label: string) => {
+    console.log('[HUD] clickActionButton', label);
+    const ok = await webviewApiRef.current?.clickByText(label);
+    console.log('[HUD] clickActionButton result:', ok);
+  }, []);
+
   // Extension 활성화 상태 로깅
   console.log('🎯 InstagramWebViewManager - Extension 상태:', {
     webViewStatusState: webViewStatus.state,
@@ -108,6 +198,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log('[HUD] click passthrough at', { x, y });
     webviewApiRef.current.click(x, y);
     e.preventDefault();
     e.stopPropagation();
@@ -118,6 +209,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log('[HUD] doubleClick passthrough at', { x, y });
     webviewApiRef.current.doubleClick(x, y);
     e.preventDefault();
     e.stopPropagation();
@@ -128,6 +220,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log('[HUD] rightClick passthrough at', { x, y });
     webviewApiRef.current.click(x, y, 'right');
     e.preventDefault();
     e.stopPropagation();
@@ -138,6 +231,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log('[HUD] wheel passthrough at', { x, y, deltaX: e.deltaX, deltaY: e.deltaY });
     webviewApiRef.current.scroll(x, y, e.deltaX, e.deltaY);
     e.preventDefault();
     e.stopPropagation();
@@ -258,7 +352,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       )}
 
       {/* WebView Container */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" id="ig-webview-container">
       <WebView
         ref={webviewApiRef}
         src={currentUrl}
@@ -268,12 +362,12 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         onLoginStatusCheck={handleInstagramStatusCheck}
         instagramState={webViewStatus.state}
         enableExtension={extensionActive}
-        disablePointerEvents={extensionActive}
+        disablePointerEvents={extensionActive && blockNativeInput}
         className="w-full h-full"
       />
 
         {/* Interaction layer: blocks native input and drives extension */}
-        {extensionActive && (
+        {extensionActive && blockNativeInput && (
           <div
             className="absolute inset-0 z-30 bg-transparent"
             onMouseMove={handleMouseMove}
@@ -286,6 +380,48 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
             aria-hidden="true"
           />
         )}
+
+          {/* Test HUD - minimal controls, events proxied into webview */}
+          {extensionActive && (
+            <div
+              className="absolute top-4 right-4 z-40 w-80 bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg backdrop-blur p-3 space-y-2"
+              onMouseDown={(e) => { e.stopPropagation(); }}
+              onMouseUp={(e) => { e.stopPropagation(); }}
+              onClick={(e) => { e.stopPropagation(); }}
+              onWheel={(e) => { e.stopPropagation(); }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-sm font-medium">Extension Test HUD</div>
+                <Button size="sm" variant={blockNativeInput ? 'default' : 'outline'} onClick={toggleBlockNative}>
+                  {blockNativeInput ? 'Blocking Input' : 'Passthrough'}
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="@username"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                />
+                <Button size="sm" onClick={handleOpenProfile}>Open Profile</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" onClick={openFollowersModal}>Open Followers</Button>
+                <Button size="sm" variant="outline" onClick={openFollowingModal}>Open Following</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" onClick={() => scrollPrimaryArea(-400)}>Scroll Up</Button>
+                <Button size="sm" variant="outline" onClick={() => scrollPrimaryArea(400)}>Scroll Down</Button>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <Button size="sm" variant="outline" onClick={closeModal}>Close Modal</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button size="sm" onClick={() => clickActionButton('Follow')}>Follow</Button>
+                <Button size="sm" onClick={() => clickActionButton('Following')}>Following</Button>
+                <Button size="sm" onClick={() => clickActionButton('Requested')}>Requested</Button>
+              </div>
+            </div>
+          )}
         
         {isLoading && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
