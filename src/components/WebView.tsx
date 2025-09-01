@@ -717,30 +717,55 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       
       if (isInstagram && extensionActive) {
         console.log('✅ Extension 컨텐츠 스크립트 주입 시작');
-        setTimeout(() => {
-          console.log('📥 Extension 컨텐츠 스크립트 주입 중...');
-          webview.executeJavaScript(`
-            // 확장프로그램 컨텐츠 스크립트 주입
-            if (!window.flowsonatController) {
-              ${getExtensionContentScript()}
+        
+        // WebView가 완전히 준비될 때까지 기다리는 함수
+        const injectExtension = () => {
+          try {
+            // WebView가 DOM에 연결되어 있는지 확인
+            if (!webview || !webview.executeJavaScript) {
+              console.warn('WebView not ready, retrying in 500ms...');
+              setTimeout(injectExtension, 500);
+              return;
             }
-            console.log('[Injected] window.flowsonatController exists?', !!window.flowsonatController);
-            try {
-              if (window.flowsonatController) {
-                if (window.flowsonatController.injectStyles) window.flowsonatController.injectStyles();
-                if (window.flowsonatController.activate) window.flowsonatController.activate();
-                window.flowsonatController.moveCursor(Math.floor(window.innerWidth/2), Math.floor(window.innerHeight/2));
+            
+            console.log('📥 Extension 컨텐츠 스크립트 주입 중...');
+            webview.executeJavaScript(`
+              // 확장프로그램 컨텐츠 스크립트 주입
+              if (!window.flowsonatController) {
+                ${getExtensionContentScript()}
               }
-            } catch (e) {}
-          `);
-          // Ensure controller is activated after injection
-          setTimeout(() => {
-            console.log('🚀 Extension 컨트롤러 활성화 중...');
-            try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}
-            try { webview.executeJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`); } catch {}
-            console.log('✅ Extension 컨트롤러 활성화 완료');
-          }, 200);
-        }, 1000);
+              console.log('[Injected] window.flowsonatController exists?', !!window.flowsonatController);
+              try {
+                if (window.flowsonatController) {
+                  if (window.flowsonatController.injectStyles) window.flowsonatController.injectStyles();
+                  if (window.flowsonatController.activate) window.flowsonatController.activate();
+                  window.flowsonatController.moveCursor(Math.floor(window.innerWidth/2), Math.floor(window.innerHeight/2));
+                }
+              } catch (e) {}
+            `);
+            
+            // Ensure controller is activated after injection
+            setTimeout(() => {
+              console.log('🚀 Extension 컨트롤러 활성화 중...');
+              try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}
+              try { 
+                if (webview && webview.executeJavaScript) {
+                  webview.executeJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`);
+                }
+              } catch (e) {
+                console.warn('WebView executeJavaScript failed:', e);
+              }
+              console.log('✅ Extension 컨트롤러 활성화 완료');
+            }, 200);
+          } catch (error) {
+            console.warn('Extension injection failed:', error);
+            // 재시도
+            setTimeout(injectExtension, 1000);
+          }
+        };
+        
+        // 1초 후에 주입 시작
+        setTimeout(injectExtension, 1000);
       } else {
         console.log('❌ Extension 컨텐츠 스크립트 주입 조건 불만족');
       }

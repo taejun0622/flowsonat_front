@@ -208,13 +208,50 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       setAutomationStatus('Fetching benchmark data...');
       const benchmarksResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
       
-      // Find the benchmark for the current Instagram account
-      const userBenchmark = benchmarksResponse.benchmarks.find(
-        benchmark => benchmark.ig?.username === instagramAccount.username
+      console.log('[Automation] Available benchmarks:', benchmarksResponse.benchmarks.map(b => b.ig?.username));
+      console.log('[Automation] Looking for username:', instagramAccount.username);
+      
+      // Select a benchmark for automation (not the current user's account)
+      console.log('[Automation] Available benchmarks:', benchmarksResponse.benchmarks.map(b => b.ig?.username));
+      console.log('[Automation] Current user account:', instagramAccount.username);
+      
+      // Find a healthy and active benchmark (exclude current user's account)
+      let userBenchmark = benchmarksResponse.benchmarks.find(
+        benchmark => 
+          benchmark.status === StatusEnum.ACTIVE && 
+          benchmark.health === HealthEnum.HEALTHY &&
+          benchmark.ig?.username !== instagramAccount.username // Don't use current user's account
       );
       
       if (!userBenchmark) {
-        throw new Error(`No benchmark found for Instagram account: ${instagramAccount.username}`);
+        const availableUsernames = benchmarksResponse.benchmarks.map(b => b.ig?.username).filter(Boolean);
+        console.warn(
+          `No suitable benchmark found for automation\n` +
+          `Current account: ${instagramAccount.username}\n` +
+          `Available benchmarks: ${availableUsernames.join(', ')}\n` +
+          `Total benchmarks: ${benchmarksResponse.total}`
+        );
+        
+        // Try to find any active benchmark as fallback
+        const fallbackBenchmark = benchmarksResponse.benchmarks.find(
+          benchmark => benchmark.status === StatusEnum.ACTIVE
+        );
+        
+        if (fallbackBenchmark) {
+          console.log(`[Automation] Using fallback benchmark: ${fallbackBenchmark.ig?.username}`);
+          userBenchmark = fallbackBenchmark;
+          setAutomationStatus(`Using benchmark: ${fallbackBenchmark.ig?.username} for automation`);
+        } else {
+          throw new Error(
+            `No suitable benchmark found for automation\n` +
+            `Current account: ${instagramAccount.username}\n` +
+            `Available benchmarks: ${availableUsernames.join(', ')}\n` +
+            `Total benchmarks: ${benchmarksResponse.total}`
+          );
+        }
+      } else {
+        console.log(`[Automation] Selected benchmark: ${userBenchmark.ig?.username}`);
+        setAutomationStatus(`Using benchmark: ${userBenchmark.ig?.username} for automation`);
       }
       
       if (userBenchmark.status !== StatusEnum.ACTIVE) {
