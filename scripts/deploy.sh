@@ -64,8 +64,8 @@ case $PLATFORM in
         npm run build:all
         ;;
     "mac")
-        log_info "Building for macOS..."
-        npm run build:mac
+        log_info "Building for macOS with code signing and notarization..."
+        npm run build:mac:env
         ;;
     "win")
         log_info "Building for Windows..."

@@ -36,7 +36,15 @@
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
-    "entitlementsInherit": "build/entitlements.mac.plist"
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": {
+      "teamId": "BJ8U9646U7"
+    },
+    "extendInfo": {
+      "NSAppleEventsUsageDescription": "This app needs to control other applications to provide automation features.",
+      "NSCameraUsageDescription": "This app needs access to camera for media features.",
+      "NSMicrophoneUsageDescription": "This app needs access to microphone for audio features."
+    }
   },
   "win": {
     "target": [
