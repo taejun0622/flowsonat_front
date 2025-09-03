@@ -19,8 +19,16 @@ export type OpenAPIConfig = {
     ENCODE_PATH?: ((path: string) => string) | undefined;
 };
 
+// 환경변수 디버깅
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+console.log('🔧 API Base URL:', {
+    env: import.meta.env.VITE_API_BASE_URL,
+    fallback: 'http://localhost:8000',
+    final: apiBaseUrl
+});
+
 export const OpenAPI: OpenAPIConfig = {
-    BASE: 'http://localhost:8000',
+    BASE: apiBaseUrl,
     VERSION: '1.0.0',
     WITH_CREDENTIALS: false,
     CREDENTIALS: 'include',

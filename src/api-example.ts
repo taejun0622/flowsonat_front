@@ -7,8 +7,8 @@ import {
   OpenAPI 
 } from './api';
 
-// API 기본 URL 설정 (필요한 경우)
-OpenAPI.BASE = 'http://localhost:8000';
+// API 기본 URL 설정 (환경변수에서 자동으로 설정됨)
+// OpenAPI.BASE는 자동으로 import.meta.env.VITE_API_BASE_URL 또는 기본값을 사용
 
 // 인증 예제
 async function loginExample() {
