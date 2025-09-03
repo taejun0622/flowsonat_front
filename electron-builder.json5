@@ -11,6 +11,13 @@
     "dist",
     "dist-electron"
   ],
+  "publish": [
+    {
+      "provider": "generic",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com",
+      "channel": "latest"
+    }
+  ],
   "mac": {
     "target": [
       {

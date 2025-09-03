@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, webContents, session } from 'electron'
+import { app, BrowserWindow, ipcMain, webContents, session, dialog } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'path'
+import { autoUpdater } from 'electron-updater'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -26,6 +27,10 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+// Auto-update configuration
+autoUpdater.autoDownload = false; // Disable auto-download (require user confirmation)
+autoUpdater.autoInstallOnAppQuit = true; // Auto-install on app quit
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
@@ -34,8 +39,8 @@ function createWindow() {
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false, // 임시로 CORS 우회
-      allowRunningInsecureContent: true // 임시로 허용
+      webSecurity: false, // Temporarily bypass CORS
+      allowRunningInsecureContent: true // Temporarily allow
     },
   })
 
@@ -59,6 +64,116 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 }
+
+// Auto-update event handlers
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for updates...');
+  win?.webContents.send('update-status', { status: 'checking', message: 'Checking for updates...' });
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info);
+  win?.webContents.send('update-status', { 
+    status: 'available', 
+    message: 'A new update is available.',
+    info 
+  });
+  
+  // Ask user to confirm update download
+  dialog.showMessageBox(win!, {
+    type: 'info',
+    title: 'Update Available',
+    message: 'A new version is available. Would you like to download it?',
+    detail: `Current version: ${app.getVersion()}\nLatest version: ${info.version}`,
+    buttons: ['Download', 'Later'],
+    defaultId: 0
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate();
+    }
+  });
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('Update not available');
+  win?.webContents.send('update-status', { 
+    status: 'not-available', 
+    message: 'You are using the latest version.' 
+  });
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log('Download progress:', progressObj);
+  win?.webContents.send('update-progress', {
+    status: 'downloading',
+    progress: progressObj.percent,
+    speed: progressObj.bytesPerSecond,
+    eta: 0, // ProgressInfo doesn't have eta property
+    message: `Downloading... ${Math.round(progressObj.percent)}%`
+  });
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info);
+  win?.webContents.send('update-status', { 
+    status: 'downloaded', 
+    message: 'Update downloaded. Will be installed on restart.',
+    info 
+  });
+  
+  // Ask user to restart now
+  dialog.showMessageBox(win!, {
+    type: 'info',
+    title: 'Update Ready',
+    message: 'Update has been downloaded. Would you like to restart now?',
+    detail: 'If you don\'t restart now, the update will be installed automatically on next app launch.',
+    buttons: ['Restart Now', 'Later'],
+    defaultId: 0
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('AutoUpdater error:', err);
+  win?.webContents.send('update-status', { 
+    status: 'error', 
+    message: `Update error: ${err.message}` 
+  });
+});
+
+// IPC handlers - Handle update requests from renderer process
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return result;
+  } catch (error) {
+    console.error('Error checking for updates:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    const result = await autoUpdater.downloadUpdate();
+    return result;
+  } catch (error) {
+    console.error('Error downloading update:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  try {
+    autoUpdater.quitAndInstall();
+    return { success: true };
+  } catch (error) {
+    console.error('Error installing update:', error);
+    throw error;
+  }
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -93,11 +208,11 @@ if (process.platform === 'win32') {
 app.whenReady().then(() => {
   createWindow()
 
-  /** 인스타 도메인 한정 전체 정리 */
+  /** Clear Instagram domain-specific data */
   async function clearInstagramData(partition = 'persist:ig') {
     const sess = session.fromPartition(partition)
 
-    // 1) origin 기반 스토리지/캐시류 삭제 (확장된 목록)
+    // 1) Delete origin-based storage/cache
     await sess.clearStorageData({
       origin: 'https://www.instagram.com',
       storages: [
@@ -112,33 +227,33 @@ app.whenReady().then(() => {
       quotas: ['temporary', 'syncable'],
     })
 
-    // 2) 도메인 기반 쿠키 완전 삭제 (.instagram.com 하위 모두)
-    const cookies = await sess.cookies.get({ domain: '.instagram.com' })
-    const removalPromises = cookies
-      .filter(c => !!c.domain && !!c.path)
-      .map(c => {
-        const protocol = c.secure ? 'https' : 'http'
-        const domain = (c.domain as string).replace(/^\./, '')
-        const path = c.path as string
-        return sess.cookies.remove(`${protocol}://${domain}${path}`, c.name)
-      })
-    await Promise.all(removalPromises)
+    // 2) Clear all cookies
+    try {
+      const cookies = await sess.cookies.get({})
+      for (const cookie of cookies) {
+        const cookieUrl = `https://${cookie.domain}${cookie.path}`
+        await sess.cookies.remove(cookieUrl, cookie.name)
+      }
+      console.log('Cleared all cookies')
+    } catch (error) {
+      console.error('Failed to clear cookies:', error)
+    }
 
-    // 3) 인증 캐시(HTTP auth)도 정리
+    // 3) Clear auth cache (HTTP auth)
     await sess.clearAuthCache()
 
-    // 4) 변경사항이 디스크에 기록되도록 강제
+    // 4) Force changes to be written to disk
     await sess.cookies.flushStore()
     await sess.clearCache()
   }
 
-  /** Renderer 요청: 인스타 세션 삭제 */
+  /** Renderer request: Clear Instagram session */
   ipcMain.handle('ig:clear-session', async () => {
     await clearInstagramData('persist:ig')
     return true
   })
 
-  /** Renderer 요청: 인스타 세션 삭제 및 리로드 */
+  /** Renderer request: Clear Instagram session and reload */
   ipcMain.handle('ig:disconnect-and-reload', async () => {
     await clearInstagramData('persist:ig')
     if (win) {
@@ -146,4 +261,12 @@ app.whenReady().then(() => {
     }
     return true
   })
+
+  // Check for updates on app start (only when not in development mode)
+  if (!VITE_DEV_SERVER_URL) {
+    // Wait a bit after app is ready before checking for updates
+    setTimeout(() => {
+      autoUpdater.checkForUpdates();
+    }, 3000);
+  }
 })
