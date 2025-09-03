@@ -1,0 +1,32 @@
+{
+  "productName": "FlowSonat",
+  "currentVersion": "1.0.0",
+  "buildTime": "2024-01-15T10:30:00Z",
+  "gitCommit": "abc123def456",
+  "gitBranch": "main",
+  "downloads": [
+    {
+      "platform": "Mac",
+      "arch": "x64",
+      "version": "1.0.0",
+      "filename": "FlowSonat-Mac-x64-1.0.0.zip",
+      "url": "https://flowsonat-release.s3.ap-northeast-2.amazonaws.com/FlowSonat-Mac-x64-1.0.0.zip",
+      "size": 52428800,
+      "checksum": "sha256:abc123...",
+      "buildTime": "2024-01-15T10:30:00Z"
+    },
+    {
+      "platform": "Mac",
+      "arch": "arm64",
+      "version": "1.0.0",
+      "filename": "FlowSonat-Mac-arm64-1.0.0.zip",
+      "url": "https://flowsonat-release.s3.ap-northeast-2.amazonaws.com/FlowSonat-Mac-arm64-1.0.0.zip",
+      "size": 52428800,
+      "checksum": "sha256:def456...",
+      "buildTime": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "updateNotes": "Bug fixes and improvements",
+  "minSupportedVersion": "0.1.0",
+  "forceUpdate": false
+}

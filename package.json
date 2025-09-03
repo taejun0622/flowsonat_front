@@ -3,9 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "author": {
+    "name": "FlowSonat Team",
+    "email": "team@flowsonat.com"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build && electron-builder",
+    "build:all": "npm run typecheck && vite build && electron-builder --mac --win --linux",
+    "build:mac": "npm run typecheck && vite build && electron-builder --mac",
+    "build:win": "npm run typecheck && vite build && electron-builder --win",
+    "build:linux": "npm run typecheck && vite build && electron-builder --linux",
+
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "typecheck": "tsc -noEmit",
     "preview": "vite preview",

@@ -1,0 +1,143 @@
+{
+  "productName": "FlowSonat",
+  "currentVersion": "0.0.0",
+  "buildTime": "2025-09-03T01:48:21Z",
+  "gitCommit": "d3106597720ed6f4c541ee7f39c2f7d76403867b",
+  "gitBranch": "dev",
+  "downloads": [
+    {
+      "platform": "Mac",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Mac-x64-0.0.0.zip",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Mac-x64-0.0.0.zip",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Mac",
+      "arch": "arm64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Mac-arm64-0.0.0.zip",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Mac-arm64-0.0.0.zip",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Mac",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Mac-x64-0.0.0.dmg",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Mac-x64-0.0.0.dmg",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Mac",
+      "arch": "arm64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Mac-arm64-0.0.0.dmg",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Mac-arm64-0.0.0.dmg",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Windows",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Windows-x64-0.0.0.exe",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Windows-x64-0.0.0.exe",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Windows",
+      "arch": "ia32",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Windows-ia32-0.0.0.exe",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Windows-ia32-0.0.0.exe",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Windows",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Windows-x64-0.0.0.zip",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Windows-x64-0.0.0.zip",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Windows",
+      "arch": "ia32",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Windows-ia32-0.0.0.zip",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Windows-ia32-0.0.0.zip",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Linux",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Linux-x64-0.0.0.AppImage",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Linux-x64-0.0.0.AppImage",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Linux",
+      "arch": "arm64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Linux-arm64-0.0.0.AppImage",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Linux-arm64-0.0.0.AppImage",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Linux",
+      "arch": "x64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Linux-x64-0.0.0.deb",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Linux-x64-0.0.0.deb",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    },
+,
+    {
+      "platform": "Linux",
+      "arch": "arm64",
+      "version": "0.0.0",
+      "filename": "FlowSonat-Linux-arm64-0.0.0.deb",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/FlowSonat-Linux-arm64-0.0.0.deb",
+      "size": 0,
+      "checksum": "",
+      "buildTime": "2025-09-03T01:48:21Z"
+    }
+  ],
+  "updateNotes": "Bug fixes and improvements",
+  "minSupportedVersion": "0.1.0",
+  "forceUpdate": false
+}
