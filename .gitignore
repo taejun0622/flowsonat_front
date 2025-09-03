@@ -27,3 +27,4 @@ dist-electron
 *.sw?
 
 release/
+version-info.json
