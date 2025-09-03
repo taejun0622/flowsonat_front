@@ -45,7 +45,7 @@ generate_platform_info() {
       "arch": "$arch",
       "version": "$CURRENT_VERSION",
       "filename": "$filename",
-      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/$filename",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/$CURRENT_VERSION/$filename",
       "size": 0,
       "checksum": "",
       "buildTime": "$BUILD_TIME"
