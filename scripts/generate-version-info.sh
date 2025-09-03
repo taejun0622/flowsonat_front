@@ -45,7 +45,7 @@ generate_platform_info() {
       "arch": "$arch",
       "version": "$CURRENT_VERSION",
       "filename": "$filename",
-      "url": "https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/$filename",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/$filename",
       "size": 0,
       "checksum": "",
       "buildTime": "$BUILD_TIME"
@@ -53,36 +53,29 @@ generate_platform_info() {
 EOF
 }
 
-       # 메인 버전 정보 JSON 생성
-       cat > version-info.json << EOF
-       {
-         "productName": "$PRODUCT_NAME",
-         "currentVersion": "$CURRENT_VERSION",
-         "buildTime": "$BUILD_TIME",
-         "gitCommit": "$GIT_COMMIT",
-         "gitBranch": "$GIT_BRANCH",
-         "downloads": [
-       $(generate_platform_info "Mac" "x64" "zip"),
-       ,
-       $(generate_platform_info "Mac" "arm64" "zip"),
-       ,
-       $(generate_platform_info "Mac" "x64" "dmg"),
-       ,
-       $(generate_platform_info "Mac" "arm64" "dmg"),
-       ,
-       $(generate_platform_info "Windows" "x64" "exe"),
-       ,
-       $(generate_platform_info "Windows" "ia32" "exe"),
-       ,
-       $(generate_platform_info "Linux" "x64" "deb"),
-       ,
-       $(generate_platform_info "Linux" "arm64" "deb")
-         ],
-         "updateNotes": "Bug fixes and improvements",
-         "minSupportedVersion": "0.1.0",
-         "forceUpdate": false
-       }
-       EOF
+# 메인 버전 정보 JSON 생성
+cat > version-info.json << EOF
+{
+  "productName": "$PRODUCT_NAME",
+  "currentVersion": "$CURRENT_VERSION", 
+  "buildTime": "$BUILD_TIME",
+  "gitCommit": "$GIT_COMMIT",
+  "gitBranch": "$GIT_BRANCH",
+  "downloads": [
+$(generate_platform_info "Mac" "x64" "zip"),
+$(generate_platform_info "Mac" "arm64" "zip"),
+$(generate_platform_info "Mac" "x64" "dmg"),
+$(generate_platform_info "Mac" "arm64" "dmg"),
+$(generate_platform_info "Windows" "x64" "exe"),
+$(generate_platform_info "Windows" "ia32" "exe"),
+$(generate_platform_info "Linux" "x64" "deb"),
+$(generate_platform_info "Linux" "arm64" "deb")
+  ],
+  "updateNotes": "Bug fixes and improvements",
+  "minSupportedVersion": "0.1.0",
+  "forceUpdate": false
+}
+EOF
 
 log_success "Version info generated: version-info.json"
 
