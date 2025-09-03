@@ -20,7 +20,12 @@
     "typecheck": "tsc -noEmit",
     "preview": "vite preview",
     "generate-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch",
-    "watch-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch --watch"
+    "watch-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch --watch",
+    
+    "version:patch": "./scripts/version-bump.sh patch",
+    "version:minor": "./scripts/version-bump.sh minor",
+    "version:major": "./scripts/version-bump.sh major",
+    "version:info": "./scripts/generate-version-info.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
