@@ -57,19 +57,38 @@ export class ElectronApiService {
     try {
       const { method, url, data, headers } = options;
       
-      console.log(`[Electron API] ${method} ${url}`, data ? { data } : '');
+      // URL 검증 - 상대 경로만 허용 (메인 프로세스에서 절대 URL로 변환)
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        console.warn('⚠️ Warning: Absolute URL passed to Electron API service. This should be a relative path.', {
+          url: url,
+          method: method
+        });
+      }
+      
+      console.log(`[Electron API] ${method} ${url}`, {
+        data: data ? { data } : '',
+        headers: headers,
+        timestamp: new Date().toISOString()
+      });
       
       const response = await (window.electronAPI as any)?.apiRequest(method, url, data, headers);
       
-      console.log(`[Electron API Response] ${method} ${url}`, response);
+      console.log(`[Electron API Response] ${method} ${url}`, {
+        status: response.status,
+        data: response.data,
+        timestamp: new Date().toISOString()
+      });
       
       return {
-        data: response,
-        status: 200,
-        statusText: 'OK'
+        data: response.data,
+        status: response.status || 200,
+        statusText: response.statusText || 'OK'
       };
     } catch (error: any) {
-      console.error(`[Electron API Error] ${options.method} ${options.url}:`, error);
+      console.error(`[Electron API Error] ${options.method} ${options.url}:`, {
+        error: error,
+        timestamp: new Date().toISOString()
+      });
       
       // 에러 응답 구조화
       const status = error.status || 500;

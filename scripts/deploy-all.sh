@@ -89,7 +89,7 @@ log_info "Step 2: Building Electron app..."
 case $PLATFORM in
     "all")
         log_info "Building for all platforms..."
-        npm run build:all
+        dotenv -e .env.deploy -- npm run build:all
         ;;
     "mac")
         log_info "Building for macOS with code signing and notarization..."
@@ -97,11 +97,11 @@ case $PLATFORM in
         ;;
     "win")
         log_info "Building for Windows..."
-        npm run build:win
+        dotenv -e .env.deploy -- npm run build:win
         ;;
     "linux")
         log_info "Building for Linux..."
-        npm run build:linux
+        dotenv -e .env.deploy -- npm run build:linux
         ;;
     *)
         log_error "Unknown platform: $PLATFORM"

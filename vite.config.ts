@@ -9,6 +9,28 @@ export default defineConfig(({ mode }) => {
   // Load environment variables based on mode
   const env = loadEnv(mode, process.cwd(), '')
   
+  // Build-time environment debugging
+  console.log('\n🏗️  BUILD-TIME ENVIRONMENT DEBUG')
+  console.log('================================')
+  console.log('Mode:', mode)
+  console.log('Process CWD:', process.cwd())
+  console.log('Node ENV:', process.env.NODE_ENV)
+  console.log('Package Version:', process.env.npm_package_version)
+  console.log('\nVite Environment Variables:')
+  Object.keys(env)
+    .filter(key => key.startsWith('VITE_'))
+    .forEach(key => {
+      const value = env[key]
+      const displayValue = key.includes('STRIPE') || key.includes('KEY') ? '[REDACTED]' : value
+      console.log(`  ${key}: ${displayValue}`)
+    })
+  console.log('\nEnvironment files that might be loaded:')
+  console.log(`  .env.${mode}`)
+  console.log(`  .env.${mode}.local`)
+  console.log('  .env.local')
+  console.log('  .env')
+  console.log('================================\n')
+  
   return {
   plugins: [
     react(),
@@ -64,11 +86,18 @@ export default defineConfig(({ mode }) => {
   },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.1'),
+    'import.meta.env.VITE_NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    // 프로덕션 환경에서 API 베이스 URL 강제 설정
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
+      env.VITE_API_BASE_URL || 'https://api.flowsonat.com'
+    ),
   },
   server: {
+    port: parseInt(process.env.VITE_DEV_PORT || '5174'), // 환경변수로 포트 설정 가능
+    strictPort: false, // 포트가 사용 중이면 다음 포트로 자동 이동
     proxy: {
       '/api': {
-        target: 'https://test.api.flowsonat.com',
+        target: env.VITE_API_BASE_URL || 'https://test.api.flowsonat.com',
         changeOrigin: true,
         secure: true
       }

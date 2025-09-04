@@ -61,8 +61,8 @@ function getEnvConfig(): EnvConfig {
     isDevelopment: env.DEV,
     mode: env.MODE,
     
-    // API Configuration
-    apiBaseUrl: env.VITE_API_BASE_URL || (isDevelopment() ? 'http://localhost:5174' : 'https://api.flowsonat.com'),
+    // API Configuration - 프로덕션 환경에서 안전한 기본값 보장
+    apiBaseUrl: env.VITE_API_BASE_URL || 'https://api.flowsonat.com',
     
     // Stripe Configuration
     stripe: {
@@ -96,23 +96,106 @@ export const getStripePublishableKey = () => envConfig.stripe.publishableKey;
 export const getStripeProductId = () => envConfig.stripe.productId;
 
 /**
- * Development-only logging
+ * Comprehensive environment variable logging and debugging
  */
 export const logEnvConfig = () => {
+  const timestamp = new Date().toISOString();
+  const allEnvVars = import.meta.env;
+  
+  console.group('🔧 Environment Configuration Debug - ' + timestamp);
+  
+  // Raw environment variables
+  console.log('📄 Raw Environment Variables:', {
+    VITE_API_BASE_URL: allEnvVars.VITE_API_BASE_URL,
+    VITE_APP_VERSION: allEnvVars.VITE_APP_VERSION,
+    VITE_STRIPE_PRICE_ID: allEnvVars.VITE_STRIPE_PRICE_ID ? '[REDACTED]' : 'undefined',
+    VITE_STRIPE_PUBLISHABLE_KEY: allEnvVars.VITE_STRIPE_PUBLISHABLE_KEY ? '[REDACTED]' : 'undefined',
+    VITE_STRIPE_PRODUCT_ID: allEnvVars.VITE_STRIPE_PRODUCT_ID ? '[REDACTED]' : 'undefined',
+    MODE: allEnvVars.MODE,
+    PROD: allEnvVars.PROD,
+    DEV: allEnvVars.DEV,
+    NODE_ENV: allEnvVars.NODE_ENV,
+  });
+  
+  // Processed configuration
+  console.log('⚙️ Processed Configuration:', {
+    appVersion: envConfig.appVersion,
+    mode: envConfig.mode,
+    apiBaseUrl: envConfig.apiBaseUrl,
+    isProduction: envConfig.isProduction,
+    isDevelopment: envConfig.isDevelopment,
+    stripe: {
+      hasPriceId: !!envConfig.stripe.priceId,
+      hasPublishableKey: !!envConfig.stripe.publishableKey,
+      hasProductId: !!envConfig.stripe.productId,
+    },
+  });
+  
+  // Environment source detection
+  console.log('🔍 Environment Source Analysis:', {
+    isViteEnvLoaded: !!allEnvVars,
+    hasVitePrefix: Object.keys(allEnvVars).filter(k => k.startsWith('VITE_')),
+    currentWorkingDirectory: typeof process !== 'undefined' ? process.cwd?.() : 'N/A (browser)',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+  });
+  
+  // Validation status
+  console.log('✅ Validation Status:', {
+    hasRequiredApiUrl: !!allEnvVars.VITE_API_BASE_URL,
+    apiUrlValue: allEnvVars.VITE_API_BASE_URL || 'MISSING',
+    fallbackUsed: !allEnvVars.VITE_API_BASE_URL && envConfig.apiBaseUrl !== allEnvVars.VITE_API_BASE_URL,
+    finalApiBaseUrl: envConfig.apiBaseUrl,
+    isAbsoluteUrl: envConfig.apiBaseUrl.startsWith('http'),
+    isFileProtocol: envConfig.apiBaseUrl.startsWith('file://'),
+  });
+  
+  console.groupEnd();
+};
+
+/**
+ * Track environment variable changes during runtime
+ */
+export const trackEnvChanges = () => {
+  const initialState = JSON.stringify({
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+    VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION,
+    MODE: import.meta.env.MODE,
+  });
+  
+  // Store initial state globally for comparison
+  (window as any).__initialEnvState = initialState;
+  
+  // Check for changes periodically (only in development)
   if (isDevelopment()) {
-    console.log('🔧 Environment Configuration:', {
-      appVersion: envConfig.appVersion,
-      mode: envConfig.mode,
-      apiBaseUrl: envConfig.apiBaseUrl,
-      isProduction: envConfig.isProduction,
-      stripe: {
-        hasPriceId: !!envConfig.stripe.priceId,
-        hasPublishableKey: !!envConfig.stripe.publishableKey,
-        hasProductId: !!envConfig.stripe.productId,
-      },
-    });
+    setInterval(() => {
+      const currentState = JSON.stringify({
+        VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+        VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION,
+        MODE: import.meta.env.MODE,
+      });
+      
+      if (currentState !== (window as any).__initialEnvState) {
+        console.error('🚨 ENVIRONMENT VARIABLES CHANGED DURING RUNTIME!');
+        console.log('Initial:', JSON.parse((window as any).__initialEnvState));
+        console.log('Current:', JSON.parse(currentState));
+        (window as any).__initialEnvState = currentState;
+      }
+    }, 5000); // Check every 5 seconds
   }
 };
 
-// Log configuration in development
-logEnvConfig();
+/**
+ * Force log environment (useful for production debugging)
+ */
+export const forceLogEnv = () => {
+  logEnvConfig();
+};
+
+// Initialize environment tracking
+trackEnvChanges();
+
+// Log configuration (only once per session)
+if (!(window as any).__envConfigLogged) {
+  logEnvConfig();
+  (window as any).__envConfigLogged = true;
+}

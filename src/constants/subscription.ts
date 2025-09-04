@@ -8,20 +8,25 @@ const getPriceId = () => {
   const envPriceId = getStripePriceId();
   const finalPriceId = envPriceId || PRODUCTION_PRICE_ID;
   
-  if (process.env.NODE_ENV === 'development') {
+  // 디버그 로그는 한 번만 실행
+  if (process.env.NODE_ENV === 'development' && !(window as any).__priceIdDebugLogged) {
     console.log('=== getPriceId Debug ===');
     console.log('Environment price ID:', envPriceId);
     console.log('Production price ID:', PRODUCTION_PRICE_ID);
     console.log('Final price ID:', finalPriceId);
     console.log('=== End getPriceId Debug ===');
+    (window as any).__priceIdDebugLogged = true;
   }
   
   return finalPriceId;
 };
 
+// 캐싱된 price ID (한 번만 계산)
+const CACHED_PRICE_ID = getPriceId();
+
 export const SUBSCRIPTION_PLANS = {
   BASIC: {
-    id: getPriceId(),
+    id: CACHED_PRICE_ID,
     name: 'Basic Plan',
     price: 999, // $9.99 in cents
     currency: 'USD',
@@ -34,7 +39,7 @@ export const SUBSCRIPTION_PLANS = {
     ],
   },
   PRO: {
-    id: getPriceId(),
+    id: CACHED_PRICE_ID,
     name: 'Pro Plan',
     price: 2999, // $29.99 in cents
     currency: 'USD',
@@ -48,7 +53,7 @@ export const SUBSCRIPTION_PLANS = {
     ],
   },
   ENTERPRISE: {
-    id: getPriceId(),
+    id: CACHED_PRICE_ID,
     name: 'Enterprise Plan',
     price: 9999, // $99.99 in cents
     currency: 'USD',
@@ -71,7 +76,7 @@ export const STRIPE_CONFIG = {
   productId: isProduction() 
     ? 'prod_SwfvVCI3rprIQK'
     : getStripeProductId() || 'prod_test_your_test_product_id',
-  priceId: getPriceId(),
+  priceId: CACHED_PRICE_ID,
 } as const;
 
 export const SUBSCRIPTION_STATUS = {

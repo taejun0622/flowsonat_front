@@ -10,6 +10,8 @@ import type { OnCancel } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
 import { apiInterceptor } from './apiInterceptor';
 import { electronApiService } from '@/services/electronApiService';
+import { createSafeApiUrl, assertAbsoluteUrl, assertNotFileProtocol, logUrlGeneration } from '@/utils/urlValidator';
+import { validateProductionUrl, validateProductionElectronApi } from '@/utils/productionValidator';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -95,7 +97,17 @@ const getUrl = (config: OpenAPIConfig, options: ApiRequestOptions): string => {
             return substring;
         });
 
-    const url = `${config.BASE}${path}`;
+    // 절대 URL 강제 생성 - 파일 프로토콜 이슈 방지
+    const url = createSafeApiUrl(config.BASE, path);
+    
+    // URL 생성 디버그 로그
+    logUrlGeneration(config.BASE, path, url);
+    
+    // 프로덕션 환경에서 URL 검증
+    if (import.meta.env.PROD) {
+        validateProductionUrl(url, 'getUrl');
+    }
+    
     if (options.query) {
         return `${url}${getQueryString(options.query)}`;
     }
@@ -203,12 +215,23 @@ export const sendRequest = async (
     headers: Headers,
     onCancel: OnCancel
 ): Promise<Response> => {
+    // URL 검증 - 파일 프로토콜 방지
+    assertNotFileProtocol(url);
+    assertAbsoluteUrl(url);
+    
     // Electron 환경인지 확인
     const isElectron = typeof window !== 'undefined' && 
                       window.electronAPI && 
                       typeof (window.electronAPI as any)?.apiRequest === 'function';
     
-    
+    console.log('🌐 API Request Debug:', {
+        isElectron: isElectron,
+        fullUrl: url,
+        configBase: config.BASE,
+        optionsUrl: options.url,
+        method: options.method,
+        timestamp: new Date().toISOString()
+    });
     
     if (isElectron) {
         // Electron 환경: Main Process를 통해 요청
@@ -218,6 +241,17 @@ export const sendRequest = async (
         try {
             // URL에서 base URL 제거 (Electron API 서비스에서 자동으로 추가됨)
             const apiUrl = url.replace(config.BASE, '');
+            
+            // 프로덕션 환경에서 Electron API URL 검증
+            if (import.meta.env.PROD) {
+                validateProductionElectronApi(apiUrl, options.method);
+            }
+            
+            console.log('🔧 Electron API URL Processing:', {
+                originalUrl: url,
+                configBase: config.BASE,
+                extractedApiUrl: apiUrl
+            });
             
             // Headers를 일반 객체로 변환
             const headersObj: Record<string, string> = {};
@@ -281,9 +315,15 @@ export const sendRequest = async (
         // 웹 환경: 프록시를 통해 요청
         const controller = new AbortController();
         
-        // URL을 프록시 URL로 변경
+        // URL을 프록시 URL로 변경 (개발 환경에서 Vite 프록시 사용)
         const proxyUrl = url.replace(config.BASE, '');
         
+        console.log('🌐 Web Environment API Request:', {
+            originalUrl: url,
+            configBase: config.BASE,
+            proxyUrl: proxyUrl,
+            method: options.method
+        });
 
         const request: RequestInit = {
             headers,
