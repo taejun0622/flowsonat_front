@@ -66,7 +66,6 @@ class GA4Service {
       console.log('✅ GA4 Service (Measurement Protocol) initialized:', this.measurementId);
       
       // Send multiple events to ensure client registration
-      console.log('🔧 Registering client ID with GA4...');
       
       // 1. Send multiple standard events without debug_mode to register client
       await this.sendEventBatch([
@@ -89,9 +88,8 @@ class GA4Service {
         }
       ], false);
       
-      // 2. Wait and send debug events
+      // 2. Wait and send initial session event with debug_mode
       setTimeout(async () => {
-        console.log('🐛 Now sending debug events for DebugView...');
         await this.sendEventBatch([
           {
             name: 'app_session_start',
@@ -99,15 +97,9 @@ class GA4Service {
               session_id: this.sessionId,
               engagement_time_msec: 1
             }
-          },
-          {
-            name: 'debug_test',
-            params: {
-              test_parameter: 'hello_debugview'
-            }
           }
         ], true); // true = force debug_mode
-      }, 2000); // 2초 대기
+      }, 1000);
     } catch (error) {
       console.error('❌ Failed to initialize GA4 Service:', error);
     }
@@ -140,13 +132,6 @@ class GA4Service {
       } catch (error) {
         console.warn('Failed to send batch via Electron analytics, falling back to direct:', error);
       }
-    } else {
-      const isViteDev = import.meta.env.DEV && window.location.protocol.startsWith('http');
-      if (isViteDev) {
-        console.log('🔧 Vite dev mode - trying direct GA4 debug endpoint (Electron desktop app development)');
-      } else {
-        console.log('❌ window.analytics not available in Electron app - check preload script');
-      }
     }
 
     // Now we can send in all environments thanks to Vite proxy
@@ -161,7 +146,6 @@ class GA4Service {
       if (isViteDevMode) {
         // Use Vite proxy for development - always use /mp/collect (not debug endpoint)
         url = `/ga4-mp/mp/collect?measurement_id=${this.measurementId}&api_secret=${this.apiSecret}`;
-        console.log('🔧 Using Vite proxy for GA4 (DebugView via debug_mode param):', url);
       } else {
         // Direct connection for production or Electron
         const host = 'www.google-analytics.com';
@@ -194,7 +178,6 @@ class GA4Service {
         }
       };
 
-      console.log('📤 Sending GA4 payload:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(url, {
         method: 'POST',
@@ -204,23 +187,14 @@ class GA4Service {
         },
       });
 
-      // Check response status
-      if (response.status === 204) {
-        console.log('✅ GA4 batch sent successfully:', events.length, 'events');
-      } else if (response.status === 200) {
-        // Debug endpoint might return validation messages
-        try {
-          const result = await response.json();
-          if (result.validationMessages?.length) {
-            console.warn('GA4 debug validation messages:', JSON.stringify(result, null, 2));
-          } else {
-            console.log('✅ GA4 batch sent successfully (with response):', events.length, 'events');
-          }
-        } catch (jsonError) {
-          console.log('✅ GA4 batch sent successfully (no JSON response):', events.length, 'events');
+      // Handle response
+      if (response.status === 204 || response.status === 200) {
+        // Success - only log in development
+        if (!isProduction()) {
+          console.log('✅ GA4 events sent:', events.length);
         }
       } else {
-        console.warn('GA4 batch unexpected status:', response.status);
+        console.warn('GA4 unexpected status:', response.status);
       }
 
     } catch (error) {
