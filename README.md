@@ -28,9 +28,10 @@ FlowSonat은 자동 업데이트 시스템을 통해 사용자가 항상 최신 
 5. 다운로드 완료 후 재시작 시 자동 설치
 
 ### 서버 설정
-- **버전 정보 URL**: `https://flowsonat-release.s3.us-east-1.amazonaws.com/version-info.json`
+- **버전 정보 URL**: `https://d3hlgb8urc94dl.cloudfront.net/version-info.json`
 - **업데이트 파일**: S3 버킷에 저장된 플랫폼별 설치 파일
 - **최소 지원 버전**: `minSupportedVersion` 필드로 지원 중단 버전 관리
+- **자동 생성**: `version-info.json`은 배포 스크립트에 의해 자동 생성
 
 ## 개발 환경 설정
 
@@ -127,20 +128,115 @@ VITE_API_BASE_URL=https://api.flowsonat.com
 - `electron-builder.json5`에서 S3 버킷 URL 설정
 - `version-info.json` 파일을 S3에 업로드하여 버전 정보 제공
 - 각 플랫폼별 설치 파일을 S3에 업로드
+- CloudFront를 통한 CDN 배포로 빠른 업데이트 다운로드
+
+### 배포 스크립트
+
+#### 전체 배포 (권장)
+```bash
+# 모든 플랫폼에 대해 버전 업데이트, 빌드, 배포
+./scripts/deploy-all.sh patch all
+
+# 특정 플랫폼만 배포
+./scripts/deploy-all.sh minor mac
+./scripts/deploy-all.sh patch win
+```
+
+#### 개별 배포
+```bash
+# 버전 정보만 생성/업로드
+./scripts/generate-version-info.sh
+
+# 특정 플랫폼 빌드 및 배포
+./scripts/deploy.sh mac
+./scripts/deploy.sh win
+./scripts/deploy.sh linux
+```
+
+### 배포 환경 설정
+`.env.deploy` 파일에 다음 환경 변수를 설정해야 합니다:
+```env
+# AWS 설정
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=flowsonat-release
+
+# CloudFront 설정 (선택사항)
+CLOUDFRONT_DOMAIN=d3hlgb8urc94dl.cloudfront.net
+CLOUDFRONT_DISTRIBUTION_ID=your_distribution_id
+```
 
 ### 버전 관리
+
+#### 기본 버전 업데이트
 ```bash
-# 패치 버전 업데이트
+# 패치 버전 업데이트 (이전 버전 지원 중단)
 npm run version:patch
 
-# 마이너 버전 업데이트
+# 마이너 버전 업데이트 (이전 버전 지원 중단)
 npm run version:minor
 
-# 메이저 버전 업데이트
+# 메이저 버전 업데이트 (이전 버전 지원 중단)
 npm run version:major
 
-# 버전 정보 생성
+# 버전 정보 생성 (현재 버전을 최소 지원 버전으로 설정)
 npm run version:info
+```
+
+#### 고급 버전 관리
+```bash
+# 특정 최소 지원 버전 설정
+./scripts/generate-version-info.sh --min-supported 0.0.15
+
+# 버전 업데이트와 함께 최소 지원 버전 설정
+./scripts/version-bump.sh patch --min-supported 0.0.15
+
+# 전체 배포와 함께 최소 지원 버전 설정
+./scripts/deploy-all.sh minor all --min-supported 0.0.15
+```
+
+#### 버전 관리 정책
+- **기본 동작**: 새 버전 배포 시 이전 버전들은 자동으로 지원 중단
+- **유연한 제어**: `--min-supported` 매개변수로 특정 버전까지 지원 가능
+- **보안 고려**: 중요한 보안 업데이트 시 이전 버전 지원 중단 권장
+
+### 스크립트 사용법
+
+#### generate-version-info.sh
+```bash
+# 현재 버전을 최소 지원 버전으로 설정
+./scripts/generate-version-info.sh
+
+# 특정 최소 지원 버전 설정
+./scripts/generate-version-info.sh --min-supported 0.0.15
+
+# 도움말 보기
+./scripts/generate-version-info.sh --help
+```
+
+#### version-bump.sh
+```bash
+# 패치 버전 업데이트 (이전 버전 지원 중단)
+./scripts/version-bump.sh patch
+
+# 마이너 버전 업데이트 (특정 버전까지 지원)
+./scripts/version-bump.sh minor --min-supported 0.0.15
+
+# 도움말 보기
+./scripts/version-bump.sh --help
+```
+
+#### deploy-all.sh
+```bash
+# 모든 플랫폼 배포 (이전 버전 지원 중단)
+./scripts/deploy-all.sh patch all
+
+# 특정 플랫폼 배포 (특정 버전까지 지원)
+./scripts/deploy-all.sh minor mac --min-supported 0.0.15
+
+# 도움말 보기
+./scripts/deploy-all.sh --help
 ```
 
 ## 라이선스
