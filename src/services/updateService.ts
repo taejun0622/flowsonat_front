@@ -1,6 +1,6 @@
 import { UpdateInfo, UpdateCheckResult, UpdateProgress } from '@/types/update';
 
-const VERSION_CHECK_URL = 'https://flowsonat-release.s3.us-east-1.amazonaws.com/version-info.json';
+const VERSION_CHECK_URL = 'https://d3hlgb8urc94dl.cloudfront.net/version-info.json';
 const VERSION_CHECK_INTERVAL = 1000 * 60 * 60; // 1시간마다 체크
 
 class UpdateService {

@@ -19,18 +19,33 @@ export type OpenAPIConfig = {
     ENCODE_PATH?: ((path: string) => string) | undefined;
 };
 
-// 환경변수 디버깅
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// 환경변수 디버깅 및 프로덕션 URL 설정
+const getApiBaseUrl = () => {
+    // 환경 변수가 설정되어 있으면 사용
+    if (import.meta.env.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL;
+    }
+    
+    // 프로덕션 환경에서는 https://api.flowsonat.com 사용
+    if (import.meta.env.PROD) {
+        return 'https://api.flowsonat.com';
+    }
+    
+    // 개발 환경에서는 localhost 사용
+    return 'http://localhost:8000';
+};
+
+const apiBaseUrl = getApiBaseUrl();
 console.log('🔧 API Base URL:', {
     env: import.meta.env.VITE_API_BASE_URL,
-    fallback: 'http://localhost:8000',
+    isProd: import.meta.env.PROD,
     final: apiBaseUrl
 });
 
 export const OpenAPI: OpenAPIConfig = {
     BASE: apiBaseUrl,
     VERSION: '1.0.0',
-    WITH_CREDENTIALS: false,
+    WITH_CREDENTIALS: true,
     CREDENTIALS: 'include',
     TOKEN: async () => {
         const token = localStorage.getItem('access_token');

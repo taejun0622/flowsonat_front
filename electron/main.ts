@@ -39,8 +39,9 @@ function createWindow() {
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false, // Temporarily bypass CORS
-      allowRunningInsecureContent: true // Temporarily allow
+      webSecurity: true, // Enable web security
+      allowRunningInsecureContent: false, // Disable insecure content
+      experimentalFeatures: false
     },
   })
 
@@ -206,6 +207,19 @@ if (process.platform === 'win32') {
 }
 
 app.whenReady().then(() => {
+  // CORS 헤더 설정
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Access-Control-Allow-Origin': ['*'],
+        'Access-Control-Allow-Methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        'Access-Control-Allow-Headers': ['Content-Type', 'Authorization', 'X-Requested-With'],
+        'Access-Control-Allow-Credentials': ['true']
+      }
+    })
+  })
+
   createWindow()
 
   /** Clear Instagram domain-specific data */
