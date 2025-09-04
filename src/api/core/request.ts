@@ -9,6 +9,9 @@ import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
 import { apiInterceptor } from './apiInterceptor';
+import { electronApiService } from '@/services/electronApiService';
+import { createSafeApiUrl, assertAbsoluteUrl, assertNotFileProtocol, logUrlGeneration } from '@/utils/urlValidator';
+import { validateProductionUrl, validateProductionElectronApi } from '@/utils/productionValidator';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -94,7 +97,17 @@ const getUrl = (config: OpenAPIConfig, options: ApiRequestOptions): string => {
             return substring;
         });
 
-    const url = `${config.BASE}${path}`;
+    // 절대 URL 강제 생성 - 파일 프로토콜 이슈 방지
+    const url = createSafeApiUrl(config.BASE, path);
+    
+    // URL 생성 디버그 로그
+    logUrlGeneration(config.BASE, path, url);
+    
+    // 프로덕션 환경에서 URL 검증
+    if (import.meta.env.PROD) {
+        validateProductionUrl(url, 'getUrl');
+    }
+    
     if (options.query) {
         return `${url}${getQueryString(options.query)}`;
     }
@@ -202,22 +215,138 @@ export const sendRequest = async (
     headers: Headers,
     onCancel: OnCancel
 ): Promise<Response> => {
-    const controller = new AbortController();
-
-    const request: RequestInit = {
-        headers,
-        body: body ?? formData,
+    // URL 검증 - 파일 프로토콜 방지
+    assertNotFileProtocol(url);
+    assertAbsoluteUrl(url);
+    
+    // Electron 환경인지 확인 - 더 강화된 감지
+    const hasWindow = typeof window !== 'undefined';
+    const hasElectronAPI = hasWindow && window.electronAPI;
+    const hasApiRequest = hasElectronAPI && typeof (window.electronAPI as any)?.apiRequest === 'function';
+    const isElectron = hasWindow && hasElectronAPI && hasApiRequest;
+    
+    // 추가 디버깅 정보
+    console.log('🌐 API Request Debug:', {
+        hasWindow: hasWindow,
+        hasElectronAPI: hasElectronAPI,
+        hasApiRequest: hasApiRequest,
+        isElectron: isElectron,
+        electronAPI: hasWindow ? window.electronAPI : 'no window',
+        fullUrl: url,
+        configBase: config.BASE,
+        optionsUrl: options.url,
         method: options.method,
-        signal: controller.signal,
-    };
+        timestamp: new Date().toISOString()
+    });
+    
+    if (isElectron) {
+        // Electron 환경: Main Process를 통해 요청
+        const controller = new AbortController();
+        onCancel(() => controller.abort());
 
-    if (config.WITH_CREDENTIALS) {
-        request.credentials = config.CREDENTIALS;
+        try {
+            // URL에서 base URL 제거 (Electron API 서비스에서 자동으로 추가됨)
+            const apiUrl = url.replace(config.BASE, '');
+            
+            // 프로덕션 환경에서 Electron API URL 검증
+            if (import.meta.env.PROD) {
+                validateProductionElectronApi(apiUrl, options.method);
+            }
+            
+            console.log('🔧 Electron API URL Processing:', {
+                originalUrl: url,
+                configBase: config.BASE,
+                extractedApiUrl: apiUrl
+            });
+            
+            // Headers를 일반 객체로 변환
+            const headersObj: Record<string, string> = {};
+            headers.forEach((value, key) => {
+                headersObj[key] = value;
+            });
+
+            const response = await electronApiService.request({
+                method: options.method as any,
+                url: apiUrl,
+                data: body,
+                headers: headersObj
+            });
+
+            // Response 객체와 유사한 구조로 변환
+            return {
+                ok: response.status >= 200 && response.status < 300,
+                status: response.status,
+                statusText: response.statusText,
+                headers: new Headers(),
+                json: async () => response.data,
+                text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+                blob: async () => new Blob([JSON.stringify(response.data)]),
+                arrayBuffer: async () => new ArrayBuffer(0),
+                formData: async () => new FormData(),
+                clone: () => ({ ...response } as any),
+                body: null,
+                bodyUsed: false,
+                url: url,
+                type: 'basic' as ResponseType,
+                redirected: false,
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
+            } as Response;
+        } catch (error: any) {
+            // 에러를 Response 형태로 변환
+            const status = error.status || 500;
+            const statusText = error.statusText || 'Internal Server Error';
+            
+            return {
+                ok: false,
+                status,
+                statusText,
+                headers: new Headers(),
+                json: async () => error.data || error.message,
+                text: async () => typeof error.data === 'string' ? error.data : JSON.stringify(error.data || error.message),
+                blob: async () => new Blob([JSON.stringify(error.data || error.message)]),
+                arrayBuffer: async () => new ArrayBuffer(0),
+                formData: async () => new FormData(),
+                clone: () => ({ ...error } as any),
+                body: null,
+                bodyUsed: false,
+                url: url,
+                type: 'basic' as ResponseType,
+                redirected: false,
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
+            } as Response;
+        }
+    } else {
+        // 웹 환경 또는 Electron 감지 실패: 절대 URL 사용
+        const controller = new AbortController();
+        
+        // 프로덕션 환경에서는 무조건 절대 URL 사용
+        const requestUrl = import.meta.env.PROD ? url : url.replace(config.BASE, '');
+        
+        console.log('🌐 Web Environment API Request:', {
+            originalUrl: url,
+            configBase: config.BASE,
+            requestUrl: requestUrl,
+            isProduction: import.meta.env.PROD,
+            method: options.method
+        });
+
+        const request: RequestInit = {
+            headers,
+            body: body ?? formData,
+            method: options.method,
+            signal: controller.signal,
+        };
+
+        if (config.WITH_CREDENTIALS) {
+            request.credentials = config.CREDENTIALS;
+        }
+
+        onCancel(() => controller.abort());
+
+        return await fetch(requestUrl, request);
     }
-
-    onCancel(() => controller.abort());
-
-    return await fetch(url, request);
 };
 
 export const getResponseHeader = (response: Response, responseHeader?: string): string | undefined => {

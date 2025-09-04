@@ -3,6 +3,9 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ApiRequestOptions } from './ApiRequestOptions';
+import { getApiBaseUrl, isProduction, isDevelopment } from '@/config/env';
+import { electronApiService } from '@/services/electronApiService';
+import { getSafeApiBaseUrl, assertAbsoluteUrl, assertNotFileProtocol } from '@/utils/urlValidator';
 
 type Resolver<T> = (options: ApiRequestOptions) => Promise<T>;
 type Headers = Record<string, string>;
@@ -19,28 +22,22 @@ export type OpenAPIConfig = {
     ENCODE_PATH?: ((path: string) => string) | undefined;
 };
 
-// 환경변수 디버깅 및 프로덕션 URL 설정
-const getApiBaseUrl = () => {
-    // 환경 변수가 설정되어 있으면 사용
-    if (import.meta.env.VITE_API_BASE_URL) {
-        return import.meta.env.VITE_API_BASE_URL;
-    }
-    
-    // 프로덕션 환경에서는 https://api.flowsonat.com 사용
-    if (import.meta.env.PROD) {
-        return 'https://api.flowsonat.com';
-    }
-    
-    // 개발 환경에서는 localhost 사용
-    return 'http://localhost:8000';
-};
+// API Base URL 설정 - 안전한 검증과 함께
+const apiBaseUrl = getSafeApiBaseUrl(import.meta.env.VITE_API_BASE_URL, 'https://api.flowsonat.com');
 
-const apiBaseUrl = getApiBaseUrl();
-console.log('🔧 API Base URL:', {
-    env: import.meta.env.VITE_API_BASE_URL,
-    isProd: import.meta.env.PROD,
-    final: apiBaseUrl
+// 항상 로깅 (production에서도 API 호출 문제 디버깅용)
+console.log('🔧 API Configuration Debug:', {
+    rawEnvVar: import.meta.env.VITE_API_BASE_URL,
+    isProd: isProduction(),
+    isDev: isDevelopment(),
+    mode: import.meta.env.MODE,
+    finalApiBaseUrl: apiBaseUrl,
+    location: window.location?.href || 'unknown',
+    timestamp: new Date().toISOString()
 });
+
+// OpenAPI BASE 설정 확인
+console.log('📡 OpenAPI BASE will be set to:', apiBaseUrl);
 
 export const OpenAPI: OpenAPIConfig = {
     BASE: apiBaseUrl,
@@ -56,6 +53,30 @@ export const OpenAPI: OpenAPIConfig = {
     HEADERS: undefined,
     ENCODE_PATH: undefined,
 };
+
+// 런타임에서 OpenAPI.BASE 검증
+console.log('✅ OpenAPI Configuration Final Check:', {
+    BASE: OpenAPI.BASE,
+    isAbsoluteURL: OpenAPI.BASE.startsWith('http'),
+    hasCorrectProtocol: OpenAPI.BASE.startsWith('https://') || OpenAPI.BASE.startsWith('http://'),
+    expectedURL: 'https://api.flowsonat.com',
+    matches: OpenAPI.BASE === 'https://api.flowsonat.com'
+});
+
+// 최종 검증 - 절대 URL 및 파일 프로토콜 방지
+try {
+    assertAbsoluteUrl(OpenAPI.BASE);
+    assertNotFileProtocol(OpenAPI.BASE);
+    console.log('✅ OpenAPI.BASE validation passed:', OpenAPI.BASE);
+} catch (error) {
+    console.error('🚨 CRITICAL: OpenAPI.BASE validation failed!', {
+        current: OpenAPI.BASE,
+        expected: 'https://api.flowsonat.com',
+        error: error,
+        willCauseFileProtocolIssue: true
+    });
+    throw error;
+}
 
 // 토큰을 동적으로 업데이트하는 함수
 export const updateToken = (newToken: string) => {

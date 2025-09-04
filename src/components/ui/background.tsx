@@ -13,15 +13,7 @@ interface Color4BgInstance {
 }
 
 // Background type options
-export type BackgroundType = 
-  | 'abstract-shape'
-  | 'aesthetic-fluid'
-  | 'blur-dot'
-  | 'blur-gradient'
-  | 'triangles-mosaic'
-  | 'random-cubes'
-  | 'wavy-waves'
-  | 'big-blob';
+export type BackgroundType = 'blur-dot';
 
 interface DynamicBackgroundProps {
   type: BackgroundType;
@@ -61,32 +53,11 @@ export const DynamicBackground = ({
         let BackgroundClass;
         
         switch (type) {
-          case 'abstract-shape':
-            BackgroundClass = (await import('color4bg.js/build/jsm/AbstractShapeBg.module.js')).AbstractShapeBg;
-            break;
-          case 'aesthetic-fluid':
-            BackgroundClass = (await import('color4bg.js/build/jsm/AestheticFluidBg.module.js')).AestheticFluidBg;
-            break;
           case 'blur-dot':
             BackgroundClass = (await import('color4bg.js/build/jsm/BlurDotBg.module.js')).BlurDotBg;
             break;
-          case 'blur-gradient':
-            BackgroundClass = (await import('color4bg.js/build/jsm/BlurGradientBg.module.js')).BlurGradientBg;
-            break;
-          case 'triangles-mosaic':
-            BackgroundClass = (await import('color4bg.js/build/jsm/TrianglesMosaicBg.module.js')).TrianglesMosaicBg;
-            break;
-          case 'random-cubes':
-            BackgroundClass = (await import('color4bg.js/build/jsm/RandomCubesBg.module.js')).RandomCubesBg;
-            break;
-          case 'wavy-waves':
-            BackgroundClass = (await import('color4bg.js/build/jsm/WavyWavesBg.module.js')).WavyWavesBg;
-            break;
-          case 'big-blob':
-            BackgroundClass = (await import('color4bg.js/build/jsm/BigBlobBg.module.js')).BigBlobBg;
-            break;
           default:
-            BackgroundClass = (await import('color4bg.js/build/jsm/AestheticFluidBg.module.js')).AestheticFluidBg;
+            BackgroundClass = (await import('color4bg.js/build/jsm/BlurDotBg.module.js')).BlurDotBg;
         }
 
         // Create background instance using ID string
@@ -140,50 +111,3 @@ export const DynamicBackground = ({
     </div>
   );
 };
-
-// Predefined background presets
-export const BackgroundPresets = {
-  ai: {
-    colors: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'],
-    type: 'aesthetic-fluid' as BackgroundType
-  },
-  modern: {
-    colors: ['#ff9a9e', '#fecfef', '#fecfef', '#fad0c4', '#ffd1ff', '#a8edea'],
-    type: 'blur-gradient' as BackgroundType
-  },
-  tech: {
-    colors: ['#4facfe', '#00f2fe', '#43e97b', '#38f9d7', '#fa709a', '#fee140'],
-    type: 'abstract-shape' as BackgroundType
-  },
-  calm: {
-    colors: ['#a8edea', '#fed6e3', '#ffecd2', '#fcb69f', '#ff9a9e', '#fecfef'],
-    type: 'wavy-waves' as BackgroundType
-  }
-};
-
-// Convenience component for common use cases
-export const AIBackground = ({ 
-  children, 
-  className 
-}: { children?: React.ReactNode; className?: string }) => (
-  <DynamicBackground
-    type={BackgroundPresets.ai.type}
-    colors={BackgroundPresets.ai.colors}
-    className={className}
-  >
-    {children}
-  </DynamicBackground>
-);
-
-export const ModernBackground = ({ 
-  children, 
-  className 
-}: { children?: React.ReactNode; className?: string }) => (
-  <DynamicBackground
-    type={BackgroundPresets.modern.type}
-    colors={BackgroundPresets.modern.colors}
-    className={className}
-  >
-    {children}
-  </DynamicBackground>
-);

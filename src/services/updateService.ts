@@ -1,6 +1,9 @@
 import { UpdateInfo, UpdateCheckResult, UpdateProgress } from '@/types/update';
+import { getAppVersion, getApiBaseUrl } from '@/config/env';
+import { VersionService } from '@/api/services/VersionService';
+import { VersionResponse } from '@/api/models/VersionResponse';
+import { VersionInfo } from '@/api/models/VersionInfo';
 
-const VERSION_CHECK_URL = 'https://d3hlgb8urc94dl.cloudfront.net/version-info.json';
 const VERSION_CHECK_INTERVAL = 1000 * 60 * 60; // 1시간마다 체크
 
 class UpdateService {
@@ -10,7 +13,7 @@ class UpdateService {
 
   constructor() {
     // package.json에서 현재 버전 가져오기
-    this.currentVersion = import.meta.env.VITE_APP_VERSION || '0.0.1';
+    this.currentVersion = getAppVersion();
   }
 
   /**
@@ -18,15 +21,60 @@ class UpdateService {
    */
   async fetchLatestVersionInfo(): Promise<UpdateInfo | null> {
     try {
-      const response = await fetch(VERSION_CHECK_URL);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch version info: ${response.status}`);
+      const response: VersionResponse = await VersionService.getVersionInfoApiV1VersionVersionGet();
+      
+      if (!response.success || !response.data) {
+        const errorMessage = response.error || 'Unknown error';
+        console.error('API returned error:', errorMessage);
+        throw new Error(`Failed to fetch version info: ${errorMessage}`);
       }
       
-      const data: UpdateInfo = await response.json();
-      return data;
+      // 캐시 정보 로깅 (개발 환경에서만)
+      if (process.env.NODE_ENV === 'development') {
+        if (response.cached) {
+          console.log('✅ Version info loaded from cache, expires at:', response.cache_expires_at);
+        } else {
+          console.log('🔄 Version info fetched fresh from server, cache expires at:', response.cache_expires_at);
+        }
+        console.log('📦 Latest version:', response.data?.currentVersion, '| Current version:', this.currentVersion);
+      }
+      
+      // API 응답을 UpdateInfo 형식으로 변환
+      const versionInfo: VersionInfo = response.data;
+      const updateInfo: UpdateInfo = {
+        productName: versionInfo.productName,
+        currentVersion: versionInfo.currentVersion,
+        buildTime: versionInfo.buildTime,
+        gitCommit: versionInfo.gitCommit,
+        gitBranch: versionInfo.gitBranch,
+        downloads: versionInfo.downloads.map(download => ({
+          platform: download.platform,
+          arch: download.arch,
+          version: download.version,
+          filename: download.filename,
+          url: download.url,
+          size: download.size,
+          checksum: download.checksum,
+          buildTime: download.buildTime
+        })),
+        updateNotes: versionInfo.updateNotes,
+        minSupportedVersion: versionInfo.minSupportedVersion,
+        forceUpdate: versionInfo.forceUpdate
+      };
+      
+      return updateInfo;
     } catch (error) {
       console.error('Failed to fetch latest version info:', error);
+      
+      // 네트워크 에러인지 API 에러인지 구분하여 로깅
+      if (error instanceof Error) {
+        if (error.message.includes('fetch')) {
+          console.error('Network error while fetching version info');
+        } else {
+          console.error('API error while fetching version info:', error.message);
+        }
+      }
+      
       return null;
     }
   }

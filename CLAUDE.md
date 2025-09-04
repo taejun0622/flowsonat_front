@@ -101,6 +101,29 @@ Always run before committing:
 npm run typecheck && npm run lint
 ```
 
+#### Environment Variable Debugging
+Comprehensive debugging tools for environment variable issues:
+
+```bash
+# Debug current environment configuration
+./scripts/debug-env.sh [mode]            # Comprehensive environment debug report
+
+# Runtime debugging (in browser console)
+window.__envDebugger.logDebugInfo()      # Log current environment state
+window.__envDebugger.takeSnapshot()      # Take environment snapshot
+window.__envDebugger.exportDebugReport() # Export full debug report
+
+# Build verification
+node scripts/verify-build-env.js         # Verify environment vars in build output
+```
+
+**Debug Features:**
+- **Runtime Tracking**: Monitors environment variables for changes during execution
+- **Build-time Logging**: Shows environment loading during Vite build process  
+- **Deployment Validation**: Verifies environment setup before deployment
+- **Post-build Verification**: Confirms correct environment embedding in build artifacts
+- **Browser Console Logs**: Comprehensive environment state logging on app startup
+
 #### API Development
 1. Start backend server on `localhost:8000`
 2. Generate API client: `npm run generate-api`

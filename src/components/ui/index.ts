@@ -7,10 +7,7 @@ export { Toaster } from './toaster';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
 export { Progress } from './progress';
 export { 
-  DynamicBackground, 
-  AIBackground, 
-  ModernBackground, 
-  BackgroundPresets,
+  DynamicBackground,
   type BackgroundType 
 } from './background';
 export {

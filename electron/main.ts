@@ -43,6 +43,13 @@ function createWindow() {
       allowRunningInsecureContent: false, // Disable insecure content
       experimentalFeatures: false
     },
+    // 개발 환경에서만 DevTools 자동 열기
+    show: false, // 창을 먼저 숨김
+  })
+
+  // 창이 준비되면 표시
+  win.once('ready-to-show', () => {
+    win?.show()
   })
 
   // Test active push message to Renderer-process.
@@ -52,12 +59,16 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
-    // Auto-open DevTools in development
-    win.webContents.openDevTools({ mode: 'undocked' })
+    // 개발 환경에서만 DevTools 열기 (에러 로그 줄이기 위해)
+    if (process.env.NODE_ENV === 'development') {
+      win.webContents.openDevTools({ mode: 'undocked' })
+    }
     // If a <webview> is attached, open its DevTools as well
     win.webContents.on('did-attach-webview', (_event, webContents) => {
       try {
-        webContents.openDevTools({ mode: 'detach' })
+        if (process.env.NODE_ENV === 'development') {
+          webContents.openDevTools({ mode: 'detach' })
+        }
       } catch {/* no-op */}
     })
   } else {
@@ -172,6 +183,86 @@ ipcMain.handle('install-update', async () => {
     return { success: true };
   } catch (error) {
     console.error('Error installing update:', error);
+    throw error;
+  }
+});
+
+// API request handler - Handle API requests from renderer process
+ipcMain.handle('api-request', async (event, { method, url, data, headers = {} }) => {
+  try {
+    // 프로덕션 환경에서 안전한 API 베이스 URL 설정
+    const baseUrl = process.env.NODE_ENV === 'development' 
+      ? (process.env.VITE_API_BASE_URL || 'https://test.api.flowsonat.com')
+      : 'https://api.flowsonat.com';
+    
+    // URL 정리 및 검증
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    const cleanUrl = url.replace(/^\//, '');
+    const fullUrl = `${cleanBaseUrl}/${cleanUrl}`;
+    
+    // URL 검증 - 절대 URL이 아니면 에러
+    if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+      console.error('🚨 CRITICAL: Generated URL is not absolute!', {
+        baseUrl: cleanBaseUrl,
+        url: url,
+        fullUrl: fullUrl,
+        willCauseFileProtocolIssue: true
+      });
+      throw new Error(`Generated URL is not absolute: ${fullUrl}. This will cause file:// protocol issues.`);
+    }
+    
+    const requestOptions: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+    };
+
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      requestOptions.body = JSON.stringify(data);
+    }
+
+    console.log(`[API Request] ${method} ${fullUrl}`, {
+      data: data ? { data } : '',
+      headers: headers,
+      timestamp: new Date().toISOString()
+    });
+    
+    const response = await fetch(fullUrl, requestOptions);
+    
+    const responseData = await response.text();
+    let parsedData;
+    
+    try {
+      parsedData = JSON.parse(responseData);
+    } catch {
+      parsedData = responseData;
+    }
+
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      (error as any).status = response.status;
+      (error as any).data = parsedData;
+      throw error;
+    }
+
+    console.log(`[API Response] ${method} ${fullUrl}`, {
+      status: response.status,
+      data: parsedData,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      data: parsedData,
+      status: response.status,
+      statusText: response.statusText
+    };
+  } catch (error) {
+    console.error(`[API Error] ${method} ${url}:`, {
+      error: error,
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
 });
