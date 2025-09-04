@@ -30,3 +30,30 @@ contextBridge.exposeInMainWorld('IG', {
     ipcRenderer.on('ig:reload-webview', cb)
   },
 })
+
+// 자동 업데이트 API
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 업데이트 체크
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  
+  // 업데이트 다운로드
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  
+  // 업데이트 설치
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  
+  // 업데이트 상태 변경 이벤트 리스너
+  onUpdateStatus: (callback: (data: any) => void) => {
+    ipcRenderer.on('update-status', (_event, data) => callback(data))
+  },
+  
+  // 업데이트 진행률 이벤트 리스너
+  onUpdateProgress: (callback: (data: any) => void) => {
+    ipcRenderer.on('update-progress', (_event, data) => callback(data))
+  },
+  
+  // 업데이트 가능 알림
+  updateAvailable: (updateResult: any) => {
+    ipcRenderer.send('update-available', updateResult)
+  }
+})

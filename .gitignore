@@ -12,6 +12,8 @@ dist
 dist-ssr
 dist-electron
 *.local
+.env
+.env.deploy
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +27,6 @@ dist-electron
 *.sw?
 
 release/
+version-info.json
+build/certificate.p12
+build/installer_certificate.p12

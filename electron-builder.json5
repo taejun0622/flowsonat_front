@@ -11,22 +11,54 @@
     "dist",
     "dist-electron"
   ],
+  "publish": [
+    {
+      "provider": "generic",
+      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com",
+      "channel": "latest"
+    }
+  ],
   "mac": {
     "target": [
-      "zip"
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
     ],
-    "artifactName": "${productName}-Mac-${version}.${ext}"
+    "artifactName": "${productName}-Mac-${arch}-${version}.${ext}",
+    "icon": "build/icon.png",
+    "category": "public.app-category.productivity",
+    "identity": "milylog Inc. (BJ8U9646U7)",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": {
+      "teamId": "BJ8U9646U7"
+    },
+    "extendInfo": {
+      "NSAppleEventsUsageDescription": "This app needs to control other applications to provide automation features.",
+      "NSCameraUsageDescription": "This app needs access to camera for media features.",
+      "NSMicrophoneUsageDescription": "This app needs access to microphone for audio features."
+    }
   },
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64", "ia32"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64", "ia32"]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "${productName}-Windows-${arch}-${version}.${ext}",
+    "icon": "build/icon.ico"
   },
   "nsis": {
     "oneClick": false,
@@ -36,8 +68,16 @@
   },
   "linux": {
     "target": [
-      "AppImage"
+      {
+        "target": "AppImage",
+        "arch": ["x64", "armv7l", "arm64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64", "armv7l", "arm64"]
+      }
     ],
-    "artifactName": "${productName}-Linux-${version}.${ext}"
+    "artifactName": "${productName}-Linux-${arch}-${version}.${ext}",
+    "icon": "build/icon.png"
   }
 }

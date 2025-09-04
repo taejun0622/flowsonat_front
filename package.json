@@ -1,16 +1,31 @@
 {
   "name": "flowsonat_front",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.12",
   "type": "module",
+  "author": {
+    "name": "FlowSonat Team",
+    "email": "team@flowsonat.com"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build && electron-builder",
+    "build:prod": "VITE_API_BASE_URL=https://api.flowsonat.com npm run typecheck && vite build && electron-builder",
+    "build:all": "npm run typecheck && vite build && electron-builder --mac --win --linux",
+    "build:mac": "npm run typecheck && vite build && electron-builder --mac",
+    "build:mac:signed": "npm run typecheck && vite build && dotenv -e .env.deploy -- electron-builder --mac",
+    "build:mac:env": "npm run typecheck && vite build && dotenv -e .env.deploy -- electron-builder --mac",
+    "build:win": "npm run typecheck && vite build && electron-builder --win",
+    "build:linux": "npm run typecheck && vite build && electron-builder --linux",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "typecheck": "tsc -noEmit",
     "preview": "vite preview",
     "generate-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch",
-    "watch-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch --watch"
+    "watch-api": "openapi --input http://localhost:8000/openapi.json --output src/api --client fetch --watch",
+    "version:patch": "./scripts/version-bump.sh patch",
+    "version:minor": "./scripts/version-bump.sh minor",
+    "version:major": "./scripts/version-bump.sh major",
+    "version:info": "./scripts/generate-version-info.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -25,6 +40,7 @@
     "clsx": "^2.1.1",
     "color4bg.js": "github:winterx/color4bg.js",
     "date-fns": "^4.1.0",
+    "electron-updater": "^6.6.2",
     "lucide-react": "^0.542.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -42,6 +58,7 @@
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.21",
+    "dotenv-cli": "^10.0.0",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",

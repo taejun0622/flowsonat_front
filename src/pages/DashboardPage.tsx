@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
+import { UpdateNotification } from '@/components/UpdateNotification';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useWebView } from '@/hooks/useWebView';
@@ -84,6 +85,9 @@ export const DashboardPage = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Update notification */}
+          <UpdateNotification className="mb-6" />
+          
           <div className="mb-8 flex justify-between items-center">
             <div className="flex items-center space-x-2">
               <Button 
