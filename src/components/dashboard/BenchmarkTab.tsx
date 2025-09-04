@@ -45,6 +45,8 @@ export const BenchmarkTab = () => {
   const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [benchmarkToDelete, setBenchmarkToDelete] = React.useState<string | null>(null);
   const [selectedBenchmark, setSelectedBenchmark] = React.useState<BenchmarkResponse | null>(null);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [formData, setFormData] = React.useState({
@@ -168,18 +170,20 @@ export const BenchmarkTab = () => {
     }
   };
 
-  const handleDeleteBenchmark = async (benchmarkId: string) => {
-    if (!confirm('Are you sure you want to delete this benchmark?')) return;
+  const handleDeleteBenchmark = async () => {
+    if (!benchmarkToDelete) return;
 
     try {
       setLoading(true);
-      await InstagramService.deleteBenchmarkApiV1InstagramBenchmarksBenchmarkIdDelete(benchmarkId);
+      await InstagramService.deleteBenchmarkApiV1InstagramBenchmarksBenchmarkIdDelete(benchmarkToDelete);
       
       toast({
         title: "Success",
         description: "Benchmark deleted successfully",
       });
       
+      setDeleteDialogOpen(false);
+      setBenchmarkToDelete(null);
       loadBenchmarks();
     } catch (error) {
       console.error('Failed to delete benchmark:', error);
@@ -191,6 +195,11 @@ export const BenchmarkTab = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openDeleteDialog = (benchmarkId: string) => {
+    setBenchmarkToDelete(benchmarkId);
+    setDeleteDialogOpen(true);
   };
 
   const handleDeleteSuggestion = async (suggestionId: string) => {
@@ -555,7 +564,7 @@ export const BenchmarkTab = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDeleteBenchmark(benchmark.id)}
+                            onClick={() => openDeleteDialog(benchmark.id)}
                             className="border-red-500/20 text-red-400 hover:bg-red-500/10"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -626,6 +635,36 @@ export const BenchmarkTab = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete Benchmark</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Are you sure you want to delete this benchmark? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setBenchmarkToDelete(null);
+              }}
+              className="border-black/30 text-white hover:bg-black/20"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteBenchmark}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
