@@ -20,12 +20,18 @@ import { useBilling } from '@/hooks/useBilling';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { STRIPE_CONFIG } from '@/constants/subscription';
+import { useComponentAnalytics, useButtonAnalytics, useSubscriptionAnalytics } from '@/hooks/useAnalyticsTracking';
 
 export const BillingTab = () => {
   const { billingInfo, isLoading, isLoadingSubscription, cancelSubscription, reactivateSubscription, updatePaymentMethod } = useBilling();
   const { user } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = React.useState(false);
   const [showReactivateDialog, setShowReactivateDialog] = React.useState(false);
+
+  // Analytics hooks
+  useComponentAnalytics('BillingTab');
+  const createButtonTracker = useButtonAnalytics();
+  const { trackSubscriptionEvent, trackPlanView } = useSubscriptionAnalytics();
 
   const subscription = billingInfo?.subscription;
   const paymentMethod = billingInfo?.payment_method;

@@ -7,6 +7,9 @@ import './index.css'
 import { envDebugger, logEnvironmentDebug, validateEnvironment } from './utils/envDebugger'
 import { initializeProductionValidation } from './utils/productionValidator'
 
+// Initialize analytics
+import { analytics } from './services/analytics'
+
 // Log environment configuration at startup
 logEnvironmentDebug()
 
@@ -26,6 +29,13 @@ try {
   // Don't block the app, just warn
 }
 
+// Initialize analytics and track app start
+analytics.initialize().then(() => {
+  analytics.trackAppStart()
+}).catch(error => {
+  console.error('Failed to initialize analytics:', error)
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
@@ -35,4 +45,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 // Use contextBridge if available
 window.ipcRenderer?.on('main-process-message', (_event: any, message: any) => {
   console.log(message)
+})
+
+// Track app close when window is about to unload
+window.addEventListener('beforeunload', () => {
+  analytics.trackAppClose()
 })

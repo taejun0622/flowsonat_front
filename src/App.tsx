@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { InstagramProvider } from '@/contexts/InstagramContext';
+import { AnalyticsProvider } from '@/contexts/AnalyticsContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Toaster } from '@/components/ui/toaster';
 import { DynamicBackground } from '@/components/ui/background';
@@ -26,6 +27,7 @@ function App() {
     <AuthProvider>
       <InstagramProvider>
         <Router>
+          <AnalyticsProvider>
           <DynamicBackground
             type="blur-dot"
             colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
@@ -79,6 +81,7 @@ function App() {
               <Toaster />
             </div>
           </DynamicBackground>
+          </AnalyticsProvider>
         </Router>
       </InstagramProvider>
     </AuthProvider>
