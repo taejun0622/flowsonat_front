@@ -104,4 +104,8 @@ log_info "Updating version information..."
 
 
 log_success "Deployment completed successfully!"
-log_info "App downloads: https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/"
+if [ -n "$CLOUDFRONT_DOMAIN" ]; then
+    log_info "App downloads: https://$CLOUDFRONT_DOMAIN/"
+else
+    log_info "App downloads: https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com/"
+fi

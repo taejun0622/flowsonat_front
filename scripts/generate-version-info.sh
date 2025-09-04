@@ -18,6 +18,11 @@ log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
+# .env.deploy 파일이 있으면 로드
+if [ -f ".env.deploy" ]; then
+    export $(cat .env.deploy | grep -v '^#' | xargs)
+fi
+
 # 현재 버전 정보 가져오기
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 PRODUCT_NAME=$(node -p "require('./package.json').productName || 'FlowSonat'")
@@ -39,13 +44,21 @@ generate_platform_info() {
     
     local filename="${PRODUCT_NAME}-${platform}-${arch}-${CURRENT_VERSION}.${extension}"
     
+    # Use CloudFront domain if available, otherwise fall back to S3 URL
+    local base_url
+    if [ -n "$CLOUDFRONT_DOMAIN" ]; then
+        base_url="https://$CLOUDFRONT_DOMAIN"
+    else
+        base_url="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com"
+    fi
+    
     cat << EOF
     {
       "platform": "$platform",
       "arch": "$arch",
       "version": "$CURRENT_VERSION",
       "filename": "$filename",
-      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com/$CURRENT_VERSION/$filename",
+      "url": "$base_url/$CURRENT_VERSION/$filename",
       "size": 0,
       "checksum": "",
       "buildTime": "$BUILD_TIME"
