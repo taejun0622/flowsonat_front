@@ -180,7 +180,7 @@ ipcMain.handle('install-update', async () => {
 ipcMain.handle('api-request', async (event, { method, url, data, headers = {} }) => {
   try {
     const baseUrl = process.env.NODE_ENV === 'development' 
-      ? 'https://test.api.flowsonat.com' 
+      ? (process.env.VITE_API_BASE_URL || 'https://test.api.flowsonat.com')
       : 'https://api.flowsonat.com';
     
     const fullUrl = `${baseUrl}${url}`;

@@ -36,6 +36,23 @@ log_error() {
 if [ -f ".env.deploy" ]; then
     log_info "Loading deployment environment variables..."
     export $(cat .env.deploy | grep -v '^#' | xargs)
+    
+    # 로드된 환경 변수 디버그 출력
+    log_info "Loaded environment variables from .env.deploy:"
+    echo "========================"
+    while IFS= read -r line; do
+        if [[ $line =~ ^[^#].+=.+ ]]; then
+            var_name=$(echo $line | cut -d'=' -f1)
+            if [[ $var_name == *"KEY"* ]] || [[ $var_name == *"SECRET"* ]] || [[ $var_name == *"PASSWORD"* ]]; then
+                echo "  $var_name=[REDACTED]"
+            else
+                echo "  $line"
+            fi
+        fi
+    done < .env.deploy
+    echo "========================"
+else
+    log_warning ".env.deploy file not found - some environment variables may not be set"
 fi
 
 # 환경 변수 확인
@@ -56,6 +73,45 @@ fi
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 log_info "Building and deploying FlowSonat app v$CURRENT_VERSION using AWS credentials"
 log_info "Target platform: $PLATFORM"
+
+# 현재 활성화된 모든 환경 변수 검증
+log_info "Environment Variables Validation:"
+echo "================================"
+echo "🔍 Build Environment:"
+echo "  NODE_ENV: ${NODE_ENV:-'not set'}"
+echo "  CURRENT_VERSION: $CURRENT_VERSION"
+echo "  PWD: $PWD"
+
+echo ""
+echo "🔍 AWS Configuration:"
+echo "  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:+[SET]} ${AWS_ACCESS_KEY_ID:-[NOT SET]}"
+echo "  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:+[SET]} ${AWS_SECRET_ACCESS_KEY:-[NOT SET]}"
+echo "  S3_BUCKET_NAME: ${S3_BUCKET_NAME:-[NOT SET]}"
+echo "  AWS_REGION: ${AWS_REGION:-[NOT SET]}"
+echo "  CLOUDFRONT_DOMAIN: ${CLOUDFRONT_DOMAIN:-[NOT SET]}"
+
+echo ""
+echo "🔍 Application Environment (will be embedded in build):"
+# Check for .env files and their contents
+for env_file in ".env.production" ".env.local" ".env"; do
+    if [ -f "$env_file" ]; then
+        echo "  📄 Found: $env_file"
+        while IFS= read -r line; do
+            if [[ $line =~ ^VITE_.+=.+ ]] && [[ ! $line =~ ^# ]]; then
+                var_name=$(echo $line | cut -d'=' -f1)
+                var_value=$(echo $line | cut -d'=' -f2-)
+                if [[ $var_name == *"KEY"* ]] || [[ $var_name == *"SECRET"* ]]; then
+                    echo "    $var_name=[REDACTED]"
+                else
+                    echo "    $var_name=$var_value"
+                fi
+            fi
+        done < "$env_file"
+    else
+        echo "  📄 Missing: $env_file"
+    fi
+done
+echo "================================"
 
 # 플랫폼별 Electron 빌드
 case $PLATFORM in
@@ -81,6 +137,21 @@ case $PLATFORM in
         exit 1
         ;;
 esac
+
+# 빌드 후 환경 변수 검증
+log_info "Verifying environment variables in build..."
+if node scripts/verify-build-env.js; then
+    log_success "Build environment verification passed"
+else
+    log_error "Build environment verification failed"
+    log_error "Build may have incorrect environment variables embedded"
+    read -p "Continue with deployment anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_error "Deployment aborted due to environment verification failure"
+        exit 1
+    fi
+fi
 
        # Electron 앱 빌드 파일 업로드 (필요한 파일만)
        log_info "Uploading Electron app builds to S3..."
