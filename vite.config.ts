@@ -70,8 +70,7 @@ export default defineConfig(({ mode }) => {
       '/api': {
         target: 'https://test.api.flowsonat.com',
         changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api')
+        secure: true
       }
     }
   }

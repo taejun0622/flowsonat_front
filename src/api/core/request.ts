@@ -209,6 +209,7 @@ export const sendRequest = async (
                       typeof window.electronAPI.apiRequest === 'function';
     
     
+    
     if (isElectron) {
         // Electron 환경: Main Process를 통해 요청
         const controller = new AbortController();
@@ -275,8 +276,12 @@ export const sendRequest = async (
             } as Response;
         }
     } else {
-        // 웹 환경: 기존 fetch 사용
+        // 웹 환경: 프록시를 통해 요청
         const controller = new AbortController();
+        
+        // URL을 프록시 URL로 변경
+        const proxyUrl = url.replace(config.BASE, '');
+        
 
         const request: RequestInit = {
             headers,
@@ -291,7 +296,7 @@ export const sendRequest = async (
 
         onCancel(() => controller.abort());
 
-        return await fetch(url, request);
+        return await fetch(proxyUrl, request);
     }
 };
 
