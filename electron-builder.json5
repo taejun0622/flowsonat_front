@@ -14,7 +14,7 @@
   "publish": [
     {
       "provider": "generic",
-      "url": "https://flowsonat-release.s3.us-east-1.amazonaws.com",
+      "url": "https://d3hlgb8urc94dl.cloudfront.net",
       "channel": "latest"
     }
   ],

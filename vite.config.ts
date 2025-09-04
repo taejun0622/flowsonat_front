@@ -60,5 +60,9 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.1'),
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
+      process.env.VITE_API_BASE_URL || 
+      (process.env.NODE_ENV === 'production' ? 'https://api.flowsonat.com' : 'http://localhost:8000')
+    ),
   },
 })
