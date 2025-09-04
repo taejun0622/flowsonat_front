@@ -67,12 +67,13 @@ export class BillingService {
    */
   static async createPaymentLink(priceId?: string): Promise<string> {
     try {
-      // Debug environment variables
-      console.log('=== Environment Variables Debug ===');
-      console.log('import.meta.env.VITE_STRIPE_PRICE_ID:', import.meta.env.VITE_STRIPE_PRICE_ID);
-      console.log('import.meta.env.PROD:', import.meta.env.PROD);
-      console.log('STRIPE_CONFIG.priceId:', STRIPE_CONFIG.priceId);
-      console.log('Provided priceId:', priceId);
+      // Debug environment variables (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== Environment Variables Debug ===');
+        console.log('STRIPE_CONFIG.priceId:', STRIPE_CONFIG.priceId);
+        console.log('Provided priceId:', priceId);
+        console.log('=== End Environment Variables Debug ===');
+      }
       
       // Use STRIPE_CONFIG for consistent price ID handling
       const actualPriceId = priceId || STRIPE_CONFIG.priceId;

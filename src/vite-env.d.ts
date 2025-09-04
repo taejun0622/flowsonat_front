@@ -3,7 +3,12 @@
 interface ImportMetaEnv {
   readonly VITE_APP_VERSION: string
   readonly VITE_API_BASE_URL: string
-  // more env variables...
+  readonly VITE_STRIPE_PRICE_ID?: string
+  readonly VITE_STRIPE_PUBLISHABLE_KEY?: string
+  readonly VITE_STRIPE_PRODUCT_ID?: string
+  readonly PROD: boolean
+  readonly DEV: boolean
+  readonly MODE: string
 }
 
 interface ImportMeta {
@@ -20,6 +25,7 @@ declare global {
       onUpdateStatus: (callback: (data: any) => void) => void
       onUpdateProgress: (callback: (data: any) => void) => void
       updateAvailable: (updateResult: any) => void
+      apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => Promise<any>
     }
     ipcRenderer: {
       on(channel: string, func: (...args: any[]) => void): void

@@ -1,4 +1,5 @@
 import { UpdateInfo, UpdateCheckResult, UpdateProgress } from '@/types/update';
+import { getAppVersion } from '@/config/env';
 
 const VERSION_CHECK_URL = 'https://d3hlgb8urc94dl.cloudfront.net/version-info.json';
 const VERSION_CHECK_INTERVAL = 1000 * 60 * 60; // 1시간마다 체크
@@ -10,7 +11,7 @@ class UpdateService {
 
   constructor() {
     // package.json에서 현재 버전 가져오기
-    this.currentVersion = import.meta.env.VITE_APP_VERSION || '0.0.1';
+    this.currentVersion = getAppVersion();
   }
 
   /**

@@ -55,5 +55,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 업데이트 가능 알림
   updateAvailable: (updateResult: any) => {
     ipcRenderer.send('update-available', updateResult)
-  }
+  },
+  
+  // API 요청 (Main Process를 통해)
+  apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => 
+    ipcRenderer.invoke('api-request', { method, url, data, headers })
 })

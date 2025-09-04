@@ -1,19 +1,20 @@
-// Environment-based Stripe configuration
-const isProduction = import.meta.env.PROD;
+import { isProduction, getStripePriceId, getStripePublishableKey, getStripeProductId } from '@/config/env';
 
 // Production Stripe Price ID
 const PRODUCTION_PRICE_ID = 'price_1S0mZgCVaHm33FAQxI3ZvEeD';
 
 // Use environment variable for price ID, fallback to production ID
 const getPriceId = () => {
-  const envPriceId = import.meta.env.VITE_STRIPE_PRICE_ID;
+  const envPriceId = getStripePriceId();
   const finalPriceId = envPriceId || PRODUCTION_PRICE_ID;
   
-  console.log('=== getPriceId Debug ===');
-  console.log('import.meta.env.VITE_STRIPE_PRICE_ID:', envPriceId);
-  console.log('PRODUCTION_PRICE_ID:', PRODUCTION_PRICE_ID);
-  console.log('Final price ID:', finalPriceId);
-  console.log('=== End getPriceId Debug ===');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('=== getPriceId Debug ===');
+    console.log('Environment price ID:', envPriceId);
+    console.log('Production price ID:', PRODUCTION_PRICE_ID);
+    console.log('Final price ID:', finalPriceId);
+    console.log('=== End getPriceId Debug ===');
+  }
   
   return finalPriceId;
 };
@@ -64,12 +65,12 @@ export const SUBSCRIPTION_PLANS = {
 
 // Stripe configuration
 export const STRIPE_CONFIG = {
-  publishableKey: isProduction 
+  publishableKey: isProduction() 
     ? 'pk_live_51RlCpUCVaHm33FAQpKX90Lxi8sckvUrH9NJ5WrhNbJhaokWKhxzinPKd9F38BHNimiu73a3m8DoIxL1vkpJutI9S008TfcCJea'
-    : import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_your_test_key_here',
-  productId: isProduction 
+    : getStripePublishableKey() || 'pk_test_your_test_key_here',
+  productId: isProduction() 
     ? 'prod_SwfvVCI3rprIQK'
-    : import.meta.env.VITE_STRIPE_PRODUCT_ID || 'prod_test_your_test_product_id',
+    : getStripeProductId() || 'prod_test_your_test_product_id',
   priceId: getPriceId(),
 } as const;
 
