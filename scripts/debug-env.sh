@@ -37,7 +37,7 @@ echo ""
 
 # .env 파일들 존재 확인
 echo -e "${YELLOW}📄 Environment Files Status:${NC}"
-env_files=(".env" ".env.local" ".env.$MODE" ".env.$MODE.local" ".env.production" ".env.deploy")
+env_files=(".env" ".env.local" ".env.$MODE" ".env.$MODE.local" ".env.deploy" ".env.production")
 for file in "${env_files[@]}"; do
     if [ -f "$file" ]; then
         echo -e "  ✅ $file ($(wc -l < "$file") lines)"

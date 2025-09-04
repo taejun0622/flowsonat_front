@@ -93,7 +93,7 @@ echo "  CLOUDFRONT_DOMAIN: ${CLOUDFRONT_DOMAIN:-[NOT SET]}"
 echo ""
 echo "🔍 Application Environment (will be embedded in build):"
 # Check for .env files and their contents
-for env_file in ".env.production" ".env.local" ".env"; do
+for env_file in ".env.deploy" ".env.production" ".env.local" ".env"; do
     if [ -f "$env_file" ]; then
         echo "  📄 Found: $env_file"
         while IFS= read -r line; do
