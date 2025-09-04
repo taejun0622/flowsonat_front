@@ -33,8 +33,8 @@ export class ElectronApiService {
    */
   private isElectron(): boolean {
     return typeof window !== 'undefined' && 
-           window.electronAPI && 
-           typeof window.electronAPI.apiRequest === 'function';
+           !!window.electronAPI && 
+           typeof (window.electronAPI as any)?.apiRequest === 'function';
   }
 
   /**
@@ -59,7 +59,7 @@ export class ElectronApiService {
       
       console.log(`[Electron API] ${method} ${url}`, data ? { data } : '');
       
-      const response = await window.electronAPI.apiRequest(method, url, data, headers);
+      const response = await (window.electronAPI as any)?.apiRequest(method, url, data, headers);
       
       console.log(`[Electron API Response] ${method} ${url}`, response);
       

@@ -206,7 +206,7 @@ export const sendRequest = async (
     // Electron 환경인지 확인
     const isElectron = typeof window !== 'undefined' && 
                       window.electronAPI && 
-                      typeof window.electronAPI.apiRequest === 'function';
+                      typeof (window.electronAPI as any)?.apiRequest === 'function';
     
     
     
@@ -249,7 +249,8 @@ export const sendRequest = async (
                 url: url,
                 type: 'basic' as ResponseType,
                 redirected: false,
-                signal: controller.signal
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
             } as Response;
         } catch (error: any) {
             // 에러를 Response 형태로 변환
@@ -272,7 +273,8 @@ export const sendRequest = async (
                 url: url,
                 type: 'basic' as ResponseType,
                 redirected: false,
-                signal: controller.signal
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
             } as Response;
         }
     } else {

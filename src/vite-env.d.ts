@@ -18,7 +18,7 @@ interface ImportMeta {
 // Electron API 타입 정의
 declare global {
   interface Window {
-    electronAPI: {
+    electronAPI?: {
       checkForUpdates: () => Promise<any>
       downloadUpdate: () => Promise<any>
       installUpdate: () => Promise<any>
@@ -27,13 +27,13 @@ declare global {
       updateAvailable: (updateResult: any) => void
       apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => Promise<any>
     }
-    ipcRenderer: {
+    ipcRenderer?: {
       on(channel: string, func: (...args: any[]) => void): void
       off(channel: string, func: (...args: any[]) => void): void
       send(channel: string, ...args: any[]): void
       invoke(channel: string, ...args: any[]): Promise<any>
     }
-    IG: {
+    IG?: {
       clearSession: () => Promise<void>
       disconnectAndReload: () => Promise<void>
       onReloadRequest: (cb: () => void) => void
