@@ -2,7 +2,7 @@
 
 # FlowSonat 완전 배포 스크립트
 # 버전 증가 -> 빌드 -> S3 업로드 -> 버전 정보 생성/업로드 -> CloudFront 캐시 무효화
-# 사용법: ./scripts/deploy-all.sh [patch|minor|major] [platform]
+# 사용법: ./scripts/deploy-all.sh [patch|minor|major] [platform] [--min-supported VERSION]
 
 set -e
 
@@ -33,11 +33,44 @@ log_error() {
 # 파라미터 설정
 VERSION_TYPE=${1:-patch}
 PLATFORM=${2:-all}
+MIN_SUPPORTED_VERSION=""
+
+# 매개변수 파싱
+shift 2 2>/dev/null || true  # 첫 두 매개변수 제거
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --min-supported)
+            MIN_SUPPORTED_VERSION="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [patch|minor|major] [platform] [--min-supported VERSION]"
+            echo ""
+            echo "Arguments:"
+            echo "  VERSION_TYPE           Version bump type: patch, minor, or major (default: patch)"
+            echo "  PLATFORM              Platform to build: mac, win, linux, or all (default: all)"
+            echo ""
+            echo "Options:"
+            echo "  --min-supported VERSION  Set minimum supported version (e.g., 0.0.15)"
+            echo "  --help, -h              Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0 patch all                                    # Patch version, all platforms, use new version as min supported"
+            echo "  $0 minor mac --min-supported 0.0.15            # Minor version, Mac only, specific min supported"
+            exit 0
+            ;;
+        *)
+            log_error "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 # 유효한 버전 타입인지 확인
 if [[ ! "$VERSION_TYPE" =~ ^(patch|minor|major)$ ]]; then
     log_error "Invalid version type. Use: patch, minor, or major"
-    echo "Usage: ./scripts/deploy-all.sh [patch|minor|major] [platform]"
+    echo "Usage: ./scripts/deploy-all.sh [patch|minor|major] [platform] [--min-supported VERSION]"
     exit 1
 fi
 
@@ -134,74 +167,15 @@ fi
 # 4. 버전 정보 생성 및 업로드
 log_info "Step 4: Generating and uploading version info..."
 
-# 버전 정보 가져오기
-CURRENT_VERSION=$(node -p "require('./package.json').version")
-PRODUCT_NAME=$(node -p "require('./package.json').productName || 'FlowSonat'")
-BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+# 버전 정보 생성 및 업로드
+log_info "Generating version info..."
 
-# 플랫폼별 빌드 정보 생성
-generate_platform_info() {
-    local platform=$1
-    local arch=$2
-    local extension=$3
-    
-    local filename="${PRODUCT_NAME}-${platform}-${arch}-${CURRENT_VERSION}.${extension}"
-    
-    # Use CloudFront domain if available, otherwise fall back to S3 URL
-    local base_url
-    if [ -n "$CLOUDFRONT_DOMAIN" ]; then
-        base_url="https://$CLOUDFRONT_DOMAIN"
-    else
-        base_url="https://$S3_BUCKET_NAME.s3.$AWS_REGION.amazonaws.com"
-    fi
-    
-    cat << EOF
-    {
-      "platform": "$platform",
-      "arch": "$arch",
-      "version": "$CURRENT_VERSION",
-      "filename": "$filename",
-      "url": "$base_url/$CURRENT_VERSION/$filename",
-      "size": 0,
-      "checksum": "",
-      "buildTime": "$BUILD_TIME"
-    }
-EOF
-}
-
-# 메인 버전 정보 JSON 생성
-cat > version-info.json << EOF
-{
-  "productName": "$PRODUCT_NAME",
-  "currentVersion": "$CURRENT_VERSION", 
-  "buildTime": "$BUILD_TIME",
-  "gitCommit": "$GIT_COMMIT",
-  "gitBranch": "$GIT_BRANCH",
-  "downloads": [
-$(generate_platform_info "Mac" "x64" "zip"),
-$(generate_platform_info "Mac" "arm64" "zip"),
-$(generate_platform_info "Mac" "x64" "dmg"),
-$(generate_platform_info "Mac" "arm64" "dmg"),
-$(generate_platform_info "Windows" "x64" "exe"),
-$(generate_platform_info "Windows" "ia32" "exe"),
-$(generate_platform_info "Linux" "x64" "deb"),
-$(generate_platform_info "Linux" "arm64" "deb")
-  ],
-  "updateNotes": "Bug fixes and improvements",
-  "minSupportedVersion": "0.1.0",
-  "forceUpdate": false
-}
-EOF
-
-log_success "Version info generated: version-info.json"
-
-# S3에 버전 정보 업로드
-aws s3 cp version-info.json s3://$S3_BUCKET_NAME/version-info.json \
-    --cache-control "no-cache,no-store,must-revalidate"
-
-log_success "Version info uploaded to S3"
+# generate-version-info.sh 스크립트 호출
+if [ -n "$MIN_SUPPORTED_VERSION" ]; then
+    ./scripts/generate-version-info.sh --min-supported "$MIN_SUPPORTED_VERSION"
+else
+    ./scripts/generate-version-info.sh
+fi
 
 # 5. CloudFront 캐시 무효화
 if [ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
