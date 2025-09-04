@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useWebView } from '@/hooks/useWebView';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
+import { useComponentAnalytics, useButtonAnalytics, useInstagramAnalytics } from '@/hooks/useAnalyticsTracking';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
@@ -18,6 +19,11 @@ export const DashboardPage = () => {
   const navigate = useNavigate();
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
+
+  // Analytics hooks
+  useComponentAnalytics('DashboardPage');
+  const createButtonTracker = useButtonAnalytics();
+  const { trackAccountConnect, trackAutomationStart, trackAutomationComplete } = useInstagramAnalytics();
 
   // Check Instagram connection status when entering dashboard and handle auto-navigation
   React.useEffect(() => {

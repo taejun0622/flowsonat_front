@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, webContents, session, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'path'
 import { autoUpdater } from 'electron-updater'
+import { ga4Service } from './ga-service'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -154,6 +155,8 @@ autoUpdater.on('error', (err) => {
     status: 'error', 
     message: `Update error: ${err.message}` 
   });
+  // GA4 에러 추적
+  ga4Service.trackError(`AutoUpdater: ${err.message}`, false).catch(console.error)
 });
 
 // IPC handlers - Handle update requests from renderer process
@@ -186,6 +189,47 @@ ipcMain.handle('install-update', async () => {
     throw error;
   }
 });
+
+// GA4 Analytics handlers
+ipcMain.handle('ga4:track-event', async (event, { name, params = {} }) => {
+  try {
+    await ga4Service.trackEvent(name, params)
+    return { success: true }
+  } catch (error) {
+    console.error('GA4 track event error:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('ga4:track-screen', async (event, { screenName, screenClass }) => {
+  try {
+    await ga4Service.trackScreenView(screenName, screenClass)
+    return { success: true }
+  } catch (error) {
+    console.error('GA4 track screen error:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('ga4:track-error', async (event, { error, fatal = false }) => {
+  try {
+    await ga4Service.trackError(error, fatal)
+    return { success: true }
+  } catch (error) {
+    console.error('GA4 track error failed:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('ga4:track-user-action', async (event, { action, category, label, value }) => {
+  try {
+    await ga4Service.trackUserAction(action, category, label, value)
+    return { success: true }
+  } catch (error) {
+    console.error('GA4 track user action error:', error)
+    throw error
+  }
+})
 
 // API request handler - Handle API requests from renderer process
 ipcMain.handle('api-request', async (event, { method, url, data, headers = {} }) => {
@@ -297,7 +341,44 @@ if (process.platform === 'win32') {
   }
 }
 
+// Global error handlers for main process
+process.on('uncaughtException', async (error) => {
+  console.error('Uncaught Exception in main process:', error)
+  try {
+    await ga4Service.trackError(error, true)
+  } catch (trackError) {
+    console.error('Failed to track uncaught exception:', trackError)
+  }
+  // 치명적 에러이므로 앱을 종료해야 할 수도 있음
+  // process.exit(1)
+})
+
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('Unhandled Rejection in main process:', reason, 'from', promise)
+  try {
+    const errorMessage = typeof reason === 'string' ? reason : 
+                        reason instanceof Error ? reason.message : 
+                        String(reason)
+    await ga4Service.trackError(`Unhandled Rejection: ${errorMessage}`, false)
+  } catch (trackError) {
+    console.error('Failed to track unhandled rejection:', trackError)
+  }
+})
+
 app.whenReady().then(() => {
+  // GA4 서비스 초기화
+  const measurementId = process.env.VITE_GA4_MEASUREMENT_ID
+  const apiSecret = process.env.VITE_GA4_API_SECRET
+  const isDev = process.env.NODE_ENV === 'development'
+  
+  if (measurementId && apiSecret) {
+    ga4Service.initialize(measurementId, apiSecret, isDev)
+    // 앱 시작 이벤트 추적
+    ga4Service.trackAppStart().catch(console.error)
+  } else {
+    console.warn('GA4 environment variables not found')
+  }
+
   // CORS 헤더 설정
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({

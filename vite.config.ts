@@ -100,6 +100,13 @@ export default defineConfig(({ mode }) => {
         target: env.VITE_API_BASE_URL || 'https://test.api.flowsonat.com',
         changeOrigin: true,
         secure: true
+      },
+      // GA4 Measurement Protocol proxy for development
+      '/ga4-mp': {
+        target: 'https://www.google-analytics.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/ga4-mp/, '')
       }
     }
   }
