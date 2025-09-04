@@ -43,6 +43,13 @@ function createWindow() {
       allowRunningInsecureContent: false, // Disable insecure content
       experimentalFeatures: false
     },
+    // 개발 환경에서만 DevTools 자동 열기
+    show: false, // 창을 먼저 숨김
+  })
+
+  // 창이 준비되면 표시
+  win.once('ready-to-show', () => {
+    win?.show()
   })
 
   // Test active push message to Renderer-process.
@@ -52,12 +59,16 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
-    // Auto-open DevTools in development
-    win.webContents.openDevTools({ mode: 'undocked' })
+    // 개발 환경에서만 DevTools 열기 (에러 로그 줄이기 위해)
+    if (process.env.NODE_ENV === 'development') {
+      win.webContents.openDevTools({ mode: 'undocked' })
+    }
     // If a <webview> is attached, open its DevTools as well
     win.webContents.on('did-attach-webview', (_event, webContents) => {
       try {
-        webContents.openDevTools({ mode: 'detach' })
+        if (process.env.NODE_ENV === 'development') {
+          webContents.openDevTools({ mode: 'detach' })
+        }
       } catch {/* no-op */}
     })
   } else {

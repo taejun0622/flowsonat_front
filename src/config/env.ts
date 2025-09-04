@@ -191,5 +191,8 @@ export const forceLogEnv = () => {
 // Initialize environment tracking
 trackEnvChanges();
 
-// Log configuration (always log, not just in development for deployment debugging)
-logEnvConfig();
+// Log configuration (only once per session)
+if (!(window as any).__envConfigLogged) {
+  logEnvConfig();
+  (window as any).__envConfigLogged = true;
+}
