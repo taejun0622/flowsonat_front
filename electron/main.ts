@@ -176,6 +176,55 @@ ipcMain.handle('install-update', async () => {
   }
 });
 
+// API request handler - Handle API requests from renderer process
+ipcMain.handle('api-request', async (event, { method, url, data, headers = {} }) => {
+  try {
+    const baseUrl = process.env.NODE_ENV === 'development' 
+      ? 'https://test.api.flowsonat.com' 
+      : 'https://api.flowsonat.com';
+    
+    const fullUrl = `${baseUrl}${url}`;
+    
+    const requestOptions: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+    };
+
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      requestOptions.body = JSON.stringify(data);
+    }
+
+    console.log(`[API Request] ${method} ${fullUrl}`, data ? { data } : '');
+    
+    const response = await fetch(fullUrl, requestOptions);
+    
+    const responseData = await response.text();
+    let parsedData;
+    
+    try {
+      parsedData = JSON.parse(responseData);
+    } catch {
+      parsedData = responseData;
+    }
+
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      (error as any).status = response.status;
+      (error as any).data = parsedData;
+      throw error;
+    }
+
+    console.log(`[API Response] ${method} ${fullUrl}`, parsedData);
+    return parsedData;
+  } catch (error) {
+    console.error(`[API Error] ${method} ${url}:`, error);
+    throw error;
+  }
+});
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

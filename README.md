@@ -88,12 +88,38 @@ electron/
 
 ## 환경 변수
 
-`.env` 파일에 다음 변수들을 설정할 수 있습니다:
+환경별로 다른 `.env` 파일을 사용합니다:
 
+### 개발 환경 (`.env.local`)
 ```env
-VITE_API_BASE_URL=https://api.flowsonat.com
-VITE_APP_VERSION=0.0.1
+# Development Environment (uses test.api.flowsonat.com via proxy)
+VITE_API_BASE_URL=http://localhost:5174
+
+# Stripe Configuration (Development/Test)
+VITE_STRIPE_PRICE_ID=price_test_your_test_price_id_here
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your_test_key_here
+VITE_STRIPE_PRODUCT_ID=prod_test_your_test_product_id_here
 ```
+
+### 프로덕션 환경 (`.env.production`)
+```env
+# Production Environment
+VITE_API_BASE_URL=https://api.flowsonat.com
+
+```
+
+### 환경 변수 설명
+
+- `VITE_APP_VERSION`: 앱 버전 (package.json에서 자동 설정, 수동 설정 불필요)
+- `VITE_API_BASE_URL`: API 서버 URL (필수)
+- `VITE_STRIPE_PRICE_ID`: Stripe 가격 ID
+- `VITE_STRIPE_PUBLISHABLE_KEY`: Stripe 공개 키
+- `VITE_STRIPE_PRODUCT_ID`: Stripe 제품 ID
+
+### 환경별 실행
+
+- **개발**: `npm run dev` → `.env.local` 사용 (프록시로 test.api.flowsonat.com)
+- **프로덕션 빌드**: `npm run build` → `.env.production` 사용 (api.flowsonat.com)
 
 ## 배포
 

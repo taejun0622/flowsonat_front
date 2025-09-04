@@ -1,11 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import { resolve } from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load environment variables based on mode
+  const env = loadEnv(mode, process.cwd(), '')
+  
+  return {
   plugins: [
     react(),
     electron([
@@ -60,9 +64,15 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.1'),
-    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
-      process.env.VITE_API_BASE_URL || 
-      (process.env.NODE_ENV === 'production' ? 'https://api.flowsonat.com' : 'http://localhost:8000')
-    ),
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://test.api.flowsonat.com',
+        changeOrigin: true,
+        secure: true
+      }
+    }
+  }
+  }
 })

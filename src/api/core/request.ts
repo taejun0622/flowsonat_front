@@ -9,6 +9,7 @@ import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
 import { apiInterceptor } from './apiInterceptor';
+import { electronApiService } from '@/services/electronApiService';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -202,22 +203,103 @@ export const sendRequest = async (
     headers: Headers,
     onCancel: OnCancel
 ): Promise<Response> => {
-    const controller = new AbortController();
+    // Electron 환경인지 확인
+    const isElectron = typeof window !== 'undefined' && 
+                      window.electronAPI && 
+                      typeof (window.electronAPI as any)?.apiRequest === 'function';
+    
+    
+    
+    if (isElectron) {
+        // Electron 환경: Main Process를 통해 요청
+        const controller = new AbortController();
+        onCancel(() => controller.abort());
 
-    const request: RequestInit = {
-        headers,
-        body: body ?? formData,
-        method: options.method,
-        signal: controller.signal,
-    };
+        try {
+            // URL에서 base URL 제거 (Electron API 서비스에서 자동으로 추가됨)
+            const apiUrl = url.replace(config.BASE, '');
+            
+            // Headers를 일반 객체로 변환
+            const headersObj: Record<string, string> = {};
+            headers.forEach((value, key) => {
+                headersObj[key] = value;
+            });
 
-    if (config.WITH_CREDENTIALS) {
-        request.credentials = config.CREDENTIALS;
+            const response = await electronApiService.request({
+                method: options.method as any,
+                url: apiUrl,
+                data: body,
+                headers: headersObj
+            });
+
+            // Response 객체와 유사한 구조로 변환
+            return {
+                ok: response.status >= 200 && response.status < 300,
+                status: response.status,
+                statusText: response.statusText,
+                headers: new Headers(),
+                json: async () => response.data,
+                text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+                blob: async () => new Blob([JSON.stringify(response.data)]),
+                arrayBuffer: async () => new ArrayBuffer(0),
+                formData: async () => new FormData(),
+                clone: () => ({ ...response } as any),
+                body: null,
+                bodyUsed: false,
+                url: url,
+                type: 'basic' as ResponseType,
+                redirected: false,
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
+            } as Response;
+        } catch (error: any) {
+            // 에러를 Response 형태로 변환
+            const status = error.status || 500;
+            const statusText = error.statusText || 'Internal Server Error';
+            
+            return {
+                ok: false,
+                status,
+                statusText,
+                headers: new Headers(),
+                json: async () => error.data || error.message,
+                text: async () => typeof error.data === 'string' ? error.data : JSON.stringify(error.data || error.message),
+                blob: async () => new Blob([JSON.stringify(error.data || error.message)]),
+                arrayBuffer: async () => new ArrayBuffer(0),
+                formData: async () => new FormData(),
+                clone: () => ({ ...error } as any),
+                body: null,
+                bodyUsed: false,
+                url: url,
+                type: 'basic' as ResponseType,
+                redirected: false,
+                signal: controller.signal,
+                bytes: async () => new Uint8Array()
+            } as Response;
+        }
+    } else {
+        // 웹 환경: 프록시를 통해 요청
+        const controller = new AbortController();
+        
+        // URL을 프록시 URL로 변경
+        const proxyUrl = url.replace(config.BASE, '');
+        
+
+        const request: RequestInit = {
+            headers,
+            body: body ?? formData,
+            method: options.method,
+            signal: controller.signal,
+        };
+
+        if (config.WITH_CREDENTIALS) {
+            request.credentials = config.CREDENTIALS;
+        }
+
+        onCancel(() => controller.abort());
+
+        return await fetch(proxyUrl, request);
     }
-
-    onCancel(() => controller.abort());
-
-    return await fetch(url, request);
 };
 
 export const getResponseHeader = (response: Response, responseHeader?: string): string | undefined => {

@@ -393,6 +393,35 @@ export class InstagramService {
         });
     }
     /**
+     * Get Targets By Username
+     * Get targets for a benchmark by Instagram username with optional filters
+     * @param igUsername
+     * @param stage Filter by stage
+     * @param status Filter by status
+     * @returns TargetListResponse Successful Response
+     * @throws ApiError
+     */
+    public static getTargetsByUsernameApiV1InstagramBenchmarksUsernameIgUsernameTargetsGet(
+        igUsername: string,
+        stage?: (StageEnum | null),
+        status?: (StatusEnum | null),
+    ): CancelablePromise<TargetListResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/benchmarks/username/{ig_username}/targets',
+            path: {
+                'ig_username': igUsername,
+            },
+            query: {
+                'stage': stage,
+                'status': status,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
      * Get Suggestions
      * Get suggestions for the current user
      * @returns SuggestionListResponse Successful Response
