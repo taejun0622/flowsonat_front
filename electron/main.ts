@@ -190,11 +190,26 @@ ipcMain.handle('install-update', async () => {
 // API request handler - Handle API requests from renderer process
 ipcMain.handle('api-request', async (event, { method, url, data, headers = {} }) => {
   try {
+    // 프로덕션 환경에서 안전한 API 베이스 URL 설정
     const baseUrl = process.env.NODE_ENV === 'development' 
       ? (process.env.VITE_API_BASE_URL || 'https://test.api.flowsonat.com')
       : 'https://api.flowsonat.com';
     
-    const fullUrl = `${baseUrl}${url}`;
+    // URL 정리 및 검증
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    const cleanUrl = url.replace(/^\//, '');
+    const fullUrl = `${cleanBaseUrl}/${cleanUrl}`;
+    
+    // URL 검증 - 절대 URL이 아니면 에러
+    if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+      console.error('🚨 CRITICAL: Generated URL is not absolute!', {
+        baseUrl: cleanBaseUrl,
+        url: url,
+        fullUrl: fullUrl,
+        willCauseFileProtocolIssue: true
+      });
+      throw new Error(`Generated URL is not absolute: ${fullUrl}. This will cause file:// protocol issues.`);
+    }
     
     const requestOptions: RequestInit = {
       method,
@@ -208,7 +223,11 @@ ipcMain.handle('api-request', async (event, { method, url, data, headers = {} })
       requestOptions.body = JSON.stringify(data);
     }
 
-    console.log(`[API Request] ${method} ${fullUrl}`, data ? { data } : '');
+    console.log(`[API Request] ${method} ${fullUrl}`, {
+      data: data ? { data } : '',
+      headers: headers,
+      timestamp: new Date().toISOString()
+    });
     
     const response = await fetch(fullUrl, requestOptions);
     
@@ -228,10 +247,22 @@ ipcMain.handle('api-request', async (event, { method, url, data, headers = {} })
       throw error;
     }
 
-    console.log(`[API Response] ${method} ${fullUrl}`, parsedData);
-    return parsedData;
+    console.log(`[API Response] ${method} ${fullUrl}`, {
+      status: response.status,
+      data: parsedData,
+      timestamp: new Date().toISOString()
+    });
+    
+    return {
+      data: parsedData,
+      status: response.status,
+      statusText: response.statusText
+    };
   } catch (error) {
-    console.error(`[API Error] ${method} ${url}:`, error);
+    console.error(`[API Error] ${method} ${url}:`, {
+      error: error,
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
 });

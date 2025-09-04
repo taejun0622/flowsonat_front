@@ -5,9 +5,13 @@
  * Verifies that environment variables were correctly embedded in the build
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 console.log('🔍 POST-BUILD ENVIRONMENT VERIFICATION');
 console.log('=====================================');
@@ -161,9 +165,25 @@ if (findings.VITE_API_BASE_URL.values.has('undefined')) {
   issuesFound++;
 }
 
-if (Array.from(findings.VITE_API_BASE_URL.values).some(url => url.includes('localhost'))) {
-  console.log('⚠️  WARNING: Build contains localhost URLs');
+// Check for localhost in API URLs (excluding library fallbacks)
+const apiUrls = Array.from(findings.VITE_API_BASE_URL.values);
+const hasLocalhostApi = apiUrls.some(url => 
+  url.includes('localhost') && 
+  !url.includes('reactjs.org') && 
+  !url.includes('w3.org') && 
+  !url.includes('github.com') &&
+  !url.includes('radix-ui.com') &&
+  !url.includes('instagram.com') &&
+  !url.includes('reactrouter.com') &&
+  url !== 'http://localhost' // React Router fallback
+);
+
+if (hasLocalhostApi) {
+  console.log('⚠️  WARNING: Build contains localhost URLs in API configuration');
   console.log('   This may be intended for development builds');
+} else if (apiUrls.some(url => url.includes('localhost'))) {
+  console.log('ℹ️  INFO: Build contains localhost URLs from libraries (React Router, etc.)');
+  console.log('   This is normal and does not affect production functionality');
 }
 
 // Final summary

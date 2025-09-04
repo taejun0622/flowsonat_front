@@ -5,6 +5,7 @@
 import type { ApiRequestOptions } from './ApiRequestOptions';
 import { getApiBaseUrl, isProduction, isDevelopment } from '@/config/env';
 import { electronApiService } from '@/services/electronApiService';
+import { getSafeApiBaseUrl, assertAbsoluteUrl, assertNotFileProtocol } from '@/utils/urlValidator';
 
 type Resolver<T> = (options: ApiRequestOptions) => Promise<T>;
 type Headers = Record<string, string>;
@@ -21,8 +22,8 @@ export type OpenAPIConfig = {
     ENCODE_PATH?: ((path: string) => string) | undefined;
 };
 
-// API Base URL 설정
-const apiBaseUrl = getApiBaseUrl();
+// API Base URL 설정 - 안전한 검증과 함께
+const apiBaseUrl = getSafeApiBaseUrl(import.meta.env.VITE_API_BASE_URL, 'https://api.flowsonat.com');
 
 // 항상 로깅 (production에서도 API 호출 문제 디버깅용)
 console.log('🔧 API Configuration Debug:', {
@@ -62,13 +63,19 @@ console.log('✅ OpenAPI Configuration Final Check:', {
     matches: OpenAPI.BASE === 'https://api.flowsonat.com'
 });
 
-// 절대 URL이 아니면 경고
-if (!OpenAPI.BASE.startsWith('http')) {
-    console.error('🚨 CRITICAL: OpenAPI.BASE is not an absolute URL!', {
+// 최종 검증 - 절대 URL 및 파일 프로토콜 방지
+try {
+    assertAbsoluteUrl(OpenAPI.BASE);
+    assertNotFileProtocol(OpenAPI.BASE);
+    console.log('✅ OpenAPI.BASE validation passed:', OpenAPI.BASE);
+} catch (error) {
+    console.error('🚨 CRITICAL: OpenAPI.BASE validation failed!', {
         current: OpenAPI.BASE,
         expected: 'https://api.flowsonat.com',
+        error: error,
         willCauseFileProtocolIssue: true
     });
+    throw error;
 }
 
 // 토큰을 동적으로 업데이트하는 함수

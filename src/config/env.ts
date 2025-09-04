@@ -61,8 +61,8 @@ function getEnvConfig(): EnvConfig {
     isDevelopment: env.DEV,
     mode: env.MODE,
     
-    // API Configuration
-    apiBaseUrl: env.VITE_API_BASE_URL || (env.DEV ? 'http://localhost:5174' : 'https://api.flowsonat.com'),
+    // API Configuration - 프로덕션 환경에서 안전한 기본값 보장
+    apiBaseUrl: env.VITE_API_BASE_URL || 'https://api.flowsonat.com',
     
     // Stripe Configuration
     stripe: {
@@ -144,6 +144,9 @@ export const logEnvConfig = () => {
     hasRequiredApiUrl: !!allEnvVars.VITE_API_BASE_URL,
     apiUrlValue: allEnvVars.VITE_API_BASE_URL || 'MISSING',
     fallbackUsed: !allEnvVars.VITE_API_BASE_URL && envConfig.apiBaseUrl !== allEnvVars.VITE_API_BASE_URL,
+    finalApiBaseUrl: envConfig.apiBaseUrl,
+    isAbsoluteUrl: envConfig.apiBaseUrl.startsWith('http'),
+    isFileProtocol: envConfig.apiBaseUrl.startsWith('file://'),
   });
   
   console.groupEnd();

@@ -5,6 +5,7 @@ import './index.css'
 
 // Initialize environment debugging
 import { envDebugger, logEnvironmentDebug, validateEnvironment } from './utils/envDebugger'
+import { initializeProductionValidation } from './utils/productionValidator'
 
 // Log environment configuration at startup
 logEnvironmentDebug()
@@ -14,6 +15,14 @@ try {
   validateEnvironment()
 } catch (error) {
   console.error('🚨 Environment validation failed:', error)
+  // Don't block the app, just warn
+}
+
+// Initialize production validation
+try {
+  initializeProductionValidation()
+} catch (error) {
+  console.error('🚨 Production validation failed:', error)
   // Don't block the app, just warn
 }
 

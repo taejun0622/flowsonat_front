@@ -87,6 +87,10 @@ export default defineConfig(({ mode }) => {
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.0.1'),
     'import.meta.env.VITE_NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    // 프로덕션 환경에서 API 베이스 URL 강제 설정
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
+      env.VITE_API_BASE_URL || 'https://api.flowsonat.com'
+    ),
   },
   server: {
     port: parseInt(process.env.VITE_DEV_PORT || '5174'), // 환경변수로 포트 설정 가능
