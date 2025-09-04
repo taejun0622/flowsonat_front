@@ -87,15 +87,30 @@ class AnalyticsService {
       return;
     }
 
-    // Skip actual sending in browser development mode due to CORS
+    // Enhanced parameters with session info
+    const enhancedParams = {
+      ...params,
+      session_id: this.sessionId,
+      app_name: 'FlowSonat',
+      app_version: getAppVersion(),
+      platform: 'desktop',
+      os: this.getOS(),
+    };
+
+    // Use Electron main process for analytics if available (avoids CORS issues)
+    if (typeof window !== 'undefined' && window.analytics) {
+      try {
+        await window.analytics.trackEvent(eventName, enhancedParams);
+        return;
+      } catch (error) {
+        console.warn('Failed to send via Electron analytics, falling back to direct:', error);
+      }
+    }
+
+    // In browser development mode, still log but skip actual sending due to CORS
     if (!isProduction() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-      console.log('Analytics (browser dev mode):', eventName, params);
-      console.log('  → Would send to GA Measurement Protocol');
-      console.log('  → Payload:', JSON.stringify({
-        client_id: this.clientId,
-        events: [{ name: eventName, params }],
-        user_properties: { app_version: { value: getAppVersion() }, platform: { value: 'desktop' } }
-      }, null, 2));
+      console.log('Analytics (browser dev mode - CORS blocked):', eventName, enhancedParams);
+      console.log('  → Would send to GA Measurement Protocol, but CORS blocks it');
       return;
     }
 
@@ -105,14 +120,7 @@ class AnalyticsService {
         events: [
           {
             name: eventName,
-            params: {
-              ...params,
-              session_id: this.sessionId,
-              app_name: 'FlowSonat',
-              app_version: getAppVersion(),
-              platform: 'desktop',
-              os: this.getOS(),
-            }
+            params: enhancedParams
           }
         ],
         user_properties: {

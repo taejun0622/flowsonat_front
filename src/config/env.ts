@@ -16,10 +16,10 @@ interface EnvConfig {
   // API Configuration
   apiBaseUrl: string;
   
-  // Analytics Configuration
+  // Analytics Configuration (GA4 Measurement Protocol)
   analytics: {
-    googleAnalyticsId?: string;
-    gaApiSecret?: string;
+    ga4MeasurementId?: string;
+    ga4ApiSecret?: string;
   };
   
   // Stripe Configuration
@@ -70,10 +70,10 @@ function getEnvConfig(): EnvConfig {
     // API Configuration - 프로덕션 환경에서 안전한 기본값 보장
     apiBaseUrl: env.VITE_API_BASE_URL || 'https://api.flowsonat.com',
     
-    // Analytics Configuration
+    // Analytics Configuration (GA4 Measurement Protocol)
     analytics: {
-      googleAnalyticsId: env.VITE_GOOGLE_ANALYTICS_ID,
-      gaApiSecret: env.VITE_GA_API_SECRET,
+      ga4MeasurementId: env.VITE_GA4_MEASUREMENT_ID,
+      ga4ApiSecret: env.VITE_GA4_API_SECRET,
     },
     
     // Stripe Configuration
@@ -108,11 +108,15 @@ export const getStripePublishableKey = () => envConfig.stripe.publishableKey;
 export const getStripeProductId = () => envConfig.stripe.productId;
 
 /**
- * Analytics configuration helpers
+ * GA4 Analytics configuration helpers
  */
 export const getAnalyticsConfig = () => envConfig.analytics;
-export const getGoogleAnalyticsId = () => envConfig.analytics.googleAnalyticsId;
-export const getGAApiSecret = () => envConfig.analytics.gaApiSecret;
+export const getGA4MeasurementId = () => envConfig.analytics.ga4MeasurementId;
+export const getGA4ApiSecret = () => envConfig.analytics.ga4ApiSecret;
+
+// Legacy aliases for backward compatibility
+export const getGoogleAnalyticsId = () => envConfig.analytics.ga4MeasurementId;
+export const getGAApiSecret = () => envConfig.analytics.ga4ApiSecret;
 
 /**
  * Comprehensive environment variable logging and debugging
@@ -127,8 +131,8 @@ export const logEnvConfig = () => {
   console.log('📄 Raw Environment Variables:', {
     VITE_API_BASE_URL: allEnvVars.VITE_API_BASE_URL,
     VITE_APP_VERSION: allEnvVars.VITE_APP_VERSION,
-    VITE_GOOGLE_ANALYTICS_ID: allEnvVars.VITE_GOOGLE_ANALYTICS_ID ? '[REDACTED]' : 'undefined',
-    VITE_GA_API_SECRET: allEnvVars.VITE_GA_API_SECRET ? '[REDACTED]' : 'undefined',
+    VITE_GA4_MEASUREMENT_ID: allEnvVars.VITE_GA4_MEASUREMENT_ID ? '[REDACTED]' : 'undefined',
+    VITE_GA4_API_SECRET: allEnvVars.VITE_GA4_API_SECRET ? '[REDACTED]' : 'undefined',
     VITE_STRIPE_PRICE_ID: allEnvVars.VITE_STRIPE_PRICE_ID ? '[REDACTED]' : 'undefined',
     VITE_STRIPE_PUBLISHABLE_KEY: allEnvVars.VITE_STRIPE_PUBLISHABLE_KEY ? '[REDACTED]' : 'undefined',
     VITE_STRIPE_PRODUCT_ID: allEnvVars.VITE_STRIPE_PRODUCT_ID ? '[REDACTED]' : 'undefined',
@@ -146,8 +150,8 @@ export const logEnvConfig = () => {
     isProduction: envConfig.isProduction,
     isDevelopment: envConfig.isDevelopment,
     analytics: {
-      hasGoogleAnalyticsId: !!envConfig.analytics.googleAnalyticsId,
-      hasGAApiSecret: !!envConfig.analytics.gaApiSecret,
+      hasGA4MeasurementId: !!envConfig.analytics.ga4MeasurementId,
+      hasGA4ApiSecret: !!envConfig.analytics.ga4ApiSecret,
     },
     stripe: {
       hasPriceId: !!envConfig.stripe.priceId,

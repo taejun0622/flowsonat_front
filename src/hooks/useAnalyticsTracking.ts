@@ -34,13 +34,10 @@ export function useFormAnalytics() {
 
   const trackFormSubmit = useCallback(
     (formName: string, success: boolean = true) => {
-      trackEvent({
-        event_name: 'form_submit',
-        event_category: 'forms',
-        event_label: formName,
-        custom_parameters: {
-          success,
-        },
+      trackEvent('form_submit', {
+        category: 'forms',
+        form_name: formName,
+        success,
       });
     },
     [trackEvent]
@@ -48,14 +45,11 @@ export function useFormAnalytics() {
 
   const trackFormValidation = useCallback(
     (formName: string, errors: string[]) => {
-      trackEvent({
-        event_name: 'form_validation_error',
-        event_category: 'forms',
-        event_label: formName,
-        custom_parameters: {
-          error_count: errors.length,
-          errors: errors.join(', '),
-        },
+      trackEvent('form_validation_error', {
+        category: 'forms',
+        form_name: formName,
+        error_count: errors.length,
+        errors: errors.join(', '),
       });
     },
     [trackEvent]
@@ -142,10 +136,9 @@ export function useSubscriptionAnalytics() {
 
   const trackPlanView = useCallback(
     (planName: string) => {
-      trackEvent({
-        event_name: 'plan_view',
-        event_category: 'subscription',
-        event_label: planName,
+      trackEvent('plan_view', {
+        category: 'subscription',
+        plan_name: planName,
       });
     },
     [trackEvent]
@@ -153,13 +146,10 @@ export function useSubscriptionAnalytics() {
 
   const trackPaymentAttempt = useCallback(
     (planName: string, success: boolean) => {
-      trackEvent({
-        event_name: 'payment_attempt',
-        event_category: 'subscription',
-        event_label: planName,
-        custom_parameters: {
-          success,
-        },
+      trackEvent('payment_attempt', {
+        category: 'subscription',
+        plan_name: planName,
+        success,
       });
     },
     [trackEvent]

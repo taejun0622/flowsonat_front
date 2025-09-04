@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { analytics, PageViewEvent, CustomEvent } from '@/services/analytics';
-import { getGoogleAnalyticsId } from '@/config/env';
+import { ga4 } from '@/services/ga4';
+import { getGA4MeasurementId } from '@/config/env';
 
 interface AnalyticsContextType {
-  trackPageView: (event: Omit<PageViewEvent, 'page_location'>) => void;
-  trackEvent: (event: CustomEvent) => void;
+  trackScreenView: (screenName: string, screenClass?: string) => void;
+  trackEvent: (name: string, params?: Record<string, any>) => void;
   trackButtonClick: (buttonName: string, location?: string) => void;
   trackFeatureUsage: (featureName: string, action?: string) => void;
-  trackError: (errorName: string, errorMessage?: string) => void;
+  trackError: (errorName: string, errorMessage?: string, fatal?: boolean) => void;
   trackUserAction: (action: string, category?: string) => void;
   trackInstagramAction: (action: string, accountId?: string) => void;
   trackSubscriptionEvent: (eventType: 'subscribe' | 'cancel' | 'upgrade' | 'downgrade') => void;
@@ -23,44 +23,34 @@ interface AnalyticsProviderProps {
 
 export function AnalyticsProvider({ children }: AnalyticsProviderProps): JSX.Element {
   const location = useLocation();
-  const isEnabled = !!getGoogleAnalyticsId();
+  const isEnabled = !!getGA4MeasurementId();
 
-  // Initialize analytics when the provider mounts
+  // Initialize GA4 when the provider mounts
   useEffect(() => {
     if (isEnabled) {
-      analytics.initialize();
+      ga4.initialize();
     }
   }, [isEnabled]);
 
-  // Track page views automatically when route changes
+  // Track screen views automatically when route changes (GA4 desktop app standard)
   useEffect(() => {
     if (isEnabled) {
-      const pageTitle = document.title || 'FlowSonat';
-      const pageLocation = window.location.href;
-      const pagePath = location.pathname + location.search + location.hash;
+      const screenName = location.pathname.replace('/', '') || 'dashboard';
+      const screenClass = 'app_screen';
 
-      analytics.trackPageView({
-        page_title: pageTitle,
-        page_location: pageLocation,
-        page_path: pagePath,
-      });
+      ga4.trackScreenView(screenName, screenClass);
     }
   }, [location, isEnabled]);
 
   const contextValue: AnalyticsContextType = {
-    trackPageView: (event) => {
-      analytics.trackPageView({
-        ...event,
-        page_location: window.location.href,
-      });
-    },
-    trackEvent: analytics.trackEvent.bind(analytics),
-    trackButtonClick: analytics.trackButtonClick.bind(analytics),
-    trackFeatureUsage: analytics.trackFeatureUsage.bind(analytics),
-    trackError: analytics.trackError.bind(analytics),
-    trackUserAction: analytics.trackUserAction.bind(analytics),
-    trackInstagramAction: analytics.trackInstagramAction.bind(analytics),
-    trackSubscriptionEvent: analytics.trackSubscriptionEvent.bind(analytics),
+    trackScreenView: ga4.trackScreenView.bind(ga4),
+    trackEvent: ga4.trackEvent.bind(ga4),
+    trackButtonClick: ga4.trackButtonClick.bind(ga4),
+    trackFeatureUsage: ga4.trackFeatureUsage.bind(ga4),
+    trackError: ga4.trackError.bind(ga4),
+    trackUserAction: ga4.trackUserAction.bind(ga4),
+    trackInstagramAction: ga4.trackInstagramAction.bind(ga4),
+    trackSubscriptionEvent: ga4.trackSubscriptionEvent.bind(ga4),
     isEnabled,
   };
 

@@ -7,8 +7,11 @@ import './index.css'
 import { envDebugger, logEnvironmentDebug, validateEnvironment } from './utils/envDebugger'
 import { initializeProductionValidation } from './utils/productionValidator'
 
-// Initialize analytics
-import { analytics } from './services/analytics'
+// Initialize GA4 analytics
+import { ga4 } from './services/ga4'
+
+// Import types for global analytics
+import './types/analytics'
 
 // Log environment configuration at startup
 logEnvironmentDebug()
@@ -29,11 +32,11 @@ try {
   // Don't block the app, just warn
 }
 
-// Initialize analytics and track app start
-analytics.initialize().then(() => {
-  analytics.trackAppStart()
+// Initialize GA4 analytics and track app start
+ga4.initialize().then(() => {
+  ga4.trackAppStart()
 }).catch(error => {
-  console.error('Failed to initialize analytics:', error)
+  console.error('Failed to initialize GA4:', error)
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -49,5 +52,29 @@ window.ipcRenderer?.on('main-process-message', (_event: any, message: any) => {
 
 // Track app close when window is about to unload
 window.addEventListener('beforeunload', () => {
-  analytics.trackAppClose()
+  ga4.trackAppClose()
+})
+
+// Global error handling with GA4
+window.addEventListener('error', (event) => {
+  console.error('Global error:', event.error)
+  const errorName = `Global Error: ${event.error?.name || 'Unknown'}`
+  const errorMessage = event.error?.message || event.message
+  ga4.trackError(errorName, errorMessage, false)
+  
+  // Also track to Electron analytics
+  if (window.analytics) {
+    window.analytics.trackError(`${errorName}: ${errorMessage}`, false).catch(console.error)
+  }
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason)
+  const errorMessage = String(event.reason)
+  ga4.trackError('Unhandled Promise Rejection', errorMessage, false)
+  
+  // Also track to Electron analytics
+  if (window.analytics) {
+    window.analytics.trackError(`Unhandled Rejection: ${errorMessage}`, false).catch(console.error)
+  }
 })
