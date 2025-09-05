@@ -1,5 +1,6 @@
 import { StripeService } from '@/api/services/StripeService';
 import { PaymentLinkResponse } from '@/api/models/PaymentLinkResponse';
+import { CustomerPortalResponse } from '@/api/models/CustomerPortalResponse';
 import { Subscription, BillingInfo, Invoice } from '@/types/subscription';
 import { STRIPE_CONFIG } from '@/constants/subscription';
 
@@ -161,6 +162,19 @@ export class BillingService {
       return paymentUrl;
     } catch (error) {
       console.error('Failed to update payment method:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create customer portal session
+   */
+  static async createCustomerPortalSession(): Promise<string> {
+    try {
+      const response: CustomerPortalResponse = await StripeService.createCustomerPortalSessionApiV1StripeCustomerPortalPost();
+      return response.url;
+    } catch (error) {
+      console.error('Failed to create customer portal session:', error);
       throw error;
     }
   }

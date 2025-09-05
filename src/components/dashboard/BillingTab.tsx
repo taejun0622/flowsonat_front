@@ -4,7 +4,6 @@ import {
   Calendar, 
   AlertTriangle, 
   CheckCircle, 
-  XCircle, 
   Download,
   RefreshCw,
   Loader2,
@@ -15,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import type { Invoice } from '@/types/subscription';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useBilling } from '@/hooks/useBilling';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -31,6 +29,7 @@ export const BillingTab = () => {
     cancelSubscription, 
     reactivateSubscription, 
     updatePaymentMethod,
+    openCustomerPortal,
     showPaymentWebView,
     paymentUrl,
     handlePaymentComplete,
@@ -38,8 +37,6 @@ export const BillingTab = () => {
     handleCloseWebView
   } = useBilling();
   const { user } = useAuth();
-  const [showCancelDialog, setShowCancelDialog] = React.useState(false);
-  const [showReactivateDialog, setShowReactivateDialog] = React.useState(false);
 
   // Analytics hooks
   useComponentAnalytics('BillingTab');
@@ -257,37 +254,15 @@ export const BillingTab = () => {
             <CardDescription className="text-gray-300">Manage your subscription and payment methods</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex justify-center">
               <Button 
-                className="w-full bg-white text-gray-900 hover:bg-gray-100"
-                onClick={() => updatePaymentMethod(subscription.plan.id)}
+                className="bg-white text-gray-900 hover:bg-gray-100"
+                onClick={openCustomerPortal}
                 disabled={isLoading}
               >
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
-                Update Payment Method
+                Go to Customer Portal
               </Button>
-              
-              {subscription.cancel_at_period_end ? (
-                <Button 
-                  variant="outline" 
-                  className="w-full border-green-500/50 text-green-400 hover:bg-green-500/10"
-                  onClick={() => setShowReactivateDialog(true)}
-                  disabled={isLoading}
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Reactivate Subscription
-                </Button>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
-                  onClick={() => setShowCancelDialog(true)}
-                  disabled={isLoading}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Cancel Subscription
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -338,69 +313,6 @@ export const BillingTab = () => {
         </Card>
       )}
 
-      {/* Cancel Subscription Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-white">Cancel Subscription</DialogTitle>
-            <DialogDescription className="text-gray-300">
-              Are you sure you want to cancel your subscription? You'll continue to have access until the end of your current billing period.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCancelDialog(false)}
-              className="border-black/30 text-white hover:bg-black/20"
-            >
-              Keep Subscription
-            </Button>
-            <Button
-              onClick={async () => {
-                await cancelSubscription();
-                setShowCancelDialog(false);
-              }}
-              disabled={isLoading}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Cancel Subscription
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reactivate Subscription Dialog */}
-      <Dialog open={showReactivateDialog} onOpenChange={setShowReactivateDialog}>
-        <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-white">Reactivate Subscription</DialogTitle>
-            <DialogDescription className="text-gray-300">
-              Reactivate your subscription to continue using all features without interruption.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowReactivateDialog(false)}
-              className="border-black/30 text-white hover:bg-black/20"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                await reactivateSubscription();
-                setShowReactivateDialog(false);
-              }}
-              disabled={isLoading}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Reactivate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Stripe Payment WebView */}
       {showPaymentWebView && paymentUrl && (

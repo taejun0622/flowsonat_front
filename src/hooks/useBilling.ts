@@ -146,6 +146,33 @@ export const useBilling = () => {
     }
   };
 
+  // Open customer portal
+  const openCustomerPortal = async () => {
+    try {
+      setIsLoading(true);
+      const portalUrl = await BillingService.createCustomerPortalSession();
+      
+      if (portalUrl) {
+        // Open customer portal in new tab
+        window.open(portalUrl, '_blank');
+        
+        toast({
+          title: "Customer portal opened",
+          description: "Manage your subscription and payment methods in the new tab.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to open customer portal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open customer portal. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   React.useEffect(() => {
     fetchSubscription();
   }, [user]);
@@ -202,6 +229,7 @@ export const useBilling = () => {
     cancelSubscription,
     reactivateSubscription,
     updatePaymentMethod,
+    openCustomerPortal,
     handlePaymentComplete,
     handlePaymentCancel,
     handleCloseWebView,
