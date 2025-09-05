@@ -11,6 +11,7 @@ export type { BenchmarkCreate } from './models/BenchmarkCreate';
 export type { BenchmarkListResponse } from './models/BenchmarkListResponse';
 export type { BenchmarkResponse } from './models/BenchmarkResponse';
 export type { BenchmarkUpdate } from './models/BenchmarkUpdate';
+export type { CustomerPortalResponse } from './models/CustomerPortalResponse';
 export type { DownloadInfo } from './models/DownloadInfo';
 export type { EmailQuotaResponse } from './models/EmailQuotaResponse';
 export type { EmailResponse } from './models/EmailResponse';
