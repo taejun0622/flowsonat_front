@@ -21,9 +21,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { STRIPE_CONFIG } from '@/constants/subscription';
 import { useComponentAnalytics, useButtonAnalytics, useSubscriptionAnalytics } from '@/hooks/useAnalyticsTracking';
+import { StripePaymentWebView } from '@/components/StripePaymentWebView';
 
 export const BillingTab = () => {
-  const { billingInfo, isLoading, isLoadingSubscription, cancelSubscription, reactivateSubscription, updatePaymentMethod } = useBilling();
+  const { 
+    billingInfo, 
+    isLoading, 
+    isLoadingSubscription, 
+    cancelSubscription, 
+    reactivateSubscription, 
+    updatePaymentMethod,
+    showPaymentWebView,
+    paymentUrl,
+    handlePaymentComplete,
+    handlePaymentCancel,
+    handleCloseWebView
+  } = useBilling();
   const { user } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = React.useState(false);
   const [showReactivateDialog, setShowReactivateDialog] = React.useState(false);
@@ -412,6 +425,16 @@ export const BillingTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Stripe Payment WebView */}
+      {showPaymentWebView && paymentUrl && (
+        <StripePaymentWebView
+          paymentUrl={paymentUrl}
+          onPaymentComplete={handlePaymentComplete}
+          onPaymentCancel={handlePaymentCancel}
+          onClose={handleCloseWebView}
+        />
+      )}
     </div>
   );
 };

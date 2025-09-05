@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SUBSCRIPTION_PLANS } from '@/constants/subscription';
 import { useBilling } from '@/hooks/useBilling';
+import { StripePaymentWebView } from '@/components/StripePaymentWebView';
 
 interface SubscriptionPlanSelectorProps {
   onPlanSelect?: (planId: string) => void;
@@ -14,18 +15,51 @@ export const SubscriptionPlanSelector = ({
   onPlanSelect,
   currentPlanId,
 }: SubscriptionPlanSelectorProps) => {
-  const { createPaymentLink, isLoading } = useBilling();
+  const { 
+    createPaymentLink, 
+    isLoading,
+    showPaymentWebView,
+    paymentUrl,
+    handlePaymentComplete,
+    handlePaymentCancel,
+    handleCloseWebView
+  } = useBilling();
+
+  // Test function to check if Electron API is working
+  const testElectronAPI = async () => {
+    try {
+      const electronAPI = (window as any).electronAPI;
+      console.log('Testing Electron API...');
+      console.log('electronAPI exists:', !!electronAPI);
+      console.log('openExternal exists:', !!(electronAPI && electronAPI.openExternal));
+      
+      if (electronAPI && electronAPI.openExternal) {
+        console.log('Testing with a simple URL...');
+        await electronAPI.openExternal('https://www.google.com');
+        console.log('Test successful!');
+      } else {
+        console.log('Electron API not available, using window.open');
+        window.open('https://www.google.com', '_blank');
+      }
+    } catch (error) {
+      console.error('Test failed:', error);
+    }
+  };
 
   const handlePlanSelect = async (planId: string) => {
+    console.log('🚀 handlePlanSelect called with planId:', planId);
+    
     if (onPlanSelect) {
+      console.log('📞 onPlanSelect callback exists, calling it');
       onPlanSelect(planId);
       return;
     }
 
+    console.log('💳 Creating payment link...');
     const paymentUrl = await createPaymentLink(planId);
-    if (paymentUrl) {
-      window.open(paymentUrl, '_blank');
-    }
+    console.log('Payment URL created:', paymentUrl);
+    
+    // WebView는 useBilling 훅에서 자동으로 처리됩니다
   };
 
   const getPlanIcon = (planName: string) => {
@@ -49,7 +83,19 @@ export const SubscriptionPlanSelector = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div>
+      {/* Test button for debugging */}
+      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded-lg">
+        <p className="text-sm text-yellow-800 mb-2">Debug: Test Electron API</p>
+        <button 
+          onClick={testElectronAPI}
+          className="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
+        >
+          Test Open External
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {Object.values(SUBSCRIPTION_PLANS).map((plan) => {
         const isCurrentPlan = currentPlanId === plan.id;
         const isPopular = plan.name === 'Pro Plan';
@@ -110,7 +156,10 @@ export const SubscriptionPlanSelector = ({
                     ? 'bg-yellow-500 text-black hover:bg-yellow-600'
                     : 'bg-white text-gray-900 hover:bg-gray-100'
                 }`}
-                onClick={() => handlePlanSelect(plan.id)}
+                onClick={() => {
+                  console.log('🔘 Button clicked for plan:', plan.id);
+                  handlePlanSelect(plan.id);
+                }}
                 disabled={isLoading || isCurrentPlan}
               >
                 {isCurrentPlan ? 'Current Plan' : 'Select Plan'}
@@ -119,6 +168,17 @@ export const SubscriptionPlanSelector = ({
           </Card>
         );
       })}
+      </div>
+
+      {/* Stripe Payment WebView */}
+      {showPaymentWebView && paymentUrl && (
+        <StripePaymentWebView
+          paymentUrl={paymentUrl}
+          onPaymentComplete={handlePaymentComplete}
+          onPaymentCancel={handlePaymentCancel}
+          onClose={handleCloseWebView}
+        />
+      )}
     </div>
   );
 };

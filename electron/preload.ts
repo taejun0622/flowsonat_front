@@ -1,5 +1,7 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
+console.log('🚀 Preload script loaded successfully!')
+
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
@@ -78,5 +80,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // API 요청 (Main Process를 통해)
   apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => 
-    ipcRenderer.invoke('api-request', { method, url, data, headers })
+    ipcRenderer.invoke('api-request', { method, url, data, headers }),
+  
+  // 외부 브라우저로 URL 열기
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url)
 })
+
+console.log('✅ electronAPI exposed to window object')
