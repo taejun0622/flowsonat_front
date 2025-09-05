@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'path'
@@ -311,32 +311,6 @@ ipcMain.handle('api-request', async (event, { method, url, data, headers = {} })
   }
 });
 
-// External URL handler - Open URLs in external browser
-ipcMain.handle('open-external', async (event, url: string) => {
-  console.log('🎯 open-external IPC handler called with URL:', url);
-  try {
-    // URL 검증
-    if (!url || typeof url !== 'string') {
-      throw new Error('Invalid URL provided');
-    }
-    
-    // URL이 http:// 또는 https://로 시작하는지 확인
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      throw new Error('URL must start with http:// or https://');
-    }
-    
-    console.log(`[External URL] Opening: ${url}`);
-    
-    // shell.openExternal을 사용하여 외부 브라우저에서 열기
-    await shell.openExternal(url);
-    
-    console.log('✅ URL opened successfully in external browser');
-    return { success: true };
-  } catch (error) {
-    console.error(`[External URL Error] Failed to open ${url}:`, error);
-    throw error;
-  }
-});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

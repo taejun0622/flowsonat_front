@@ -25,26 +25,6 @@ export const SubscriptionPlanSelector = ({
     handleCloseWebView
   } = useBilling();
 
-  // Test function to check if Electron API is working
-  const testElectronAPI = async () => {
-    try {
-      const electronAPI = (window as any).electronAPI;
-      console.log('Testing Electron API...');
-      console.log('electronAPI exists:', !!electronAPI);
-      console.log('openExternal exists:', !!(electronAPI && electronAPI.openExternal));
-      
-      if (electronAPI && electronAPI.openExternal) {
-        console.log('Testing with a simple URL...');
-        await electronAPI.openExternal('https://www.google.com');
-        console.log('Test successful!');
-      } else {
-        console.log('Electron API not available, using window.open');
-        window.open('https://www.google.com', '_blank');
-      }
-    } catch (error) {
-      console.error('Test failed:', error);
-    }
-  };
 
   const handlePlanSelect = async (planId: string) => {
     console.log('🚀 handlePlanSelect called with planId:', planId);
@@ -84,16 +64,6 @@ export const SubscriptionPlanSelector = ({
 
   return (
     <div>
-      {/* Test button for debugging */}
-      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded-lg">
-        <p className="text-sm text-yellow-800 mb-2">Debug: Test Electron API</p>
-        <button 
-          onClick={testElectronAPI}
-          className="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600"
-        >
-          Test Open External
-        </button>
-      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {Object.values(SUBSCRIPTION_PLANS).map((plan) => {

@@ -43,6 +43,5 @@ interface Window {
     onUpdateProgress: (callback: (data: any) => void) => void
     updateAvailable: (updateResult: any) => void
     apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => Promise<any>
-    openExternal: (url: string) => Promise<{ success: boolean }>
   }
 }
