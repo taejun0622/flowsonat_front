@@ -405,7 +405,7 @@ export class AutomationService {
             const followed = await this.clickFollowButton();
             if (followed) {
               await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
-                stage: StageEnum.PENDING // Using PENDING as there's no FOLLOW stage
+                stage: StageEnum.REQUESTED
               });
               followedCount++;
               this.options.onAction?.('follow', target.ig.username, true);

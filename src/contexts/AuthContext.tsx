@@ -2,11 +2,14 @@ import React from 'react';
 import { AuthService } from '@/api/services/AuthService';
 import { User, Token, UserLogin, UserCreate } from '@/api';
 import { useToast } from '@/hooks/use-toast';
+import { UserStatus } from '@/types/user';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
+  userStatus: UserStatus | null;
+  isTrialOver: boolean;
   login: (credentials: UserLogin) => Promise<void>;
   register: (userData: UserCreate) => Promise<User>;
   logout: () => void;
@@ -33,6 +36,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [token, setToken] = React.useState<string | null>(localStorage.getItem('access_token'));
   const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
+
+  // Helper function to get user status
+  const getUserStatus = (user: User | null): UserStatus | null => {
+    if (!user?.status) return null;
+    return user.status as UserStatus;
+  };
+
+  // Helper function to check if trial is over
+  const isTrialOver = React.useMemo(() => {
+    const status = getUserStatus(user);
+    return status === 'TRIAL_OVER';
+  }, [user]);
 
   React.useEffect(() => {
     const initializeAuth = async () => {
@@ -158,6 +173,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     token,
     isLoading,
+    userStatus: getUserStatus(user),
+    isTrialOver,
     login,
     register,
     logout,
