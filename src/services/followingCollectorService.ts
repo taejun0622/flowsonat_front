@@ -106,7 +106,7 @@ export class FollowingCollectorService {
   private async collectFollowingFromModal(): Promise<string[]> {
     const following: string[] = [];
     let unchangedScrolls = 0;
-    const maxUnchangedScrolls = 5;
+    const maxUnchangedScrolls = 10; // Increased for better stability with more scrolls
     let prevSnapshot = '';
 
     console.log('[Following Collection] Starting following collection...');
@@ -141,7 +141,7 @@ export class FollowingCollectorService {
 
         console.log('[Following Collection] Scrolling down...');
         this.options.onProgress?.(following.length, following.length, 'Scrolling to load more...');
-        const scrolled = await this.webviewApi.scrollForemost(500);
+        const scrolled = await this.webviewApi.scrollForemost(1000);
         if (!scrolled) {
           console.log('[Following Collection] Cannot scroll further');
           break;

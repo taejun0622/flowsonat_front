@@ -486,7 +486,7 @@ export class AutomationService {
   private async collectUsernamesFromModalWithScroll(): Promise<string[]> {
     const usernames: string[] = [];
     let unchangedScrolls = 0;
-    const maxUnchangedScrolls = 5;
+    const maxUnchangedScrolls = 10; // Increased for better stability with more scrolls
     let prevSnapshot = '';
 
     console.log('[Automation] Starting username collection with scrolling...');
@@ -526,7 +526,7 @@ export class AutomationService {
         // Scroll down to load more
         console.log('[Automation] Scrolling down...');
         this.options.onProgress?.(usernames.length, usernames.length, 'Scrolling to load more...');
-        const scrolled = await this.webviewApi.scrollForemost(500);
+        const scrolled = await this.webviewApi.scrollForemost(1000);
         if (!scrolled) {
           console.log('[Automation] Cannot scroll further');
           break;

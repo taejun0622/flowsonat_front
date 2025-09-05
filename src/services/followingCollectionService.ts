@@ -147,7 +147,7 @@ export class FollowingCollectionService {
     let unchangedScrolls = 0;
     const maxUnchangedScrolls = 5; // Stop if list doesn't change for 5 scrolls
     let scrollAttempts = 0;
-    const maxScrollAttempts = 50; // Prevent infinite loops
+    const maxScrollAttempts = 1000; // Prevent infinite loops
     let prevSnapshot = '';
 
     console.log('[Following Collection] Starting following collection...');
@@ -200,7 +200,7 @@ export class FollowingCollectionService {
         // Scroll down to load more
         console.log('[Following Collection] Scrolling down...');
         this.options.onProgress?.(following.length, following.length, 'Scrolling to load more...');
-        const scrolled = await this.webviewApi.scrollForemost(500); // Increased scroll distance
+        const scrolled = await this.webviewApi.scrollForemost(1000); // Increased scroll distance
         if (!scrolled) {
           console.log('[Following Collection] Cannot scroll further');
           break;
