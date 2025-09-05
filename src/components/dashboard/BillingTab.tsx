@@ -186,30 +186,6 @@ export const BillingTab = () => {
                 </div>
               )}
 
-              {/* Usage Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
-                  <div className="text-sm text-gray-300">Usage</div>
-                  <div className="text-lg font-semibold text-white">
-                    {subscription.usage.percentage}%
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {subscription.usage.current} / {subscription.usage.limit}
-                  </div>
-                </div>
-                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
-                  <div className="text-sm text-gray-300">Remaining Credits</div>
-                  <div className="text-lg font-semibold text-white">
-                    {subscription.usage.limit - subscription.usage.current}
-                  </div>
-                </div>
-                <div className="p-4 border border-black/20 rounded-lg bg-black/5">
-                  <div className="text-sm text-gray-300">This Month's Spend</div>
-                  <div className="text-lg font-semibold text-white">
-                    {formatCurrency(subscription.plan.price, subscription.plan.currency)}
-                  </div>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
