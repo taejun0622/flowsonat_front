@@ -524,8 +524,8 @@ export class AutomationService {
         // Extract usernames from current view
         const snapshotUsernames = await this.extractUsernamesFromModal();
 
-        // Snapshot for change detection
-        const currentSnapshot = snapshotUsernames.slice(0, 100).join('|');
+        // Snapshot for change detection - use total count and last few items
+        const currentSnapshot = `${snapshotUsernames.length}|${snapshotUsernames.slice(-20).join('|')}`;
         if (currentSnapshot === prevSnapshot) {
           unchangedScrolls++;
           console.log(`[Automation] No change detected in list (${unchangedScrolls}/${maxUnchangedScrolls})`);
