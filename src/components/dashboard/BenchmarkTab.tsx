@@ -36,6 +36,7 @@ import {
   HealthEnum,
   StatusEnum 
 } from '@/api';
+import { BenchmarkTargetsModal } from './BenchmarkTargetsModal';
 
 export const BenchmarkTab = () => {
   const navigate = useNavigate();
@@ -49,6 +50,8 @@ export const BenchmarkTab = () => {
   const [benchmarkToDelete, setBenchmarkToDelete] = React.useState<string | null>(null);
   const [selectedBenchmark, setSelectedBenchmark] = React.useState<BenchmarkResponse | null>(null);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [targetsModalOpen, setTargetsModalOpen] = React.useState(false);
+  const [selectedBenchmarkForTargets, setSelectedBenchmarkForTargets] = React.useState<BenchmarkResponse | null>(null);
   const [formData, setFormData] = React.useState({
     ig_username: '',
     status: '' as StatusEnum | ''
@@ -272,6 +275,16 @@ export const BenchmarkTab = () => {
   const openEditDialog = (benchmark: BenchmarkResponse) => {
     setSelectedBenchmark(benchmark);
     setEditDialogOpen(true);
+  };
+
+  const openTargetsModal = (benchmark: BenchmarkResponse) => {
+    setSelectedBenchmarkForTargets(benchmark);
+    setTargetsModalOpen(true);
+  };
+
+  const closeTargetsModal = () => {
+    setTargetsModalOpen(false);
+    setSelectedBenchmarkForTargets(null);
   };
 
   const getStatusColor = (status: StatusEnum) => {
@@ -513,9 +526,10 @@ export const BenchmarkTab = () => {
                   {statusBenchmarks.map((benchmark, index) => (
                     <div
                       key={benchmark.id}
-                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
+                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors cursor-pointer ${
                         index !== statusBenchmarks.length - 1 ? 'border-b border-black/20' : ''
                       }`}
+                      onClick={() => openTargetsModal(benchmark)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -544,7 +558,7 @@ export const BenchmarkTab = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -632,6 +646,13 @@ export const BenchmarkTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Benchmark Targets Modal */}
+      <BenchmarkTargetsModal
+        isOpen={targetsModalOpen}
+        onClose={closeTargetsModal}
+        benchmark={selectedBenchmarkForTargets}
+      />
 
     </div>
   );
