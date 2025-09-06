@@ -189,13 +189,13 @@ export const useBilling = () => {
 
   // WebView 핸들러들 - useCallback으로 메모이제이션
   const handlePaymentComplete = useCallback(() => {
-    console.log('✅ Payment completed successfully');
+    console.log('✅ Payment completed successfully - closing WebView and refreshing billing data');
     setShowPaymentWebView(false);
     setPaymentUrl('');
     
     toast({
       title: "Payment Successful",
-      description: "Your payment has been processed successfully.",
+      description: "Your payment has been processed successfully. Updating your subscription...",
     });
     
     // 구독 정보 새로고침
