@@ -7,6 +7,7 @@ export interface ProfileInfo {
   followers?: string;
   following?: string;
   links?: string;
+  raw_data?: string;
 }
 
 export interface ProfileCollectionResult {
@@ -38,7 +39,8 @@ export class ProfileCollectionService {
               bio: '',
               followers: '',
               following: '',
-              links: ''
+              links: '',
+              raw_data: ''
             };
 
             // header 태그 찾기
@@ -168,6 +170,12 @@ export class ProfileCollectionService {
             
             result.links = links.join(', ');
 
+            // Raw data 추출 - header 태그의 전체 내용
+            if (headerElement) {
+              result.raw_data = headerElement.outerHTML;
+              console.log('[Profile Collection] Raw data extracted from header');
+            }
+
             console.log('[Profile Collection] Collected data:', result);
             return result;
           } catch (error) {
@@ -213,6 +221,7 @@ export class ProfileCollectionService {
       }
 
       const historyData: IGHistoryCreate = {
+        raw_data: profileInfo.raw_data || null,
         bio: profileInfo.bio || null,
         links: profileInfo.links || null,
         followers: profileInfo.followers || null,
