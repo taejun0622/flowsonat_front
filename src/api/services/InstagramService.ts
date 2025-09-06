@@ -6,6 +6,8 @@ import type { BenchmarkCreate } from '../models/BenchmarkCreate';
 import type { BenchmarkListResponse } from '../models/BenchmarkListResponse';
 import type { BenchmarkResponse } from '../models/BenchmarkResponse';
 import type { BenchmarkUpdate } from '../models/BenchmarkUpdate';
+import type { BulkFollowRequest1 } from '../models/BulkFollowRequest1';
+import type { BulkFollowRequest2 } from '../models/BulkFollowRequest2';
 import type { BulkTargetCreate } from '../models/BulkTargetCreate';
 import type { FollowRequest } from '../models/FollowRequest';
 import type { FollowResponse } from '../models/FollowResponse';
@@ -68,6 +70,46 @@ export class InstagramService {
                 'follower_username': followerUsername,
                 'following_username': followingUsername,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Create Bulk Follow Relationships Followers
+     * Create multiple follow relationships where multiple followers follow one account
+     * @param requestBody
+     * @returns FollowResponse Successful Response
+     * @throws ApiError
+     */
+    public static createBulkFollowRelationshipsFollowersApiV1InstagramFollowBulkFollowersPost(
+        requestBody: BulkFollowRequest1,
+    ): CancelablePromise<Array<FollowResponse>> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/follow/bulk/followers',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Create Bulk Follow Relationships Following
+     * Create multiple follow relationships where one follower follows multiple accounts
+     * @param requestBody
+     * @returns FollowResponse Successful Response
+     * @throws ApiError
+     */
+    public static createBulkFollowRelationshipsFollowingApiV1InstagramFollowBulkFollowingPost(
+        requestBody: BulkFollowRequest2,
+    ): CancelablePromise<Array<FollowResponse>> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/follow/bulk/following',
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },
