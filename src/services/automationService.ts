@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2 } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -514,6 +514,11 @@ export class AutomationService {
       
       console.log(`[Automation] Collected ${followers.length} followers`);
       
+      // Send followers to API using BulkFollowRequest1
+      if (followers.length > 0) {
+        await this.sendFollowersToAPI(followers);
+      }
+      
       return followers.length;
     } catch (error) {
       console.error('[Automation] Followers collection error:', error);
@@ -539,6 +544,11 @@ export class AutomationService {
       const following = await this.collectUsernamesFromModalWithScroll();
       
       console.log(`[Automation] Collected ${following.length} following`);
+      
+      // Send following to API using BulkFollowRequest2
+      if (following.length > 0) {
+        await this.sendFollowingToAPI(following);
+      }
       
       return following.length;
     } catch (error) {
@@ -819,6 +829,100 @@ export class AutomationService {
     } catch (error) {
       console.error('[Automation] Collect followers from profile error:', error);
       return [];
+    }
+  }
+
+  /**
+   * Send followers to API using BulkFollowRequest1
+   * Multiple followers following one account (my account)
+   */
+  private async sendFollowersToAPI(followers: string[]): Promise<void> {
+    try {
+      console.log(`[Automation] Sending ${followers.length} followers to API...`);
+      
+      // Process in batches to avoid overwhelming the API
+      const batchSize = 100; // Process 100 followers at a time
+      const batches = [];
+      
+      for (let i = 0; i < followers.length; i += batchSize) {
+        batches.push(followers.slice(i, i + batchSize));
+      }
+      
+      let totalSent = 0;
+      for (const batch of batches) {
+        try {
+          const bulkRequest: BulkFollowRequest1 = {
+            follower_usernames: batch,
+            following_username: this.instagramUsername
+          };
+          
+          await InstagramService.createBulkFollowRelationshipsFollowersApiV1InstagramFollowBulkFollowersPost(
+            bulkRequest
+          );
+          
+          totalSent += batch.length;
+          console.log(`[Automation] Sent ${batch.length} followers to API (${totalSent}/${followers.length})`);
+          
+          // Small delay between batches
+          await this.delay(200);
+          
+        } catch (error) {
+          console.error(`[Automation] Failed to send followers batch:`, error);
+          // Continue with other batches even if one fails
+        }
+      }
+      
+      console.log(`[Automation] Successfully sent ${totalSent}/${followers.length} followers to API`);
+      
+    } catch (error) {
+      console.error('[Automation] Error sending followers to API:', error);
+    }
+  }
+
+  /**
+   * Send following to API using BulkFollowRequest2
+   * One follower (me) following multiple accounts
+   */
+  private async sendFollowingToAPI(following: string[]): Promise<void> {
+    try {
+      console.log(`[Automation] Sending ${following.length} following to API...`);
+      
+      // Process in batches to avoid overwhelming the API
+      const batchSize = 100; // Process 100 following at a time
+      const batches = [];
+      
+      for (let i = 0; i < following.length; i += batchSize) {
+        batches.push(following.slice(i, i + batchSize));
+      }
+      
+      let totalSent = 0;
+      for (const batch of batches) {
+        try {
+          const bulkRequest: BulkFollowRequest2 = {
+            follower_username: this.instagramUsername,
+            following_usernames: batch
+          };
+          
+          await InstagramService.createBulkFollowRelationshipsFollowingApiV1InstagramFollowBulkFollowingPost(
+            bulkRequest
+          );
+          
+          totalSent += batch.length;
+          console.log(`[Automation] Sent ${batch.length} following to API (${totalSent}/${following.length})`);
+          
+          // Small delay between batches
+          await this.delay(200);
+          
+        } catch (error) {
+          console.error(`[Automation] Failed to send following batch:`, error);
+          // Continue with other batches even if one fails
+        }
+      }
+      
+      console.log(`[Automation] Successfully sent ${totalSent}/${following.length} following to API`);
+      
+    } catch (error) {
+      console.error('[Automation] Error sending following to API:', error);
     }
   }
 
