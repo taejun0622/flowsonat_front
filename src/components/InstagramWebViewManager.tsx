@@ -9,6 +9,7 @@ import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { collectFollowingToBenchmark, FollowingCollectorResult } from '@/services/followingCollectorService';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
+import { ProfileCollectionService } from '@/services/profileCollectionService';
 import { InstagramService } from '@/api/services/InstagramService';
 import { HealthEnum, StatusEnum } from '@/api';
 
@@ -27,6 +28,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
+  const profileCollectionServiceRef = useRef<ProfileCollectionService | null>(null);
   
   const {
     webViewStatus,
@@ -45,6 +47,53 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const params = new URLSearchParams(location.search);
   const autoExecute = params.get('autoExecute') === '1';
   const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+
+  // Initialize profile collection service when webview is ready
+  useEffect(() => {
+    if (webviewApiRef.current && !profileCollectionServiceRef.current) {
+      profileCollectionServiceRef.current = new ProfileCollectionService(webviewApiRef.current);
+    }
+  }, [webviewApiRef.current]);
+
+  // Monitor URL changes and collect profile history when entering profile pages
+  useEffect(() => {
+    const handleUrlChange = async () => {
+      if (!profileCollectionServiceRef.current || !currentUrl) return;
+
+      // Check if current URL is a profile page (not our own profile)
+      const profileMatch = currentUrl.match(/instagram\.com\/([^\/\?]+)\/?$/);
+      if (profileMatch && profileMatch[1] && profileMatch[1] !== 'accounts' && profileMatch[1] !== 'explore' && profileMatch[1] !== 'reels') {
+        const username = profileMatch[1];
+        
+        // Don't collect history for our own profile
+        if (instagramAccount?.username && username === instagramAccount.username) {
+          return;
+        }
+
+        try {
+          console.log('[WebView] Detected profile page visit:', username);
+          
+          // Wait a bit for page to fully load
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Collect and send profile history
+          const result = await profileCollectionServiceRef.current.collectAndSendProfileHistory();
+          
+          if (result.success) {
+            console.log('[WebView] Successfully collected profile history for:', username);
+          } else {
+            console.warn('[WebView] Failed to collect profile history for:', username, result.error);
+          }
+        } catch (error) {
+          console.error('[WebView] Error collecting profile history:', error);
+        }
+      }
+    };
+
+    // Debounce URL change handling
+    const timeoutId = setTimeout(handleUrlChange, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [currentUrl, instagramAccount?.username]);
 
   // 뒤로가기 핸들러
   const handleGoBack = useCallback(() => {
@@ -448,6 +497,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           onError={handleWebViewError}
           onInstagramLogin={handleInstagramLogin}
           onLoginStatusCheck={handleInstagramStatusCheck}
+          onUrlChange={setCurrentUrl}
           instagramState={webViewStatus.state}
           enableExtension={extensionActive}
           disablePointerEvents={extensionActive && blockNativeInput}

@@ -1,5 +1,6 @@
 import { InstagramService } from '@/api/services/InstagramService';
 import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum } from '@/api';
+import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
   scrollDelay?: number;
@@ -34,6 +35,7 @@ export class AutomationService {
   private webviewApi: any;
   private instagramUsername: string;
   private benchmark: BenchmarkResponse;
+  private profileCollectionService: ProfileCollectionService;
   private options: {
     scrollDelay: number;
     pageLoadDelay: number;
@@ -50,6 +52,7 @@ export class AutomationService {
     this.webviewApi = webviewApi;
     this.instagramUsername = instagramUsername;
     this.benchmark = benchmark;
+    this.profileCollectionService = new ProfileCollectionService(webviewApi);
     this.options = {
       scrollDelay: options.scrollDelay || 1000,
       pageLoadDelay: options.pageLoadDelay || 3000,
@@ -178,6 +181,27 @@ export class AutomationService {
           })();
         `);
       }
+
+      // Wait for page to load
+      await this.delay(this.options.pageLoadDelay);
+
+      // Collect profile information and send to history API
+      try {
+        console.log('[Automation] Collecting profile information for history...');
+        const result = await this.profileCollectionService.collectAndSendProfileHistory();
+        
+        if (result.success) {
+          console.log('[Automation] Successfully collected and sent profile history');
+          this.options.onAction?.('profile_history_collected', profileUrl, true);
+        } else {
+          console.warn('[Automation] Failed to collect profile history:', result.error);
+          this.options.onAction?.('profile_history_failed', profileUrl, false);
+        }
+      } catch (historyError) {
+        console.error('[Automation] Error collecting profile history:', historyError);
+        this.options.onAction?.('profile_history_error', profileUrl, false);
+      }
+
     } catch (error) {
       console.error('[Automation] Navigation error:', error);
       throw error;

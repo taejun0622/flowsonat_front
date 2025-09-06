@@ -38,6 +38,7 @@ interface WebViewProps {
   onError?: (error: any) => void;
   onInstagramLogin?: (sessionData: any) => void;
   onLoginStatusCheck?: (isLoggedIn: boolean) => void;
+  onUrlChange?: (url: string) => void; // URL 변경 콜백 추가
   className?: string;
   instagramState?: string; // Instagram 상태 추가
   enableExtension?: boolean; // 확장프로그램 활성화 여부
@@ -50,6 +51,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   onError,
   onInstagramLogin,
   onLoginStatusCheck,
+  onUrlChange,
   className = "",
   instagramState,
   enableExtension = false,
@@ -793,6 +795,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           const inferredLoggedIn = !onLoginPage;
           console.log('🔎 URL-based status:', { url, inferredLoggedIn });
           onLoginStatusCheck?.(inferredLoggedIn);
+          
+          // Notify parent component of URL change
+          onUrlChange?.(url);
         }
       } catch {}
     };
