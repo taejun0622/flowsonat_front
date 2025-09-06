@@ -6,6 +6,7 @@ import type { BenchmarkCreate } from '../models/BenchmarkCreate';
 import type { BenchmarkListResponse } from '../models/BenchmarkListResponse';
 import type { BenchmarkResponse } from '../models/BenchmarkResponse';
 import type { BenchmarkUpdate } from '../models/BenchmarkUpdate';
+import type { BulkTargetCreate } from '../models/BulkTargetCreate';
 import type { FollowRequest } from '../models/FollowRequest';
 import type { FollowResponse } from '../models/FollowResponse';
 import type { HealthEnum } from '../models/HealthEnum';
@@ -341,6 +342,31 @@ export class InstagramService {
                 'stage': stage,
                 'status': status,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Create Bulk Targets
+     * Create multiple targets for a benchmark in bulk
+     * @param benchmarkId
+     * @param requestBody
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
+        benchmarkId: string,
+        requestBody: BulkTargetCreate,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/benchmarks/{benchmark_id}/targets/bulk',
+            path: {
+                'benchmark_id': benchmarkId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },
