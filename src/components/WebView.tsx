@@ -67,10 +67,19 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [isDomReady, setIsDomReady] = useState(false);
 
   useEffect(() => {
-    setCurrentSrc(src);
-    // New navigation; wait for next dom-ready
-    setIsDomReady(false);
-  }, [src]);
+    console.log('[WebView] Source URL changed:', src);
+    console.log('[WebView] Previous source:', currentSrc);
+    
+    // Only update if the URL is actually different to avoid unnecessary reloads
+    if (src !== currentSrc) {
+      console.log('[WebView] URL is different, updating currentSrc');
+      setCurrentSrc(src);
+      // New navigation; wait for next dom-ready
+      setIsDomReady(false);
+    } else {
+      console.log('[WebView] URL is the same, skipping update to preserve session');
+    }
+  }, [src, currentSrc]);
 
   // Instagram disconnect 후 강제 리렌더링 이벤트 감지
   useEffect(() => {

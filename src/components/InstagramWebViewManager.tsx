@@ -25,7 +25,17 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const navigate = useNavigate();
   const location = useLocation();
   const { disconnectAccount, instagramAccount } = useInstagram();
-  const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
+  
+  // Check URL parameters for initial URL and auto-execution
+  const params = new URLSearchParams(location.search);
+  const urlParam = params.get('url');
+  const autoExecute = params.get('autoExecute') === '1';
+  const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+  
+  // Use URL parameter if provided, otherwise default to login page
+  const [currentUrl, setCurrentUrl] = useState<string>(
+    urlParam ? decodeURIComponent(urlParam) : 'https://www.instagram.com/accounts/login/'
+  );
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
   const profileCollectionServiceRef = useRef<ProfileCollectionService | null>(null);
@@ -43,10 +53,22 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     handleManualUsernameConfirm
   } = useInstagramWebView();
 
-  // Check URL parameters for auto-execution
-  const params = new URLSearchParams(location.search);
-  const autoExecute = params.get('autoExecute') === '1';
-  const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+  // Update currentUrl when URL parameter changes
+  useEffect(() => {
+    if (urlParam) {
+      const decodedUrl = decodeURIComponent(urlParam);
+      if (decodedUrl !== currentUrl) {
+        console.log('[WebView] URL parameter changed, updating currentUrl:', decodedUrl);
+        console.log('[WebView] Previous URL:', currentUrl);
+        setCurrentUrl(decodedUrl);
+      }
+    }
+  }, [urlParam, currentUrl]);
+
+  // Log when currentUrl changes
+  useEffect(() => {
+    console.log('[WebView] Current URL updated:', currentUrl);
+  }, [currentUrl]);
 
   // Initialize profile collection service when webview is ready
   useEffect(() => {
@@ -148,6 +170,16 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     console.error('WebView error:', error);
     setIsLoading(false);
   }, []);
+
+  // WebView URL 변경 핸들러 (세션 유지를 위해 상태 업데이트하지 않음)
+  const handleUrlChange = useCallback((url: string) => {
+    console.log('[WebView] URL changed from WebView:', url);
+    console.log('[WebView] Current URL state:', currentUrl);
+    
+    // WebView 내부에서 URL이 변경되어도 React 상태는 업데이트하지 않음
+    // 이렇게 하면 WebView의 src prop이 변경되지 않아 세션이 유지됨
+    console.log('[WebView] Skipping currentUrl state update to preserve session');
+  }, [currentUrl]);
   
   // Whether to block native input (overlay + pointer-events: none)
   const [blockNativeInput, setBlockNativeInput] = useState<boolean>(true);
@@ -504,7 +536,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           onError={handleWebViewError}
           onInstagramLogin={handleInstagramLogin}
           onLoginStatusCheck={handleInstagramStatusCheck}
-          onUrlChange={setCurrentUrl}
+          onUrlChange={handleUrlChange}
           instagramState={webViewStatus.state}
           enableExtension={extensionActive}
           disablePointerEvents={extensionActive && blockNativeInput}
