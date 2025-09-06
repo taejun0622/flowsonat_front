@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkCreate } from '@/api';
+import { BenchmarkCreate, BulkTargetCreate, TargetCreate } from '@/api';
 
 export interface FollowingCollectionOptions {
   scrollDelay?: number;
@@ -312,30 +312,63 @@ export class FollowingCollectionService {
       const benchmark = await InstagramService.createBenchmarkApiV1InstagramBenchmarksPost(createData);
       console.log(`[Following Collection] Created benchmark: ${benchmark.id}`);
       
-      // 2. Add following as targets
+      // 2. Add following as targets using Bulk API
       console.log(`[Following Collection] Adding ${following.length} following as targets...`);
       let addedTargets = 0;
       
-      for (const followingUsername of following) {
+      // Process targets in batches to avoid overwhelming the API
+      const batchSize = 50; // Process 50 targets at a time
+      const batches = [];
+      
+      for (let i = 0; i < following.length; i += batchSize) {
+        batches.push(following.slice(i, i + batchSize));
+      }
+      
+      for (const batch of batches) {
         try {
-          const targetData = {
-            ig_username: followingUsername
+          const bulkTargetData: BulkTargetCreate = {
+            targets: batch.map(username => ({ ig_username: username }))
           };
           
-          await InstagramService.createTargetApiV1InstagramBenchmarksBenchmarkIdTargetsPost(
+          await InstagramService.createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
             benchmark.id,
-            targetData
+            bulkTargetData
           );
           
-          addedTargets++;
+          addedTargets += batch.length;
           this.options.onProgress?.(addedTargets, following.length, `Added ${addedTargets} targets...`);
           
-          // Small delay to avoid overwhelming the API
-          await this.delay(100);
+          console.log(`[Following Collection] Created ${batch.length} targets in bulk`);
+          
+          // Small delay between batches to avoid overwhelming the API
+          await this.delay(200);
           
         } catch (error) {
-          console.error(`[Following Collection] Error adding target ${followingUsername}:`, error);
-          // Continue with other targets even if one fails
+          console.error(`[Following Collection] Bulk target creation failed, falling back to individual creation:`, error);
+          
+          // Fallback to individual creation if bulk fails
+          for (const followingUsername of batch) {
+            try {
+              const targetData = {
+                ig_username: followingUsername
+              };
+              
+              await InstagramService.createTargetApiV1InstagramBenchmarksBenchmarkIdTargetsPost(
+                benchmark.id,
+                targetData
+              );
+              
+              addedTargets++;
+              this.options.onProgress?.(addedTargets, following.length, `Added ${addedTargets} targets...`);
+              
+              // Small delay to avoid overwhelming the API
+              await this.delay(100);
+              
+            } catch (individualError) {
+              console.error(`[Following Collection] Error adding target ${followingUsername}:`, individualError);
+              // Continue with other targets even if one fails
+            }
+          }
         }
       }
       

@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -363,8 +363,6 @@ export class AutomationService {
       let targetsCollected = 0;
       
       for (const benchmark of benchmarks) {
-        if (targetsCollected >= 250) break; // Max 250 targets
-        
         try {
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
@@ -377,18 +375,60 @@ export class AutomationService {
             // Collect followers from this profile
             const followers = await this.collectFollowersFromProfile(benchmark.ig.username);
             
-            // Create targets from followers
-            for (const follower of followers) {
-              if (targetsCollected >= 250) break;
-              
+            // Create targets from followers using Bulk API (no limit for target creation)
+            if (followers.length > 0) {
               try {
-                await InstagramService.createTargetApiV1InstagramBenchmarksBenchmarkIdTargetsPost(
+                const bulkTargetData: BulkTargetCreate = {
+                  targets: followers.map(follower => ({ ig_username: follower }))
+                };
+                
+                await InstagramService.createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
                   benchmark.id,
-                  { ig_username: follower }
+                  bulkTargetData
                 );
-                targetsCollected++;
+                
+                targetsCollected += followers.length;
+                console.log(`[Automation] Created ${followers.length} targets in bulk`);
               } catch (error) {
-                console.error(`[Automation] Failed to create target for ${follower}:`, error);
+                console.error(`[Automation] Bulk target creation failed, trying smaller batches:`, error);
+                
+                // Try smaller batches if bulk fails
+                const batchSize = 10;
+                for (let i = 0; i < followers.length; i += batchSize) {
+                  const batch = followers.slice(i, i + batchSize);
+                  
+                  try {
+                    const batchData: BulkTargetCreate = {
+                      targets: batch.map(follower => ({ ig_username: follower }))
+                    };
+                    
+                    await InstagramService.createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
+                      benchmark.id,
+                      batchData
+                    );
+                    
+                    targetsCollected += batch.length;
+                    console.log(`[Automation] Created ${batch.length} targets in smaller batch`);
+                    
+                    // Small delay between batches
+                    await this.delay(100);
+                  } catch (batchError) {
+                    console.error(`[Automation] Batch creation failed, falling back to individual creation for batch:`, batchError);
+                    
+                    // Only fallback to individual for this specific batch
+                    for (const follower of batch) {
+                      try {
+                        await InstagramService.createTargetApiV1InstagramBenchmarksBenchmarkIdTargetsPost(
+                          benchmark.id,
+                          { ig_username: follower }
+                        );
+                        targetsCollected++;
+                      } catch (individualError) {
+                        console.error(`[Automation] Failed to create target for ${follower}:`, individualError);
+                      }
+                    }
+                  }
+                }
               }
             }
           }
