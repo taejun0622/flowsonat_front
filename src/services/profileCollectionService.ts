@@ -31,9 +31,9 @@ export class ProfileCollectionService {
 
       // 프로필 정보 수집 스크립트 실행
       const profileData = await this.webviewApi.executeScript(`
-        (() => {
+        (function() {
           try {
-            const result = {
+            var result = {
               username: '',
               bio: '',
               followers: '',
@@ -41,86 +41,130 @@ export class ProfileCollectionService {
               links: ''
             };
 
+            // header 태그 찾기
+            var headerElement = document.querySelector('header');
+            if (!headerElement) {
+              console.log('[Profile Collection] Header element not found');
+              return result;
+            }
+
             // Username 추출 (h2 태그 내 span)
-            const usernameElement = document.querySelector('h2 span');
+            var usernameElement = headerElement.querySelector('h2 span');
             if (usernameElement) {
-              result.username = usernameElement.textContent?.trim() || '';
-            }
-
-            // Followers 수 추출
-            const followersLink = document.querySelector('a[href*="/followers/"]');
-            if (followersLink) {
-              const followersSpan = followersLink.querySelector('span span');
-              if (followersSpan) {
-                result.followers = followersSpan.textContent?.trim() || '';
+              result.username = usernameElement.textContent ? usernameElement.textContent.trim() : '';
+              console.log('[Profile Collection] Found username element:', usernameElement);
+              console.log('[Profile Collection] Username text:', result.username);
+            } else {
+              console.log('[Profile Collection] Username element not found');
+              // 대안: h2 태그에서 직접 추출 시도
+              var h2Element = headerElement.querySelector('h2');
+              if (h2Element) {
+                result.username = h2Element.textContent ? h2Element.textContent.trim() : '';
+                console.log('[Profile Collection] Username from h2:', result.username);
               }
             }
 
-            // Following 수 추출
-            const followingLink = document.querySelector('a[href*="/following/"]');
-            if (followingLink) {
-              const followingSpan = followingLink.querySelector('span span');
-              if (followingSpan) {
-                result.following = followingSpan.textContent?.trim() || '';
+            // Posts, Followers, Following 수 추출
+            var allSpans = headerElement.querySelectorAll('span');
+            
+            for (var i = 0; i < allSpans.length; i++) {
+              var span = allSpans[i];
+              var text = span.textContent ? span.textContent.trim() : '';
+              
+              if (text === 'posts') {
+                // 이전 span에서 posts 수 추출
+                var prevSpan = span.previousElementSibling;
+                if (prevSpan && prevSpan.tagName === 'SPAN') {
+                  var postsText = prevSpan.textContent ? prevSpan.textContent.trim() : '';
+                  if (postsText) {
+                    console.log('[Profile Collection] Posts:', postsText);
+                  }
+                }
+              } else if (text === 'followers') {
+                // 이전 span에서 followers 수 추출
+                var prevSpan = span.previousElementSibling;
+                if (prevSpan && prevSpan.tagName === 'SPAN') {
+                  result.followers = prevSpan.textContent ? prevSpan.textContent.trim() : '';
+                }
+              } else if (text === 'following') {
+                // 이전 span에서 following 수 추출
+                var prevSpan = span.previousElementSibling;
+                if (prevSpan && prevSpan.tagName === 'SPAN') {
+                  result.following = prevSpan.textContent ? prevSpan.textContent.trim() : '';
+                }
               }
             }
 
-            // Bio 정보 추출 (JSON 형태로 구조화)
-            const bioSection = document.querySelector('section[class*="x1xdureb"][class*="x18wylqe"]');
-            if (bioSection) {
-              const bioData: any = {};
-              
-              // 이름 부분 (첫 번째 div span[dir="auto"])
-              const nameElement = bioSection.querySelector('div span[dir="auto"]');
-              if (nameElement) {
-                const name = nameElement.textContent?.trim();
-                if (name) bioData.name = name;
+            // Bio 정보 추출 (header 내의 텍스트 내용)
+            var bioTexts = [];
+            
+            // header 내의 모든 텍스트 노드 수집
+            var walker = document.createTreeWalker(
+              headerElement,
+              NodeFilter.SHOW_TEXT,
+              {
+                acceptNode: function(node) {
+                  var text = node.textContent ? node.textContent.trim() : '';
+                  if (!text) return NodeFilter.FILTER_REJECT;
+                  
+                  // username, posts, followers, following은 제외
+                  if (text === result.username || 
+                      text === 'posts' || 
+                      text === 'followers' || 
+                      text === 'following' ||
+                      text === 'Following' ||
+                      text === 'Message' ||
+                      text === 'Options' ||
+                      text === 'Followed by') {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  
+                  // 숫자나 숫자+문자(K, M 등)인 경우 제외 (posts, followers, following 수)
+                  if (/^\\d+[KMB]?$/.test(text) || /^\\d+\\.\\d+[KMB]?$/.test(text)) {
+                    return NodeFilter.FILTER_REJECT;
+                  }
+                  
+                  return NodeFilter.FILTER_ACCEPT;
+                }
               }
-              
-              // 설명 부분 (span[dir="auto"] div)
-              const descriptionElement = bioSection.querySelector('span[dir="auto"] div');
-              if (descriptionElement) {
-                const description = descriptionElement.textContent?.trim();
-                if (description) bioData.description = description;
+            );
+
+            var node;
+            while (node = walker.nextNode()) {
+              var text = node.textContent ? node.textContent.trim() : '';
+              if (text && text.length > 1) {
+                bioTexts.push(text);
               }
-              
-              // 해시태그 추출
-              const hashtags: string[] = [];
-              const hashtagLinks = bioSection.querySelectorAll('a[href*="/explore/tags/"]');
-              hashtagLinks.forEach(link => {
-                const hashtag = link.textContent?.trim();
-                if (hashtag) hashtags.push(hashtag);
-              });
-              if (hashtags.length > 0) {
-                bioData.hashtags = hashtags;
-              }
-              
-              // JSON 문자열로 변환
-              if (Object.keys(bioData).length > 0) {
-                result.bio = JSON.stringify(bioData);
-              }
+            }
+
+            // Bio 텍스트 정리 및 결합
+            if (bioTexts.length > 0) {
+              result.bio = bioTexts.join(' ').replace(/\\s+/g, ' ').trim();
             }
 
             // Links 추출 (프로필 링크, 웹사이트 링크 등)
-            const links: string[] = [];
+            var links = [];
             
             // 프로필 링크 (username 링크)
-            const profileLink = document.querySelector('a[href*="/' + result.username + '/"]');
-            if (profileLink) {
-              const href = profileLink.getAttribute('href');
-              if (href) {
-                links.push('https://www.instagram.com' + href);
+            if (result.username) {
+              var profileLink = headerElement.querySelector('a[href*="/' + result.username + '/"]');
+              if (profileLink) {
+                var href = profileLink.getAttribute('href');
+                if (href) {
+                  links.push('https://www.instagram.com' + href);
+                }
               }
             }
             
             // 웹사이트 링크 (bio에 있는 외부 링크)
-            const externalLinks = document.querySelectorAll('a[href^="http"]:not([href*="instagram.com"])');
-            externalLinks.forEach(link => {
-              const href = link.getAttribute('href');
+            var externalLinks = headerElement.querySelectorAll('a[href^="http"]:not([href*="instagram.com"])');
+            for (var j = 0; j < externalLinks.length; j++) {
+              var link = externalLinks[j];
+              var href = link.getAttribute('href');
               if (href) {
                 links.push(href);
               }
-            });
+            }
             
             result.links = links.join(', ');
 
@@ -159,6 +203,14 @@ export class ProfileCollectionService {
   async sendProfileHistory(profileInfo: ProfileInfo): Promise<boolean> {
     try {
       console.log('[Profile Collection] Sending profile history for:', profileInfo.username);
+      console.log('[Profile Collection] Full profile info:', profileInfo);
+
+      // Username이 비어있는 경우 에러 처리
+      if (!profileInfo.username || profileInfo.username.trim() === '') {
+        console.error('[Profile Collection] Username is empty or undefined');
+        console.error('[Profile Collection] Cannot send history without username');
+        return false;
+      }
 
       const historyData: IGHistoryCreate = {
         bio: profileInfo.bio || null,
@@ -166,6 +218,8 @@ export class ProfileCollectionService {
         followers: profileInfo.followers || null,
         followings: profileInfo.following || null
       };
+
+      console.log('[Profile Collection] History data to send:', historyData);
 
       await InstagramService.createHistoryApiV1InstagramHistoryUsernamePost(
         profileInfo.username,
