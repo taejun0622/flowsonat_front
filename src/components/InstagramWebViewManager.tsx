@@ -60,6 +60,13 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     const handleUrlChange = async () => {
       if (!profileCollectionServiceRef.current || !currentUrl) return;
 
+      // Skip URL change handling if we're in a modal (followers/following pages) or during automation
+      if (currentUrl.includes('/followers/') || currentUrl.includes('/following/') || 
+          isRunningAutomation || isCollectingFollowing) {
+        console.log('[WebView] Skipping URL change handling - in modal or during automation:', currentUrl);
+        return;
+      }
+
       // Check if current URL is a profile page (not our own profile)
       const profileMatch = currentUrl.match(/instagram\.com\/([^\/\?]+)\/?$/);
       if (profileMatch && profileMatch[1] && profileMatch[1] !== 'accounts' && profileMatch[1] !== 'explore' && profileMatch[1] !== 'reels') {
