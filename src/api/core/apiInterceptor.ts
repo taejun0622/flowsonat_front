@@ -1,11 +1,25 @@
 import { ApiError } from './ApiError';
 import { AuthService } from '../services/AuthService';
 
-// 토스트 알림을 위한 함수 (옵션)
+// 토스트 알림을 위한 함수
 const showToast = (title: string, description: string, variant: 'default' | 'destructive' = 'default') => {
   // 토스트 시스템이 있다면 사용, 없으면 console.log
-  if (typeof window !== 'undefined' && window.showToast) {
-    window.showToast({ title, description, variant });
+  if (typeof window !== 'undefined') {
+    try {
+      // useToast 훅의 toast 함수를 직접 import하여 사용
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title,
+          description,
+          variant,
+        });
+      }).catch(() => {
+        // 토스트 시스템을 사용할 수 없는 경우 console.log로 대체
+        console.log(`${title}: ${description}`);
+      });
+    } catch (error) {
+      console.log(`${title}: ${description}`);
+    }
   } else {
     console.log(`${title}: ${description}`);
   }
@@ -14,19 +28,22 @@ const showToast = (title: string, description: string, variant: 'default' | 'des
 interface PendingRequest {
   resolve: (value: any) => void;
   reject: (error: any) => void;
-  config: any;
+  retryRequest: () => Promise<any>;
 }
 
 class ApiInterceptor {
   private isRefreshing = false;
   private failedQueue: PendingRequest[] = [];
 
-  private processQueue(error: any, _token: string | null = null) {
-    this.failedQueue.forEach(({ resolve, reject, config }) => {
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach(({ resolve, reject, retryRequest }) => {
       if (error) {
         reject(error);
       } else {
-        resolve(config);
+        // 새로운 토큰으로 원래 요청 재시도
+        retryRequest()
+          .then(resolve)
+          .catch(reject);
       }
     });
     
@@ -59,10 +76,10 @@ class ApiInterceptor {
 
     if (error.status === 401 && !originalRequest._retry) {
       if (this.isRefreshing) {
-        // 이미 토큰 갱신 중이면 큐에 추가
+        // 이미 토큰 갱신 중이면 큐에 추가하고 대기
         return new Promise((resolve, reject) => {
-          this.failedQueue.push({ resolve, reject, config: originalRequest });
-        }).then(() => retryRequest());
+          this.failedQueue.push({ resolve, reject, retryRequest });
+        });
       }
 
       (originalRequest as any)._retry = true;
@@ -71,6 +88,11 @@ class ApiInterceptor {
       try {
         // Refresh token으로 새로운 access token 발급
         const refreshToken = localStorage.getItem('refresh_token') || '';
+        
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
         const tokenData = await AuthService.refreshTokenApiV1AuthRefreshPost(refreshToken);
         
         // 새로운 토큰을 localStorage에 저장
@@ -81,13 +103,15 @@ class ApiInterceptor {
         const { updateToken } = await import('./OpenAPI');
         updateToken(tokenData.access_token);
 
-        // 대기 중인 요청들 처리
+        // 대기 중인 요청들 처리 (새로운 토큰으로 재시도)
         this.processQueue(null, tokenData.access_token);
         
         // 원래 요청 재시도
         return retryRequest();
       } catch (refreshError) {
-        // 토큰 갱신 실패 시 로그아웃 처리
+        console.error('Token refresh failed:', refreshError);
+        
+        // 토큰 갱신 실패 시 대기 중인 모든 요청들 실패 처리
         this.processQueue(refreshError, null);
         
         // localStorage 정리
@@ -97,8 +121,10 @@ class ApiInterceptor {
         // 토큰 갱신 실패 알림
         showToast('Session Expired', 'Your session has expired. Please log in again.', 'destructive');
         
-        // 로그인 페이지로 리다이렉트
-        window.location.href = '/login';
+        // 로그인 페이지로 리다이렉트 (약간의 지연을 두어 토스트가 보이도록)
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1000);
         
         throw refreshError;
       } finally {
