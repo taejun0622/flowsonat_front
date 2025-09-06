@@ -362,7 +362,10 @@ export class AutomationService {
       const benchmarks = await this.getHealthyBenchmarks();
       let targetsCollected = 0;
       
-      for (const benchmark of benchmarks) {
+      // Shuffle benchmarks array to randomize processing order
+      const shuffledBenchmarks = this.shuffleArray([...benchmarks]);
+      
+      for (const benchmark of shuffledBenchmarks) {
         try {
           // Check 500+ limit before processing each benchmark
           const currentPendingTargets = await this.getPendingTargets();
@@ -1007,6 +1010,18 @@ export class AutomationService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Shuffle array using Fisher-Yates algorithm
+   */
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 }
 
