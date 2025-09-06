@@ -5,6 +5,7 @@
 import type { IGResponse } from './IGResponse';
 import type { StatusEnum } from './StatusEnum';
 export type IGHistoryResponse = {
+    raw_data?: (string | null);
     bio?: (string | null);
     links?: (string | null);
     followers?: (string | null);

@@ -14,6 +14,7 @@ export type { BenchmarkUpdate } from './models/BenchmarkUpdate';
 export type { BulkFollowRequest1 } from './models/BulkFollowRequest1';
 export type { BulkFollowRequest2 } from './models/BulkFollowRequest2';
 export type { BulkTargetCreate } from './models/BulkTargetCreate';
+export type { BulkTargetUpdateResponse } from './models/BulkTargetUpdateResponse';
 export type { CustomerPortalResponse } from './models/CustomerPortalResponse';
 export type { DownloadInfo } from './models/DownloadInfo';
 export type { EmailQuotaResponse } from './models/EmailQuotaResponse';

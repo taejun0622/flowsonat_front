@@ -9,6 +9,7 @@ import type { BenchmarkUpdate } from '../models/BenchmarkUpdate';
 import type { BulkFollowRequest1 } from '../models/BulkFollowRequest1';
 import type { BulkFollowRequest2 } from '../models/BulkFollowRequest2';
 import type { BulkTargetCreate } from '../models/BulkTargetCreate';
+import type { BulkTargetUpdateResponse } from '../models/BulkTargetUpdateResponse';
 import type { FollowRequest } from '../models/FollowRequest';
 import type { FollowResponse } from '../models/FollowResponse';
 import type { HealthEnum } from '../models/HealthEnum';
@@ -76,15 +77,15 @@ export class InstagramService {
         });
     }
     /**
-     * Create Bulk Follow Relationships Followers
-     * Create multiple follow relationships where multiple followers follow one account
+     * Update Bulk Target Stages Followers
+     * Update target stages when multiple followers follow one account
      * @param requestBody
-     * @returns FollowResponse Successful Response
+     * @returns BulkTargetUpdateResponse Successful Response
      * @throws ApiError
      */
-    public static createBulkFollowRelationshipsFollowersApiV1InstagramFollowBulkFollowersPost(
+    public static updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
         requestBody: BulkFollowRequest1,
-    ): CancelablePromise<Array<FollowResponse>> {
+    ): CancelablePromise<BulkTargetUpdateResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/instagram/follow/bulk/followers',
@@ -96,15 +97,15 @@ export class InstagramService {
         });
     }
     /**
-     * Create Bulk Follow Relationships Following
-     * Create multiple follow relationships where one follower follows multiple accounts
+     * Update Bulk Target Stages Following
+     * Update target stages when one follower follows multiple accounts
      * @param requestBody
-     * @returns FollowResponse Successful Response
+     * @returns BulkTargetUpdateResponse Successful Response
      * @throws ApiError
      */
-    public static createBulkFollowRelationshipsFollowingApiV1InstagramFollowBulkFollowingPost(
+    public static updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
         requestBody: BulkFollowRequest2,
-    ): CancelablePromise<Array<FollowResponse>> {
+    ): CancelablePromise<BulkTargetUpdateResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/instagram/follow/bulk/following',
