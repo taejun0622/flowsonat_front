@@ -106,7 +106,7 @@ export class FollowingCollectorService {
   private async collectFollowingFromModal(): Promise<string[]> {
     const following: string[] = [];
     let unchangedScrolls = 0;
-    const maxUnchangedScrolls = 10; // Increased for better stability with more scrolls
+    const maxUnchangedScrolls = 5; // Reduced for faster completion
     let prevSnapshot = '';
 
     console.log('[Following Collection] Starting following collection...');

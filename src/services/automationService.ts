@@ -550,7 +550,7 @@ export class AutomationService {
   private async collectUsernamesFromModalWithScroll(): Promise<string[]> {
     const usernames: string[] = [];
     let unchangedScrolls = 0;
-    const maxUnchangedScrolls = 10; // Increased for better stability with more scrolls
+    const maxUnchangedScrolls = 5; // Reduced for faster completion
     let prevSnapshot = '';
 
     console.log('[Automation] Starting username collection with scrolling...');
