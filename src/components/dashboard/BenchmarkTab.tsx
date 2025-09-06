@@ -135,23 +135,19 @@ export const BenchmarkTab = () => {
     }
   };
 
-  const handleUpdateBenchmark = async () => {
+  const handleDeactivateBenchmark = async () => {
     if (!selectedBenchmark) return;
 
     try {
       setLoading(true);
-      const updateData: BenchmarkUpdate = {
-        health: selectedBenchmark.health // Keep existing health
-      };
       
-      await InstagramService.updateBenchmarkApiV1InstagramBenchmarksBenchmarkIdPut(
-        selectedBenchmark.id,
-        updateData
+      await InstagramService.deleteBenchmarkApiV1InstagramBenchmarksBenchmarkIdDelete(
+        selectedBenchmark.id
       );
       
       toast({
         title: "Success",
-        description: "Benchmark updated successfully",
+        description: "Benchmark deactivated successfully",
       });
       
       setEditDialogOpen(false);
@@ -159,10 +155,10 @@ export const BenchmarkTab = () => {
       setFormData({ ig_username: '', status: '' });
       loadBenchmarks();
     } catch (error) {
-      console.error('Failed to update benchmark:', error);
+      console.error('Failed to deactivate benchmark:', error);
       toast({
         title: "Error",
-        description: "Failed to update benchmark",
+        description: "Failed to deactivate benchmark",
         variant: "destructive",
       });
     } finally {
@@ -275,10 +271,6 @@ export const BenchmarkTab = () => {
 
   const openEditDialog = (benchmark: BenchmarkResponse) => {
     setSelectedBenchmark(benchmark);
-    setFormData({
-      ig_username: benchmark.ig.username || '',
-      status: benchmark.status
-    });
     setEditDialogOpen(true);
   };
 
@@ -586,36 +578,11 @@ export const BenchmarkTab = () => {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Benchmark</DialogTitle>
+            <DialogTitle className="text-white">Deactivate Benchmark</DialogTitle>
             <DialogDescription className="text-gray-300">
-              Update the status of this benchmark.
+              Are you sure you want to deactivate this benchmark?
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="status" className="text-white">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: any) => setFormData({ ...formData, status: value as StatusEnum })}
-              >
-                <SelectTrigger className="bg-black/20 border-black/30 text-white focus:border-white/30">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent className="bg-black/40 backdrop-blur-md border-black/30">
-                  <SelectItem value={StatusEnum.ACTIVE}>Active</SelectItem>
-                  <SelectItem value={StatusEnum.DELETED}>Deleted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-white">Health Status (Read-only)</Label>
-              <div className="p-3 bg-black/20 border border-black/30 rounded-md">
-                <span className={`font-medium ${getHealthColor(selectedBenchmark?.health)}`}>
-                  {selectedBenchmark?.health || 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -625,11 +592,11 @@ export const BenchmarkTab = () => {
               Cancel
             </Button>
             <Button
-              onClick={handleUpdateBenchmark}
+              onClick={handleDeactivateBenchmark}
               disabled={loading}
-              className="bg-white text-gray-900 hover:bg-gray-100"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Deactivating...' : 'Deactivate'}
             </Button>
           </DialogFooter>
         </DialogContent>
