@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2 } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -15,13 +15,14 @@ export interface AutomationResult {
   targetsProcessed: string[];
   errors: string[];
   executionTime: number;
-  stage: 'profile_collection' | 'unfollow' | 'target_collection' | 'follow' | 'completed';
+  stage: 'profile_collection' | 'unfollow' | 'target_collection' | 'follow' | 'suggestion_collection' | 'completed';
   details: {
     followersCollected?: number;
     followingCollected?: number;
     unfollowedCount?: number;
     targetsCollected?: number;
     followedCount?: number;
+    suggestionsCollected?: number;
   };
 }
 
@@ -72,34 +73,39 @@ export class AutomationService {
       this.options.onProgress?.(0, 0, 'Starting workflow automation...');
       
       // Stage 1: Profile Collection (Followers & Following)
-      this.options.onProgress?.(0, 4, 'Stage 1: Collecting profile information...');
+      this.options.onProgress?.(0, 5, 'Stage 1: Collecting profile information...');
       const profileResult = await this.collectProfileInformation();
       details.followersCollected = profileResult.followersCollected;
       details.followingCollected = profileResult.followingCollected;
       
       // Stage 2: Unfollow
-      this.options.onProgress?.(1, 4, 'Stage 2: Processing unfollows...');
+      this.options.onProgress?.(1, 5, 'Stage 2: Processing unfollows...');
       const unfollowResult = await this.processUnfollows();
       details.unfollowedCount = unfollowResult.unfollowedCount;
       
       // Stage 3: Target Collection
-      this.options.onProgress?.(2, 4, 'Stage 3: Collecting targets...');
+      this.options.onProgress?.(2, 5, 'Stage 3: Collecting targets...');
       const targetResult = await this.collectTargets();
       details.targetsCollected = targetResult.targetsCollected;
       
       // Stage 4: Follow
-      this.options.onProgress?.(3, 4, 'Stage 4: Processing follows...');
+      this.options.onProgress?.(3, 5, 'Stage 4: Processing follows...');
       const followResult = await this.processFollows();
       details.followedCount = followResult.followedCount;
       
-      // Stage 5: Complete
-      this.options.onProgress?.(4, 4, 'Workflow completed successfully!');
+      // Stage 5: Suggestion Collection
+      this.options.onProgress?.(4, 5, 'Stage 5: Collecting suggestions...');
+      const suggestionResult = await this.collectSuggestions();
+      details.suggestionsCollected = suggestionResult.suggestionsCollected;
+      
+      // Stage 6: Complete
+      this.options.onProgress?.(5, 5, 'Workflow completed successfully!');
       
       const executionTime = Date.now() - startTime;
       
       return {
         success: true,
-        actionsPerformed: (details.followersCollected || 0) + (details.followingCollected || 0) + (details.unfollowedCount || 0) + (details.targetsCollected || 0) + (details.followedCount || 0),
+        actionsPerformed: (details.followersCollected || 0) + (details.followingCollected || 0) + (details.unfollowedCount || 0) + (details.targetsCollected || 0) + (details.followedCount || 0) + (details.suggestionsCollected || 0),
         targetsProcessed,
         errors,
         executionTime,
@@ -534,6 +540,49 @@ export class AutomationService {
     } catch (error) {
       console.error('[Automation] Follow processing error:', error);
       return { followedCount: 0 };
+    }
+  }
+
+  // Stage 5: Suggestion Collection
+  private async collectSuggestions(): Promise<{ suggestionsCollected: number }> {
+    try {
+      console.log('[Automation] Starting suggestion collection...');
+      
+      // Navigate to Instagram Suggested page
+      const suggestedUrl = 'https://www.instagram.com/explore/people/suggested/';
+      await this.navigateToProfile(suggestedUrl);
+      await this.delay(this.options.pageLoadDelay);
+      
+      // Extract usernames from the Suggested page
+      const usernames = await this.extractUsernamesFromSuggestedPage();
+      
+      console.log(`[Automation] Extracted ${usernames.length} usernames from Suggested page`);
+      
+      // Create suggestions using the API
+      let suggestionsCollected = 0;
+      for (const username of usernames) {
+        try {
+          const suggestionData: SuggestionCreate = {
+            ig_username: username
+          };
+          
+          await InstagramService.createSuggestionApiV1InstagramSuggestionsPost(suggestionData);
+          suggestionsCollected++;
+          this.options.onAction?.('suggestion_created', username, true);
+          
+          // Small delay between API calls
+          await this.delay(100);
+        } catch (error) {
+          console.error(`[Automation] Failed to create suggestion for ${username}:`, error);
+          this.options.onAction?.('suggestion_failed', username, false);
+        }
+      }
+      
+      console.log(`[Automation] Successfully created ${suggestionsCollected} suggestions`);
+      return { suggestionsCollected };
+    } catch (error) {
+      console.error('[Automation] Suggestion collection error:', error);
+      return { suggestionsCollected: 0 };
     }
   }
 
@@ -1010,6 +1059,70 @@ export class AutomationService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Extract usernames from Instagram Suggested page
+   */
+  private async extractUsernamesFromSuggestedPage(): Promise<string[]> {
+    try {
+      console.log('[Automation] Extracting usernames from Suggested page...');
+      
+      const result = await this.webviewApi.executeScript(`
+        (function(){
+          try {
+            var usernames = [];
+            var anchors = document.querySelectorAll('a[href*="/"]');
+            
+            for (var i = 0; i < anchors.length; i++) {
+              var anchor = anchors[i];
+              var href = anchor.getAttribute('href') || '';
+              
+              // Match Instagram profile URLs
+              var match = href.match(/^\\/([A-Za-z0-9._]{1,30})\\/?$/);
+              if (match) {
+                var username = match[1].toLowerCase();
+                
+                // Filter out reserved usernames and common non-profile links
+                var reserved = ['explore', 'accounts', 'about', 'privacy', 'terms', 'policies', 'legal', 
+                              'reels', 'reel', 'channels', 'stories', 'tv', 'directory', 'web', 'graphql',
+                              'developer', 'business', 'ads', 'press', 'blog', 'api', 'help', 'sessions',
+                              'direct', 'p', 'suggested', 'people'];
+                
+                if (!reserved.includes(username) && username.length > 1) {
+                  usernames.push(username);
+                }
+              }
+            }
+            
+            // Remove duplicates
+            var uniqueUsernames = [...new Set(usernames)];
+            
+            return JSON.stringify({
+              usernames: uniqueUsernames,
+              total: uniqueUsernames.length,
+              url: window.location.href
+            });
+          } catch (e) {
+            return JSON.stringify({ __error: e.message || String(e) });
+          }
+        })();
+      `);
+
+      const parsed = JSON.parse(result || '{}');
+      if (parsed.__error) {
+        console.error('[Automation] Error extracting usernames:', parsed.__error);
+        return [];
+      }
+
+      const usernames = parsed.usernames || [];
+      console.log(`[Automation] Extracted ${usernames.length} unique usernames from Suggested page`);
+      
+      return usernames;
+    } catch (error) {
+      console.error('[Automation] Error extracting usernames from Suggested page:', error);
+      return [];
+    }
   }
 
   /**
