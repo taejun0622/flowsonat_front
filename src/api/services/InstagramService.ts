@@ -395,13 +395,13 @@ export class InstagramService {
      * Create multiple targets for a benchmark in bulk
      * @param benchmarkId
      * @param requestBody
-     * @returns any Successful Response
+     * @returns TargetListResponse Successful Response
      * @throws ApiError
      */
     public static createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
         benchmarkId: string,
         requestBody: BulkTargetCreate,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<TargetListResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/instagram/benchmarks/{benchmark_id}/targets/bulk',

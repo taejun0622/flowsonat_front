@@ -350,10 +350,10 @@ export class AutomationService {
   // Stage 3: Target Collection
   private async collectTargets(): Promise<{ targetsCollected: number }> {
     try {
-      // Check if we have less than 500 PENDING targets
-      const pendingTargets = await this.getPendingTargets();
+      // Initial check if we have less than 500 PENDING targets
+      const initialPendingTargets = await this.getPendingTargets();
       
-      if (pendingTargets.length >= 500) {
+      if (initialPendingTargets.length >= 500) {
         this.options.onProgress?.(0, 1, 'Skipping target collection (500+ pending targets)');
         return { targetsCollected: 0 };
       }
@@ -364,6 +364,14 @@ export class AutomationService {
       
       for (const benchmark of benchmarks) {
         try {
+          // Check 500+ limit before processing each benchmark
+          const currentPendingTargets = await this.getPendingTargets();
+          if (currentPendingTargets.length >= 500) {
+            console.log(`[Automation] Reached 500+ pending targets (${currentPendingTargets.length}), stopping target collection`);
+            this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+            break;
+          }
+          
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
           await this.delay(this.options.pageLoadDelay);
@@ -389,12 +397,28 @@ export class AutomationService {
                 
                 targetsCollected += followers.length;
                 console.log(`[Automation] Created ${followers.length} targets in bulk`);
+                
+                // Check 500+ limit after bulk creation
+                const afterBulkPendingTargets = await this.getPendingTargets();
+                if (afterBulkPendingTargets.length >= 500) {
+                  console.log(`[Automation] Reached 500+ pending targets (${afterBulkPendingTargets.length}) after bulk creation, stopping target collection`);
+                  this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                  break;
+                }
               } catch (error) {
                 console.error(`[Automation] Bulk target creation failed, trying smaller batches:`, error);
                 
                 // Try smaller batches if bulk fails
                 const batchSize = 10;
                 for (let i = 0; i < followers.length; i += batchSize) {
+                  // Check 500+ limit before each batch
+                  const beforeBatchPendingTargets = await this.getPendingTargets();
+                  if (beforeBatchPendingTargets.length >= 500) {
+                    console.log(`[Automation] Reached 500+ pending targets (${beforeBatchPendingTargets.length}) before batch, stopping target collection`);
+                    this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                    return { targetsCollected };
+                  }
+                  
                   const batch = followers.slice(i, i + batchSize);
                   
                   try {
@@ -410,6 +434,14 @@ export class AutomationService {
                     targetsCollected += batch.length;
                     console.log(`[Automation] Created ${batch.length} targets in smaller batch`);
                     
+                    // Check 500+ limit after each batch
+                    const afterBatchPendingTargets = await this.getPendingTargets();
+                    if (afterBatchPendingTargets.length >= 500) {
+                      console.log(`[Automation] Reached 500+ pending targets (${afterBatchPendingTargets.length}) after batch, stopping target collection`);
+                      this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                      return { targetsCollected };
+                    }
+                    
                     // Small delay between batches
                     await this.delay(100);
                   } catch (batchError) {
@@ -417,6 +449,14 @@ export class AutomationService {
                     
                     // Only fallback to individual for this specific batch
                     for (const follower of batch) {
+                      // Check 500+ limit before each individual creation
+                      const beforeIndividualPendingTargets = await this.getPendingTargets();
+                      if (beforeIndividualPendingTargets.length >= 500) {
+                        console.log(`[Automation] Reached 500+ pending targets (${beforeIndividualPendingTargets.length}) before individual creation, stopping target collection`);
+                        this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                        return { targetsCollected };
+                      }
+                      
                       try {
                         await InstagramService.createTargetApiV1InstagramBenchmarksBenchmarkIdTargetsPost(
                           benchmark.id,
@@ -706,7 +746,18 @@ export class AutomationService {
         StageEnum.REQUESTED
       );
       
-      const targets = allTargets.targets.filter((target: TargetResponse) => 
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      let targetsArray: TargetResponse[] = [];
+      if (Array.isArray(allTargets)) {
+        targetsArray = allTargets;
+      } else if (allTargets && Array.isArray(allTargets.targets)) {
+        targetsArray = allTargets.targets;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', allTargets);
+        return [];
+      }
+      
+      const targets = targetsArray.filter((target: TargetResponse) => 
         target.updated_at && 
         new Date(target.updated_at) < fourDaysAgo
       );
@@ -725,7 +776,15 @@ export class AutomationService {
         StageEnum.PENDING
       );
       
-      return targets.targets || [];
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      if (Array.isArray(targets)) {
+        return targets;
+      } else if (targets && Array.isArray(targets.targets)) {
+        return targets.targets;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', targets);
+        return [];
+      }
     } catch (error) {
       console.error('[Automation] Get pending targets error:', error);
       return [];
@@ -735,7 +794,19 @@ export class AutomationService {
   private async getHealthyBenchmarks(): Promise<BenchmarkResponse[]> {
     try {
       const benchmarks = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
-      return benchmarks.benchmarks.filter(b => 
+      
+      // Handle new response schema - check if benchmarks is directly an array or nested in a property
+      let benchmarksArray: BenchmarkResponse[] = [];
+      if (Array.isArray(benchmarks)) {
+        benchmarksArray = benchmarks;
+      } else if (benchmarks && Array.isArray(benchmarks.benchmarks)) {
+        benchmarksArray = benchmarks.benchmarks;
+      } else {
+        console.warn('[Automation] Unexpected benchmarks response format:', benchmarks);
+        return [];
+      }
+      
+      return benchmarksArray.filter(b => 
         b.health === HealthEnum.HEALTHY && b.status === StatusEnum.ACTIVE
       );
     } catch (error) {
@@ -751,7 +822,15 @@ export class AutomationService {
         StageEnum.UNFOLLOWED
       );
       
-      return targets.targets.length || 0;
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      if (Array.isArray(targets)) {
+        return targets.length;
+      } else if (targets && Array.isArray(targets.targets)) {
+        return targets.targets.length;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', targets);
+        return 0;
+      }
     } catch (error) {
       console.error('[Automation] Get unfollowed count error:', error);
       return 0;
@@ -856,7 +935,7 @@ export class AutomationService {
             following_username: this.instagramUsername
           };
           
-          await InstagramService.createBulkFollowRelationshipsFollowersApiV1InstagramFollowBulkFollowersPost(
+          await InstagramService.updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
             bulkRequest
           );
           
@@ -903,7 +982,7 @@ export class AutomationService {
             following_usernames: batch
           };
           
-          await InstagramService.createBulkFollowRelationshipsFollowingApiV1InstagramFollowBulkFollowingPost(
+          await InstagramService.updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
             bulkRequest
           );
           
