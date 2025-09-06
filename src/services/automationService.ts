@@ -350,11 +350,11 @@ export class AutomationService {
   // Stage 3: Target Collection
   private async collectTargets(): Promise<{ targetsCollected: number }> {
     try {
-      // Initial check if we have less than 500 PENDING targets
+      // Initial check if we have less than 400 PENDING targets
       const initialPendingTargets = await this.getPendingTargets();
       
-      if (initialPendingTargets.length >= 500) {
-        this.options.onProgress?.(0, 1, 'Skipping target collection (500+ pending targets)');
+      if (initialPendingTargets.length >= 400) {
+        this.options.onProgress?.(0, 1, 'Skipping target collection (400+ pending targets)');
         return { targetsCollected: 0 };
       }
       
@@ -367,11 +367,11 @@ export class AutomationService {
       
       for (const benchmark of shuffledBenchmarks) {
         try {
-          // Check 500+ limit before processing each benchmark
+          // Check 400+ limit before processing each benchmark
           const currentPendingTargets = await this.getPendingTargets();
-          if (currentPendingTargets.length >= 500) {
-            console.log(`[Automation] Reached 500+ pending targets (${currentPendingTargets.length}), stopping target collection`);
-            this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+          if (currentPendingTargets.length >= 400) {
+            console.log(`[Automation] Reached 400+ pending targets (${currentPendingTargets.length}), stopping target collection`);
+            this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (400+ pending targets)`);
             break;
           }
           
@@ -401,11 +401,11 @@ export class AutomationService {
                 targetsCollected += followers.length;
                 console.log(`[Automation] Created ${followers.length} targets in bulk`);
                 
-                // Check 500+ limit after bulk creation
+                // Check 400+ limit after bulk creation
                 const afterBulkPendingTargets = await this.getPendingTargets();
-                if (afterBulkPendingTargets.length >= 500) {
-                  console.log(`[Automation] Reached 500+ pending targets (${afterBulkPendingTargets.length}) after bulk creation, stopping target collection`);
-                  this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                if (afterBulkPendingTargets.length >= 400) {
+                  console.log(`[Automation] Reached 400+ pending targets (${afterBulkPendingTargets.length}) after bulk creation, stopping target collection`);
+                  this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (400+ pending targets)`);
                   break;
                 }
               } catch (error) {
@@ -414,11 +414,11 @@ export class AutomationService {
                 // Try smaller batches if bulk fails
                 const batchSize = 10;
                 for (let i = 0; i < followers.length; i += batchSize) {
-                  // Check 500+ limit before each batch
+                  // Check 400+ limit before each batch
                   const beforeBatchPendingTargets = await this.getPendingTargets();
-                  if (beforeBatchPendingTargets.length >= 500) {
-                    console.log(`[Automation] Reached 500+ pending targets (${beforeBatchPendingTargets.length}) before batch, stopping target collection`);
-                    this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                  if (beforeBatchPendingTargets.length >= 400) {
+                    console.log(`[Automation] Reached 400+ pending targets (${beforeBatchPendingTargets.length}) before batch, stopping target collection`);
+                    this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (400+ pending targets)`);
                     return { targetsCollected };
                   }
                   
@@ -437,11 +437,11 @@ export class AutomationService {
                     targetsCollected += batch.length;
                     console.log(`[Automation] Created ${batch.length} targets in smaller batch`);
                     
-                    // Check 500+ limit after each batch
+                    // Check 400+ limit after each batch
                     const afterBatchPendingTargets = await this.getPendingTargets();
-                    if (afterBatchPendingTargets.length >= 500) {
-                      console.log(`[Automation] Reached 500+ pending targets (${afterBatchPendingTargets.length}) after batch, stopping target collection`);
-                      this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                    if (afterBatchPendingTargets.length >= 400) {
+                      console.log(`[Automation] Reached 400+ pending targets (${afterBatchPendingTargets.length}) after batch, stopping target collection`);
+                      this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (400+ pending targets)`);
                       return { targetsCollected };
                     }
                     
@@ -452,11 +452,11 @@ export class AutomationService {
                     
                     // Only fallback to individual for this specific batch
                     for (const follower of batch) {
-                      // Check 500+ limit before each individual creation
+                      // Check 400+ limit before each individual creation
                       const beforeIndividualPendingTargets = await this.getPendingTargets();
-                      if (beforeIndividualPendingTargets.length >= 500) {
-                        console.log(`[Automation] Reached 500+ pending targets (${beforeIndividualPendingTargets.length}) before individual creation, stopping target collection`);
-                        this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (500+ pending targets)`);
+                      if (beforeIndividualPendingTargets.length >= 400) {
+                        console.log(`[Automation] Reached 400+ pending targets (${beforeIndividualPendingTargets.length}) before individual creation, stopping target collection`);
+                        this.options.onProgress?.(targetsCollected, targetsCollected, `Target collection stopped (400+ pending targets)`);
                         return { targetsCollected };
                       }
                       
@@ -493,7 +493,7 @@ export class AutomationService {
   private async processFollows(): Promise<{ followedCount: number }> {
     try {
       const targets = await this.getPendingTargets();
-      const maxFollows = 500 - (await this.getUnfollowedCount());
+      const maxFollows = 400 - (await this.getUnfollowedCount());
       let followedCount = 0;
       
       for (const target of targets) {
