@@ -9,5 +9,6 @@ export type User = {
     is_superuser: boolean;
     created_at: string;
     updated_at?: (string | null);
+    status?: (string | null);
 };
 

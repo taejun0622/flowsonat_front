@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { InstagramProvider } from '@/contexts/InstagramContext';
+import { AnalyticsProvider } from '@/contexts/AnalyticsContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 import { DynamicBackground } from '@/components/ui/background';
 
@@ -23,17 +25,19 @@ import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage
 
 function App() {
   return (
-    <AuthProvider>
-      <InstagramProvider>
-        <Router>
-          <DynamicBackground
-            type="blur-dot"
-            colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
-            loop={true}
-            seed={1000}
-          >
-            <div className="relative w-full h-full overflow-auto">
-              <Routes>
+    <ErrorBoundary>
+      <AuthProvider>
+        <InstagramProvider>
+          <Router>
+            <AnalyticsProvider>
+            <DynamicBackground
+              type="blur-dot"
+              colors={['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe']}
+              loop={true}
+              seed={1000}
+            >
+              <div className="relative w-full h-full overflow-auto">
+                <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -76,12 +80,14 @@ function App() {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
               
-              <Toaster />
-            </div>
-          </DynamicBackground>
-        </Router>
-      </InstagramProvider>
-    </AuthProvider>
+                <Toaster />
+              </div>
+            </DynamicBackground>
+            </AnalyticsProvider>
+          </Router>
+        </InstagramProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

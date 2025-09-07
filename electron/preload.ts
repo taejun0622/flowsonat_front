@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge, shell } from 'electron'
+import { ipcRenderer, contextBridge } from 'electron'
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -29,6 +29,25 @@ contextBridge.exposeInMainWorld('IG', {
   onReloadRequest: (cb: () => void) => {
     ipcRenderer.on('ig:reload-webview', cb)
   },
+})
+
+// Google Analytics 4 API
+contextBridge.exposeInMainWorld('analytics', {
+  // 일반 이벤트 추적
+  trackEvent: (name: string, params?: Record<string, any>) => 
+    ipcRenderer.invoke('ga4:track-event', { name, params }),
+  
+  // 화면 조회 추적
+  trackScreen: (screenName: string, screenClass?: string) => 
+    ipcRenderer.invoke('ga4:track-screen', { screenName, screenClass }),
+  
+  // 에러/예외 추적
+  trackError: (error: string, fatal?: boolean) => 
+    ipcRenderer.invoke('ga4:track-error', { error, fatal }),
+  
+  // 사용자 액션 추적
+  trackUserAction: (action: string, category?: string, label?: string, value?: number) => 
+    ipcRenderer.invoke('ga4:track-user-action', { action, category, label, value })
 })
 
 // 자동 업데이트 API

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError } from '@/api/core/ApiError';
+import { useComponentAnalytics, useFormAnalytics, useErrorAnalytics } from '@/hooks/useAnalyticsTracking';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -25,6 +26,11 @@ export const LoginPage = () => {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Analytics hooks
+  useComponentAnalytics('LoginPage');
+  const { trackFormSubmit, trackFormValidation } = useFormAnalytics();
+  const { trackApiError } = useErrorAnalytics();
 
   const {
     register,
@@ -41,6 +47,7 @@ export const LoginPage = () => {
       console.log('Attempting login...');
       await login(data);
       console.log('Login successful');
+      trackFormSubmit('login', true);
       navigate('/dashboard');
     } catch (error: any) {
       console.log('Login error caught:', error);
@@ -52,6 +59,9 @@ export const LoginPage = () => {
         console.log('ApiError status:', error.status);
         console.log('ApiError body:', error.body);
         console.log('ApiError message:', error.message);
+        
+        trackApiError('login', error.status, error.message);
+        trackFormSubmit('login', false);
         
         if (error.status >= 400 && error.status < 500) {
           // Client errors (400-series)
@@ -71,6 +81,7 @@ export const LoginPage = () => {
       } else {
         // Network or other errors
         console.log('Non-ApiError:', error);
+        trackFormSubmit('login', false);
         setErrorMessage('Network error. Please check your connection and try again.');
       }
     } finally {

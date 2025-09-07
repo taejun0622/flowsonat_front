@@ -2,6 +2,7 @@
 
 # FlowSonat 버전 정보 생성 스크립트
 # 자동 업데이트를 위한 버전 정보 JSON 생성
+# 사용법: ./scripts/generate-version-info.sh [--min-supported VERSION]
 
 set -e
 
@@ -18,6 +19,38 @@ log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
+log_error() {
+    echo -e "\033[0;31m[ERROR]\033[0m $1"
+}
+
+# 매개변수 파싱
+MIN_SUPPORTED_VERSION=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --min-supported)
+            MIN_SUPPORTED_VERSION="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--min-supported VERSION]"
+            echo ""
+            echo "Options:"
+            echo "  --min-supported VERSION  Set minimum supported version (e.g., 0.0.15)"
+            echo "  --help, -h              Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                                    # Use current version as min supported version"
+            echo "  $0 --min-supported 0.0.15            # Set specific min supported version"
+            exit 0
+            ;;
+        *)
+            log_error "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 # .env.deploy 파일이 있으면 로드
 if [ -f ".env.deploy" ]; then
     export $(cat .env.deploy | grep -v '^#' | xargs)
@@ -26,6 +59,15 @@ fi
 # 현재 버전 정보 가져오기
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 PRODUCT_NAME=$(node -p "require('./package.json').productName || 'FlowSonat'")
+
+# 최소 지원 버전 설정
+if [ -z "$MIN_SUPPORTED_VERSION" ]; then
+    # 매개변수가 제공되지 않으면 현재 버전을 최소 지원 버전으로 설정
+    MIN_SUPPORTED_VERSION="$CURRENT_VERSION"
+    log_info "Using current version as min supported version: $MIN_SUPPORTED_VERSION"
+else
+    log_info "Using specified min supported version: $MIN_SUPPORTED_VERSION"
+fi
 
 # 빌드 시간
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -85,7 +127,7 @@ $(generate_platform_info "Linux" "x64" "deb"),
 $(generate_platform_info "Linux" "arm64" "deb")
   ],
   "updateNotes": "Bug fixes and improvements",
-  "minSupportedVersion": "0.1.0",
+  "minSupportedVersion": "$MIN_SUPPORTED_VERSION",
   "forceUpdate": false
 }
 EOF

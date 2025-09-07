@@ -24,7 +24,10 @@ export const WebViewLauncher: React.FC<WebViewLauncherProps> = ({
 
   const handleOpenWebView = () => {
     // Navigate to webview page with URL as search parameter
-    navigate(`/webview?url=${encodeURIComponent(url)}`);
+    const targetUrl = `/webview?url=${encodeURIComponent(url)}`;
+    console.log('[WebViewLauncher] Opening WebView with URL:', url);
+    console.log('[WebViewLauncher] Target route:', targetUrl);
+    navigate(targetUrl);
   };
 
   return (

@@ -6,18 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { BenchmarkTab, BillingTab, SettingsTab } from '@/components/dashboard';
 import { UpdateNotification } from '@/components/UpdateNotification';
+import { TrialOverBanner } from '@/components/TrialOverNotification';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { useWebView } from '@/hooks/useWebView';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
+import { useComponentAnalytics, useButtonAnalytics, useInstagramAnalytics } from '@/hooks/useAnalyticsTracking';
 
 export const DashboardPage = () => {
-  const { user } = useAuth();
+  const { user, isTrialOver } = useAuth();
   const { isConnected, checkConnection, saveInstagramSession } = useInstagram();
   const { openWebView } = useWebView();
   const navigate = useNavigate();
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
+  const [showTrialOverBanner, setShowTrialOverBanner] = React.useState(true);
+  const { activeTab, switchToTab, switchToBilling } = useTabNavigation();
+
+  // Analytics hooks
+  useComponentAnalytics('DashboardPage');
+  const createButtonTracker = useButtonAnalytics();
+  const { trackAccountConnect, trackAutomationStart, trackAutomationComplete } = useInstagramAnalytics();
 
   // Check Instagram connection status when entering dashboard and handle auto-navigation
   React.useEffect(() => {
@@ -68,6 +78,14 @@ export const DashboardPage = () => {
     openWebView('https://www.instagram.com/accounts/login/');
   };
 
+  const handleGoToBilling = () => {
+    switchToBilling();
+  };
+
+  const handleDismissTrialOverBanner = () => {
+    setShowTrialOverBanner(false);
+  };
+
   // Show loading when checking connection status
   if (isCheckingConnection) {
     return (
@@ -87,6 +105,14 @@ export const DashboardPage = () => {
         <div className="px-4 py-6 sm:px-0">
           {/* Update notification */}
           <UpdateNotification className="mb-6" />
+          
+          {/* Trial Over Banner */}
+          {isTrialOver && showTrialOverBanner && (
+            <TrialOverBanner
+              onGoToBilling={handleGoToBilling}
+              onDismiss={handleDismissTrialOverBanner}
+            />
+          )}
           
           <div className="mb-8 flex justify-between items-center">
             <div className="flex items-center space-x-2">
@@ -114,7 +140,7 @@ export const DashboardPage = () => {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="benchmark" className="w-full">
+          <Tabs value={activeTab} onValueChange={switchToTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-black/10 backdrop-blur-sm border border-black/20">
               <TabsTrigger value="benchmark" className="flex items-center text-white data-[state=active]:bg-black/20 data-[state=active]:text-white">
                 <BarChart3 className="h-4 w-4 mr-2" />

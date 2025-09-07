@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SUBSCRIPTION_PLANS } from '@/constants/subscription';
 import { useBilling } from '@/hooks/useBilling';
+import { StripePaymentWebView } from '@/components/StripePaymentWebView';
 
 interface SubscriptionPlanSelectorProps {
   onPlanSelect?: (planId: string) => void;
@@ -14,18 +15,31 @@ export const SubscriptionPlanSelector = ({
   onPlanSelect,
   currentPlanId,
 }: SubscriptionPlanSelectorProps) => {
-  const { createPaymentLink, isLoading } = useBilling();
+  const { 
+    createPaymentLink, 
+    isLoading,
+    showPaymentWebView,
+    paymentUrl,
+    handlePaymentComplete,
+    handlePaymentCancel,
+    handleCloseWebView
+  } = useBilling();
+
 
   const handlePlanSelect = async (planId: string) => {
+    console.log('🚀 handlePlanSelect called with planId:', planId);
+    
     if (onPlanSelect) {
+      console.log('📞 onPlanSelect callback exists, calling it');
       onPlanSelect(planId);
       return;
     }
 
+    console.log('💳 Creating payment link...');
     const paymentUrl = await createPaymentLink(planId);
-    if (paymentUrl) {
-      window.open(paymentUrl, '_blank');
-    }
+    console.log('Payment URL created:', paymentUrl);
+    
+    // WebView는 useBilling 훅에서 자동으로 처리됩니다
   };
 
   const getPlanIcon = (planName: string) => {
@@ -49,7 +63,9 @@ export const SubscriptionPlanSelector = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {Object.values(SUBSCRIPTION_PLANS).map((plan) => {
         const isCurrentPlan = currentPlanId === plan.id;
         const isPopular = plan.name === 'Pro Plan';
@@ -110,7 +126,10 @@ export const SubscriptionPlanSelector = ({
                     ? 'bg-yellow-500 text-black hover:bg-yellow-600'
                     : 'bg-white text-gray-900 hover:bg-gray-100'
                 }`}
-                onClick={() => handlePlanSelect(plan.id)}
+                onClick={() => {
+                  console.log('🔘 Button clicked for plan:', plan.id);
+                  handlePlanSelect(plan.id);
+                }}
                 disabled={isLoading || isCurrentPlan}
               >
                 {isCurrentPlan ? 'Current Plan' : 'Select Plan'}
@@ -119,6 +138,17 @@ export const SubscriptionPlanSelector = ({
           </Card>
         );
       })}
+      </div>
+
+      {/* Stripe Payment WebView */}
+      {showPaymentWebView && paymentUrl && (
+        <StripePaymentWebView
+          paymentUrl={paymentUrl}
+          onPaymentComplete={handlePaymentComplete}
+          onPaymentCancel={handlePaymentCancel}
+          onClose={handleCloseWebView}
+        />
+      )}
     </div>
   );
 };
