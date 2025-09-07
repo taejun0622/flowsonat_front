@@ -34,8 +34,10 @@ import {
   SuggestionResponse,
   SuggestionListResponse,
   HealthEnum,
-  StatusEnum 
+  StatusEnum,
+  MetricsResponse
 } from '@/api';
+import { BenchmarkTargetsModal } from './BenchmarkTargetsModal';
 
 export const BenchmarkTab = () => {
   const navigate = useNavigate();
@@ -43,12 +45,19 @@ export const BenchmarkTab = () => {
   const [suggestions, setSuggestions] = React.useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
+  const [stats, setStats] = React.useState<MetricsResponse>({
+    waiting_for_follow_back: 0,
+    increased_follower_by_flowsonat: 0,
+    impression_by_flowsonat: 0
+  });
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [benchmarkToDelete, setBenchmarkToDelete] = React.useState<string | null>(null);
   const [selectedBenchmark, setSelectedBenchmark] = React.useState<BenchmarkResponse | null>(null);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [targetsModalOpen, setTargetsModalOpen] = React.useState(false);
+  const [selectedBenchmarkForTargets, setSelectedBenchmarkForTargets] = React.useState<BenchmarkResponse | null>(null);
   const [formData, setFormData] = React.useState({
     ig_username: '',
     status: '' as StatusEnum | ''
@@ -68,6 +77,8 @@ export const BenchmarkTab = () => {
       setLoading(true);
       const response: BenchmarkListResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
       setBenchmarks(response.benchmarks);
+      // Refresh stats when benchmarks are updated
+      loadStats();
     } catch (error) {
       console.error('Failed to load benchmarks:', error);
       toast({
@@ -94,6 +105,21 @@ export const BenchmarkTab = () => {
       });
     } finally {
       setSuggestionsLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      // Get metrics for the last 30 days
+      const metricsResponse: MetricsResponse = await InstagramService.getUserMetricsApiV1InstagramMetricsGet(30);
+      setStats(metricsResponse);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load metrics",
+        variant: "destructive",
+      });
     }
   };
 
@@ -135,23 +161,19 @@ export const BenchmarkTab = () => {
     }
   };
 
-  const handleUpdateBenchmark = async () => {
+  const handleDeactivateBenchmark = async () => {
     if (!selectedBenchmark) return;
 
     try {
       setLoading(true);
-      const updateData: BenchmarkUpdate = {
-        health: selectedBenchmark.health // Keep existing health
-      };
       
-      await InstagramService.updateBenchmarkApiV1InstagramBenchmarksBenchmarkIdPut(
-        selectedBenchmark.id,
-        updateData
+      await InstagramService.deleteBenchmarkApiV1InstagramBenchmarksBenchmarkIdDelete(
+        selectedBenchmark.id
       );
       
       toast({
         title: "Success",
-        description: "Benchmark updated successfully",
+        description: "Benchmark deactivated successfully",
       });
       
       setEditDialogOpen(false);
@@ -159,10 +181,10 @@ export const BenchmarkTab = () => {
       setFormData({ ig_username: '', status: '' });
       loadBenchmarks();
     } catch (error) {
-      console.error('Failed to update benchmark:', error);
+      console.error('Failed to deactivate benchmark:', error);
       toast({
         title: "Error",
-        description: "Failed to update benchmark",
+        description: "Failed to deactivate benchmark",
         variant: "destructive",
       });
     } finally {
@@ -275,11 +297,17 @@ export const BenchmarkTab = () => {
 
   const openEditDialog = (benchmark: BenchmarkResponse) => {
     setSelectedBenchmark(benchmark);
-    setFormData({
-      ig_username: benchmark.ig.username || '',
-      status: benchmark.status
-    });
     setEditDialogOpen(true);
+  };
+
+  const openTargetsModal = (benchmark: BenchmarkResponse) => {
+    setSelectedBenchmarkForTargets(benchmark);
+    setTargetsModalOpen(true);
+  };
+
+  const closeTargetsModal = () => {
+    setTargetsModalOpen(false);
+    setSelectedBenchmarkForTargets(null);
   };
 
   const getStatusColor = (status: StatusEnum) => {
@@ -336,7 +364,56 @@ export const BenchmarkTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Users className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{stats.waiting_for_follow_back}</p>
+                <p className="text-sm text-white">Waiting for Follow-Back</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <Activity className="h-6 w-6 text-green-400" />
+              </div>
+              <div>
+                <div className="flex items-baseline space-x-2">
+                  <p className="text-2xl font-bold text-white">{stats.increased_follower_by_flowsonat}</p>
+                  <p className="text-xs text-white">/mo</p>
+                </div>
+                <p className="text-sm text-white">Followers Increased by FlowSonat</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-purple-400" />
+              </div>
+              <div>
+                <div className="flex items-baseline space-x-2">
+                  <p className="text-2xl font-bold text-white">{stats.impression_by_flowsonat}</p>
+                  <p className="text-xs text-white">/mo</p>
+                </div>
+                <p className="text-sm text-white">Impressions by FlowSonat</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Glassmorphism Container */}
       <Card className="bg-black/10 backdrop-blur-sm border-black/20">
@@ -521,9 +598,10 @@ export const BenchmarkTab = () => {
                   {statusBenchmarks.map((benchmark, index) => (
                     <div
                       key={benchmark.id}
-                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors ${
+                      className={`p-4 bg-black/5 hover:bg-black/10 transition-colors cursor-pointer ${
                         index !== statusBenchmarks.length - 1 ? 'border-b border-black/20' : ''
                       }`}
+                      onClick={() => openTargetsModal(benchmark)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -552,7 +630,7 @@ export const BenchmarkTab = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -586,36 +664,11 @@ export const BenchmarkTab = () => {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Benchmark</DialogTitle>
+            <DialogTitle className="text-white">Deactivate Benchmark</DialogTitle>
             <DialogDescription className="text-gray-300">
-              Update the status of this benchmark.
+              Are you sure you want to deactivate this benchmark?
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="status" className="text-white">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: any) => setFormData({ ...formData, status: value as StatusEnum })}
-              >
-                <SelectTrigger className="bg-black/20 border-black/30 text-white focus:border-white/30">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent className="bg-black/40 backdrop-blur-md border-black/30">
-                  <SelectItem value={StatusEnum.ACTIVE}>Active</SelectItem>
-                  <SelectItem value={StatusEnum.DELETED}>Deleted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-white">Health Status (Read-only)</Label>
-              <div className="p-3 bg-black/20 border border-black/30 rounded-md">
-                <span className={`font-medium ${getHealthColor(selectedBenchmark?.health)}`}>
-                  {selectedBenchmark?.health || 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -625,11 +678,11 @@ export const BenchmarkTab = () => {
               Cancel
             </Button>
             <Button
-              onClick={handleUpdateBenchmark}
+              onClick={handleDeactivateBenchmark}
               disabled={loading}
-              className="bg-white text-gray-900 hover:bg-gray-100"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Deactivating...' : 'Deactivate'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -665,6 +718,13 @@ export const BenchmarkTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Benchmark Targets Modal */}
+      <BenchmarkTargetsModal
+        isOpen={targetsModalOpen}
+        onClose={closeTargetsModal}
+        benchmark={selectedBenchmarkForTargets}
+      />
 
     </div>
   );

@@ -6,6 +6,10 @@ import type { BenchmarkCreate } from '../models/BenchmarkCreate';
 import type { BenchmarkListResponse } from '../models/BenchmarkListResponse';
 import type { BenchmarkResponse } from '../models/BenchmarkResponse';
 import type { BenchmarkUpdate } from '../models/BenchmarkUpdate';
+import type { BulkFollowRequest1 } from '../models/BulkFollowRequest1';
+import type { BulkFollowRequest2 } from '../models/BulkFollowRequest2';
+import type { BulkTargetCreate } from '../models/BulkTargetCreate';
+import type { BulkTargetUpdateResponse } from '../models/BulkTargetUpdateResponse';
 import type { FollowRequest } from '../models/FollowRequest';
 import type { FollowResponse } from '../models/FollowResponse';
 import type { HealthEnum } from '../models/HealthEnum';
@@ -15,6 +19,7 @@ import type { IGHistoryResponse } from '../models/IGHistoryResponse';
 import type { InstagramConnectRequest } from '../models/InstagramConnectRequest';
 import type { InstagramConnectResponse } from '../models/InstagramConnectResponse';
 import type { InstagramDisconnectResponse } from '../models/InstagramDisconnectResponse';
+import type { MetricsResponse } from '../models/MetricsResponse';
 import type { StageEnum } from '../models/StageEnum';
 import type { StatusEnum } from '../models/StatusEnum';
 import type { SuggestionCreate } from '../models/SuggestionCreate';
@@ -67,6 +72,46 @@ export class InstagramService {
                 'follower_username': followerUsername,
                 'following_username': followingUsername,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Update Bulk Target Stages Followers
+     * Update target stages when multiple followers follow one account
+     * @param requestBody
+     * @returns BulkTargetUpdateResponse Successful Response
+     * @throws ApiError
+     */
+    public static updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
+        requestBody: BulkFollowRequest1,
+    ): CancelablePromise<BulkTargetUpdateResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/follow/bulk/followers',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Update Bulk Target Stages Following
+     * Update target stages when one follower follows multiple accounts
+     * @param requestBody
+     * @returns BulkTargetUpdateResponse Successful Response
+     * @throws ApiError
+     */
+    public static updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
+        requestBody: BulkFollowRequest2,
+    ): CancelablePromise<BulkTargetUpdateResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/follow/bulk/following',
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },
@@ -347,6 +392,31 @@ export class InstagramService {
         });
     }
     /**
+     * Create Bulk Targets
+     * Create multiple targets for a benchmark in bulk
+     * @param benchmarkId
+     * @param requestBody
+     * @returns TargetListResponse Successful Response
+     * @throws ApiError
+     */
+    public static createBulkTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsBulkPost(
+        benchmarkId: string,
+        requestBody: BulkTargetCreate,
+    ): CancelablePromise<TargetListResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/instagram/benchmarks/{benchmark_id}/targets/bulk',
+            path: {
+                'benchmark_id': benchmarkId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
      * Update Target
      * Update a target
      * @param targetId
@@ -530,6 +600,32 @@ export class InstagramService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/instagram/sync-follow-table',
+        });
+    }
+    /**
+     * Get User Metrics
+     * Get user metrics for Instagram targets
+     *
+     * Returns:
+     * - waiting_for_follow_back: Count of targets with REQUESTED status
+     * - increased_follower_by_flowsonat: Count of targets with FOLLOW_BACK status in the last N days
+     * - impression_by_flowsonat: Count of targets with all statuses except PENDING in the last N days
+     * @param days Number of days to look back for time-based metrics
+     * @returns MetricsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getUserMetricsApiV1InstagramMetricsGet(
+        days: number = 30,
+    ): CancelablePromise<MetricsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/metrics',
+            query: {
+                'days': days,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
         });
     }
 }

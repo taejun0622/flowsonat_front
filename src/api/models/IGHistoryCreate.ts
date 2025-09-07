@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export type IGHistoryCreate = {
+    raw_data?: (string | null);
     bio?: (string | null);
     links?: (string | null);
     followers?: (string | null);

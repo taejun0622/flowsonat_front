@@ -9,6 +9,7 @@ import { InstagramManualUsernameModal } from './InstagramManualUsernameModal';
 import { useInstagram } from '@/contexts/InstagramContext';
 import { collectFollowingToBenchmark, FollowingCollectorResult } from '@/services/followingCollectorService';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
+import { ProfileCollectionService } from '@/services/profileCollectionService';
 import { InstagramService } from '@/api/services/InstagramService';
 import { HealthEnum, StatusEnum } from '@/api';
 
@@ -24,9 +25,20 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const navigate = useNavigate();
   const location = useLocation();
   const { disconnectAccount, instagramAccount } = useInstagram();
-  const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
+  
+  // Check URL parameters for initial URL and auto-execution
+  const params = new URLSearchParams(location.search);
+  const urlParam = params.get('url');
+  const autoExecute = params.get('autoExecute') === '1';
+  const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+  
+  // Use URL parameter if provided, otherwise default to login page
+  const [currentUrl, setCurrentUrl] = useState<string>(
+    urlParam ? decodeURIComponent(urlParam) : 'https://www.instagram.com/accounts/login/'
+  );
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
+  const profileCollectionServiceRef = useRef<ProfileCollectionService | null>(null);
   
   const {
     webViewStatus,
@@ -41,10 +53,76 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     handleManualUsernameConfirm
   } = useInstagramWebView();
 
-  // Check URL parameters for auto-execution
-  const params = new URLSearchParams(location.search);
-  const autoExecute = params.get('autoExecute') === '1';
-  const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+  // Update currentUrl when URL parameter changes
+  useEffect(() => {
+    if (urlParam) {
+      const decodedUrl = decodeURIComponent(urlParam);
+      if (decodedUrl !== currentUrl) {
+        console.log('[WebView] URL parameter changed, updating currentUrl:', decodedUrl);
+        console.log('[WebView] Previous URL:', currentUrl);
+        setCurrentUrl(decodedUrl);
+      }
+    }
+  }, [urlParam, currentUrl]);
+
+  // Log when currentUrl changes
+  useEffect(() => {
+    console.log('[WebView] Current URL updated:', currentUrl);
+  }, [currentUrl]);
+
+  // Initialize profile collection service when webview is ready
+  useEffect(() => {
+    if (webviewApiRef.current && !profileCollectionServiceRef.current) {
+      profileCollectionServiceRef.current = new ProfileCollectionService(webviewApiRef.current);
+    }
+  }, [webviewApiRef.current]);
+
+  // Monitor URL changes and collect profile history when entering profile pages
+  useEffect(() => {
+    const handleUrlChange = async () => {
+      if (!profileCollectionServiceRef.current || !currentUrl) return;
+
+      // Skip URL change handling if we're in a modal (followers/following pages) or during automation
+      if (currentUrl.includes('/followers/') || currentUrl.includes('/following/') || 
+          isRunningAutomation || isCollectingFollowing) {
+        console.log('[WebView] Skipping URL change handling - in modal or during automation:', currentUrl);
+        return;
+      }
+
+      // Check if current URL is a profile page (not our own profile)
+      const profileMatch = currentUrl.match(/instagram\.com\/([^\/\?]+)\/?$/);
+      if (profileMatch && profileMatch[1] && profileMatch[1] !== 'accounts' && profileMatch[1] !== 'explore' && profileMatch[1] !== 'reels') {
+        const username = profileMatch[1];
+        
+        // Don't collect history for our own profile
+        if (instagramAccount?.username && username === instagramAccount.username) {
+          return;
+        }
+
+        try {
+          console.log('[WebView] Detected profile page visit:', username);
+          
+          // Wait a bit for page to fully load
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Collect and send profile history
+          const result = await profileCollectionServiceRef.current.collectAndSendProfileHistory();
+          
+          if (result.success) {
+            console.log('[WebView] Successfully collected profile history for:', username);
+          } else {
+            console.warn('[WebView] Failed to collect profile history for:', username, result.error);
+          }
+        } catch (error) {
+          console.error('[WebView] Error collecting profile history:', error);
+        }
+      }
+    };
+
+    // Debounce URL change handling
+    const timeoutId = setTimeout(handleUrlChange, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [currentUrl, instagramAccount?.username]);
 
   // 뒤로가기 핸들러
   const handleGoBack = useCallback(() => {
@@ -92,6 +170,16 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     console.error('WebView error:', error);
     setIsLoading(false);
   }, []);
+
+  // WebView URL 변경 핸들러 (세션 유지를 위해 상태 업데이트하지 않음)
+  const handleUrlChange = useCallback((url: string) => {
+    console.log('[WebView] URL changed from WebView:', url);
+    console.log('[WebView] Current URL state:', currentUrl);
+    
+    // WebView 내부에서 URL이 변경되어도 React 상태는 업데이트하지 않음
+    // 이렇게 하면 WebView의 src prop이 변경되지 않아 세션이 유지됨
+    console.log('[WebView] Skipping currentUrl state update to preserve session');
+  }, [currentUrl]);
   
   // Whether to block native input (overlay + pointer-events: none)
   const [blockNativeInput, setBlockNativeInput] = useState<boolean>(true);
@@ -448,6 +536,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           onError={handleWebViewError}
           onInstagramLogin={handleInstagramLogin}
           onLoginStatusCheck={handleInstagramStatusCheck}
+          onUrlChange={handleUrlChange}
           instagramState={webViewStatus.state}
           enableExtension={extensionActive}
           disablePointerEvents={extensionActive && blockNativeInput}

@@ -59,13 +59,22 @@ export const StripePaymentWebView: React.FC<StripePaymentWebViewProps> = ({
       const url = e?.url || webview.getURL?.() || '';
       console.log('🔄 Navigation detected:', url);
       
-      // Stripe 결제 완료 URL 패턴 감지
+      // FlowSonat 리다이렉션 감지 (결제 성공)
+      if (url.includes('flowsonat.com')) {
+        console.log('✅ Payment successful - redirected to FlowSonat');
+        handlePaymentComplete();
+        return;
+      }
+      
+      // Stripe 결제 완료 URL 패턴 감지 (fallback)
       if (url.includes('stripe.com') && (url.includes('success') || url.includes('complete'))) {
+        console.log('✅ Payment successful - Stripe success page detected');
         handlePaymentComplete();
       }
       
       // 결제 취소 URL 패턴 감지
       if (url.includes('stripe.com') && url.includes('cancel')) {
+        console.log('❌ Payment cancelled - Stripe cancel page detected');
         handlePaymentCancel();
       }
     };
