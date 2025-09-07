@@ -90,7 +90,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       }
 
       // Check if current URL is a profile page (not our own profile)
-      const profileMatch = currentUrl.match(/instagram\.com\/([^\/\?]+)\/?$/);
+      const profileMatch = currentUrl.match(/instagram\.com\/([^/?]+)\/?$/);
       if (profileMatch && profileMatch[1] && profileMatch[1] !== 'accounts' && profileMatch[1] !== 'explore' && profileMatch[1] !== 'reels') {
         const username = profileMatch[1];
         

@@ -758,7 +758,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             // Ensure controller is activated after injection
             setTimeout(() => {
               console.log('🚀 Extension 컨트롤러 활성화 중...');
-              try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}
+              try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {
+                // Ignore errors when posting message
+              }
               try { 
                 if (webview && webview.executeJavaScript) {
                   webview.executeJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`);
@@ -808,7 +810,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           // Notify parent component of URL change
           onUrlChange?.(url);
         }
-      } catch {}
+      } catch {
+        // Ignore errors when handling load event
+      }
     };
 
     webview.addEventListener('did-finish-load', handleLoad);

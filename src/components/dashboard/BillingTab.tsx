@@ -8,7 +8,8 @@ import {
   RefreshCw,
   Loader2,
   Check,
-  Zap
+  Zap,
+  XCircle
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';

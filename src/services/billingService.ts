@@ -129,12 +129,15 @@ export class BillingService {
 
   /**
    * Cancel user subscription
+   * Note: This redirects to the customer portal since direct cancellation API is not available
    */
   static async cancelSubscription(): Promise<void> {
     try {
-      await StripeService.cancelSubscriptionApiV1StripeSubscriptionCancelPost();
+      // Since there's no direct cancel API, redirect to customer portal
+      const portalUrl = await this.createCustomerPortalSession();
+      window.open(portalUrl, '_blank');
     } catch (error) {
-      console.error('Failed to cancel subscription:', error);
+      console.error('Failed to open customer portal for subscription cancellation:', error);
       throw error;
     }
   }

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import { resolve } from 'path'
+import packageJson from './package.json'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -52,7 +53,7 @@ export default defineConfig(({ mode }) => {
             minify: !process.env.ELECTRON_RENDERER_URL,
             outDir: 'dist-electron',
             rollupOptions: {
-              external: Object.keys(require('./package.json').devDependencies),
+              external: Object.keys(packageJson.devDependencies),
             },
           },
         },
@@ -71,7 +72,7 @@ export default defineConfig(({ mode }) => {
             minify: !process.env.ELECTRON_RENDERER_URL,
             outDir: 'dist-electron',
             rollupOptions: {
-              external: Object.keys(require('./package.json').devDependencies),
+              external: Object.keys(packageJson.devDependencies),
             },
           },
         },

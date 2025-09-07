@@ -66,7 +66,6 @@ export class AutomationService {
     const startTime = Date.now();
     const targetsProcessed: string[] = [];
     const errors: string[] = [];
-    let actionsPerformed = 0;
     const details: AutomationResult['details'] = {};
 
     try {
@@ -120,7 +119,7 @@ export class AutomationService {
       
       return {
         success: false,
-        actionsPerformed,
+        actionsPerformed: (details.followersCollected || 0) + (details.followingCollected || 0) + (details.unfollowedCount || 0) + (details.targetsCollected || 0) + (details.followedCount || 0) + (details.suggestionsCollected || 0),
         targetsProcessed,
         errors,
         executionTime,
