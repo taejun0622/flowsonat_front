@@ -35,9 +35,7 @@ import {
   SuggestionListResponse,
   HealthEnum,
   StatusEnum,
-  StageEnum,
-  TargetResponse,
-  TargetListResponse
+  MetricsResponse
 } from '@/api';
 import { BenchmarkTargetsModal } from './BenchmarkTargetsModal';
 
@@ -47,10 +45,10 @@ export const BenchmarkTab = () => {
   const [suggestions, setSuggestions] = React.useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
-  const [stats, setStats] = React.useState({
-    waitingForFollowBack: 0,
-    increasedFollowers: 0,
-    impressions: 0
+  const [stats, setStats] = React.useState<MetricsResponse>({
+    waiting_for_follow_back: 0,
+    increased_follower_by_flowsonat: 0,
+    impression_by_flowsonat: 0
   });
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -112,60 +110,16 @@ export const BenchmarkTab = () => {
 
   const loadStats = async () => {
     try {
-      // Get all benchmarks first
-      const benchmarksResponse: BenchmarkListResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
-      const allBenchmarks = benchmarksResponse.benchmarks;
-
-      let waitingForFollowBack = 0;
-      let increasedFollowers = 0;
-      let impressions = 0;
-
-      // Calculate one month ago date
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-      // Process each benchmark
-      for (const benchmark of allBenchmarks) {
-        try {
-          // Get all targets for this benchmark
-          const targetsResponse: TargetListResponse = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(benchmark.id);
-          const targets = targetsResponse.targets;
-
-          // Filter targets created within the last month
-          const recentTargets = targets.filter(target => {
-            const createdAt = new Date(target.created_at);
-            return createdAt >= oneMonthAgo;
-          });
-
-          // Calculate stats
-          for (const target of recentTargets) {
-            // 1. Waiting for Follow Back: REQUESTED status
-            if (target.stage === StageEnum.REQUESTED) {
-              waitingForFollowBack++;
-            }
-
-            // 2. Increased followers by FlowSonat: FOLLOW_BACK status
-            if (target.stage === StageEnum.FOLLOW_BACK) {
-              increasedFollowers++;
-            }
-
-            // 3. Impressions by FlowSonat: All statuses except PENDING
-            if (target.stage !== StageEnum.PENDING) {
-              impressions++;
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to load targets for benchmark ${benchmark.id}:`, error);
-        }
-      }
-
-      setStats({
-        waitingForFollowBack,
-        increasedFollowers,
-        impressions
-      });
+      // Get metrics for the last 30 days
+      const metricsResponse: MetricsResponse = await InstagramService.getUserMetricsApiV1InstagramMetricsGet(30);
+      setStats(metricsResponse);
     } catch (error) {
       console.error('Failed to load stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load metrics",
+        variant: "destructive",
+      });
     }
   };
 
@@ -417,7 +371,7 @@ export const BenchmarkTab = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Waiting for Follow Back</p>
-                <p className="text-2xl font-bold text-white">{stats.waitingForFollowBack}</p>
+                <p className="text-2xl font-bold text-white">{stats.waiting_for_follow_back}</p>
               </div>
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Users className="h-6 w-6 text-blue-400" />
@@ -431,7 +385,7 @@ export const BenchmarkTab = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Increased Followers by FlowSonat</p>
-                <p className="text-2xl font-bold text-white">{stats.increasedFollowers}</p>
+                <p className="text-2xl font-bold text-white">{stats.increased_follower_by_flowsonat}</p>
               </div>
               <div className="p-2 bg-green-500/20 rounded-lg">
                 <Activity className="h-6 w-6 text-green-400" />
@@ -445,7 +399,7 @@ export const BenchmarkTab = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Impressions by FlowSonat</p>
-                <p className="text-2xl font-bold text-white">{stats.impressions}</p>
+                <p className="text-2xl font-bold text-white">{stats.impression_by_flowsonat}</p>
               </div>
               <div className="p-2 bg-purple-500/20 rounded-lg">
                 <BarChart3 className="h-6 w-6 text-purple-400" />
