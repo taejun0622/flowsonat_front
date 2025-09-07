@@ -374,7 +374,7 @@ export const BenchmarkTab = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">{stats.waiting_for_follow_back}</p>
-                <p className="text-sm text-white">Waiting for Follow Back</p>
+                <p className="text-sm text-white">Waiting for Follow-Back</p>
               </div>
             </div>
           </CardContent>
@@ -391,7 +391,7 @@ export const BenchmarkTab = () => {
                   <p className="text-2xl font-bold text-white">{stats.increased_follower_by_flowsonat}</p>
                   <p className="text-xs text-white">/mo</p>
                 </div>
-                <p className="text-sm text-white">Increased Followers by FlowSonat</p>
+                <p className="text-sm text-white">Followers Increased by FlowSonat</p>
               </div>
             </div>
           </CardContent>
