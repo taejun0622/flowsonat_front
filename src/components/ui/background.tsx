@@ -49,6 +49,8 @@ export const DynamicBackground = ({
 
     const loadBackground = async () => {
       try {
+        console.log('🎨 Loading background component...', { type, containerId });
+        
         // Dynamically import the specific background module
         let BackgroundClass;
         
@@ -60,6 +62,8 @@ export const DynamicBackground = ({
             BackgroundClass = (await import('color4bg.js/build/jsm/BlurDotBg.module.js')).BlurDotBg;
         }
 
+        console.log('✅ Background class loaded successfully');
+
         // Create background instance using ID string
         const options: Color4BgOptions = {
           dom: containerId,
@@ -69,8 +73,12 @@ export const DynamicBackground = ({
         };
 
         backgroundInstanceRef.current = new BackgroundClass(options);
+        console.log('✅ Background instance created successfully');
       } catch (error) {
-        console.error('Failed to load background:', error);
+        console.error('❌ Failed to load background:', error);
+        console.warn('⚠️ Continuing without background animation');
+        // Don't throw the error, just log it and continue
+        // This ensures the app doesn't crash if the background fails to load
       }
     };
 
@@ -79,7 +87,11 @@ export const DynamicBackground = ({
     // Cleanup function
     return () => {
       if (backgroundInstanceRef.current?.destroy) {
-        backgroundInstanceRef.current.destroy();
+        try {
+          backgroundInstanceRef.current.destroy();
+        } catch (error) {
+          console.warn('Failed to destroy background instance:', error);
+        }
       }
     };
   }, [isMounted, type, colors, seed, loop, containerId]);
@@ -95,7 +107,9 @@ export const DynamicBackground = ({
         left: 0,
         width: '100vw', 
         height: '100vh',
-        zIndex: 0
+        zIndex: 0,
+        // Fallback background in case the dynamic background fails
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}
     >
       <div 
