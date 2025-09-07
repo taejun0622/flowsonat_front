@@ -19,6 +19,7 @@ import type { IGHistoryResponse } from '../models/IGHistoryResponse';
 import type { InstagramConnectRequest } from '../models/InstagramConnectRequest';
 import type { InstagramConnectResponse } from '../models/InstagramConnectResponse';
 import type { InstagramDisconnectResponse } from '../models/InstagramDisconnectResponse';
+import type { MetricsResponse } from '../models/MetricsResponse';
 import type { StageEnum } from '../models/StageEnum';
 import type { StatusEnum } from '../models/StatusEnum';
 import type { SuggestionCreate } from '../models/SuggestionCreate';
@@ -599,6 +600,32 @@ export class InstagramService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/instagram/sync-follow-table',
+        });
+    }
+    /**
+     * Get User Metrics
+     * Get user metrics for Instagram targets
+     *
+     * Returns:
+     * - waiting_for_follow_back: Count of targets with REQUESTED status
+     * - increased_follower_by_flowsonat: Count of targets with FOLLOW_BACK status in the last N days
+     * - impression_by_flowsonat: Count of targets with all statuses except PENDING in the last N days
+     * @param days Number of days to look back for time-based metrics
+     * @returns MetricsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getUserMetricsApiV1InstagramMetricsGet(
+        days: number = 30,
+    ): CancelablePromise<MetricsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/instagram/metrics',
+            query: {
+                'days': days,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
         });
     }
 }

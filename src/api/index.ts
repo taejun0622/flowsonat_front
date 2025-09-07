@@ -34,6 +34,7 @@ export type { IGResponse } from './models/IGResponse';
 export type { InstagramConnectRequest } from './models/InstagramConnectRequest';
 export type { InstagramConnectResponse } from './models/InstagramConnectResponse';
 export type { InstagramDisconnectResponse } from './models/InstagramDisconnectResponse';
+export type { MetricsResponse } from './models/MetricsResponse';
 export type { PasswordReset } from './models/PasswordReset';
 export type { PasswordResetConfirm } from './models/PasswordResetConfirm';
 export type { PasswordResetEmailRequest } from './models/PasswordResetEmailRequest';

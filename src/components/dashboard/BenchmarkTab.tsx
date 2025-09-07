@@ -34,7 +34,10 @@ import {
   SuggestionResponse,
   SuggestionListResponse,
   HealthEnum,
-  StatusEnum 
+  StatusEnum,
+  StageEnum,
+  TargetResponse,
+  TargetListResponse
 } from '@/api';
 import { BenchmarkTargetsModal } from './BenchmarkTargetsModal';
 
@@ -44,6 +47,11 @@ export const BenchmarkTab = () => {
   const [suggestions, setSuggestions] = React.useState<SuggestionResponse[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = React.useState(false);
+  const [stats, setStats] = React.useState({
+    waitingForFollowBack: 0,
+    increasedFollowers: 0,
+    impressions: 0
+  });
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -71,6 +79,8 @@ export const BenchmarkTab = () => {
       setLoading(true);
       const response: BenchmarkListResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
       setBenchmarks(response.benchmarks);
+      // Refresh stats when benchmarks are updated
+      loadStats();
     } catch (error) {
       console.error('Failed to load benchmarks:', error);
       toast({
@@ -97,6 +107,65 @@ export const BenchmarkTab = () => {
       });
     } finally {
       setSuggestionsLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      // Get all benchmarks first
+      const benchmarksResponse: BenchmarkListResponse = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
+      const allBenchmarks = benchmarksResponse.benchmarks;
+
+      let waitingForFollowBack = 0;
+      let increasedFollowers = 0;
+      let impressions = 0;
+
+      // Calculate one month ago date
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+      // Process each benchmark
+      for (const benchmark of allBenchmarks) {
+        try {
+          // Get all targets for this benchmark
+          const targetsResponse: TargetListResponse = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(benchmark.id);
+          const targets = targetsResponse.targets;
+
+          // Filter targets created within the last month
+          const recentTargets = targets.filter(target => {
+            const createdAt = new Date(target.created_at);
+            return createdAt >= oneMonthAgo;
+          });
+
+          // Calculate stats
+          for (const target of recentTargets) {
+            // 1. Waiting for Follow Back: REQUESTED status
+            if (target.stage === StageEnum.REQUESTED) {
+              waitingForFollowBack++;
+            }
+
+            // 2. Increased followers by FlowSonat: FOLLOW_BACK status
+            if (target.stage === StageEnum.FOLLOW_BACK) {
+              increasedFollowers++;
+            }
+
+            // 3. Impressions by FlowSonat: All statuses except PENDING
+            if (target.stage !== StageEnum.PENDING) {
+              impressions++;
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to load targets for benchmark ${benchmark.id}:`, error);
+        }
+      }
+
+      setStats({
+        waitingForFollowBack,
+        increasedFollowers,
+        impressions
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
     }
   };
 
@@ -341,7 +410,50 @@ export const BenchmarkTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Waiting for Follow Back</p>
+                <p className="text-2xl font-bold text-white">{stats.waitingForFollowBack}</p>
+              </div>
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Users className="h-6 w-6 text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Increased Followers by FlowSonat</p>
+                <p className="text-2xl font-bold text-white">{stats.increasedFollowers}</p>
+              </div>
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <Activity className="h-6 w-6 text-green-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-black/10 backdrop-blur-sm border-black/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Impressions by FlowSonat</p>
+                <p className="text-2xl font-bold text-white">{stats.impressions}</p>
+              </div>
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-purple-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Glassmorphism Container */}
       <Card className="bg-black/10 backdrop-blur-sm border-black/20">
