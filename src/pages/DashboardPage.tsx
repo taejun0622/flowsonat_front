@@ -13,6 +13,8 @@ import { useInstagram } from '@/contexts/InstagramContext';
 import { useWebView } from '@/hooks/useWebView';
 import { executeAutomation, AutomationResult } from '@/services/automationService';
 import { useComponentAnalytics, useButtonAnalytics, useInstagramAnalytics } from '@/hooks/useAnalyticsTracking';
+import { InstagramService } from '@/api/services/InstagramService';
+import { BenchmarkResponse } from '@/api';
 
 export const DashboardPage = () => {
   const { user, isTrialOver } = useAuth();
@@ -22,6 +24,8 @@ export const DashboardPage = () => {
   const [isCheckingConnection, setIsCheckingConnection] = React.useState(false);
   const [hasCheckedConnection, setHasCheckedConnection] = React.useState(false);
   const [showTrialOverBanner, setShowTrialOverBanner] = React.useState(true);
+  const [benchmarks, setBenchmarks] = React.useState<BenchmarkResponse[]>([]);
+  const [isLoadingBenchmarks, setIsLoadingBenchmarks] = React.useState(false);
   const { activeTab, switchToTab, switchToBilling } = useTabNavigation();
 
   // Analytics hooks
@@ -63,6 +67,13 @@ export const DashboardPage = () => {
     }
   }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
+  // Load benchmarks when Instagram is connected
+  React.useEffect(() => {
+    if (isConnected && hasCheckedConnection) {
+      loadBenchmarks();
+    }
+  }, [isConnected, hasCheckedConnection]);
+
   const handleStartAutomation = () => {
     // Open full-screen WebView manager in minimal mode with auto-execution
     navigate('/webview?minimal=1&autoExecute=1');
@@ -71,6 +82,10 @@ export const DashboardPage = () => {
   const handleRefresh = () => {
     // Refresh Instagram connection status
     checkConnection();
+    // Also refresh benchmarks if connected
+    if (isConnected) {
+      loadBenchmarks();
+    }
   };
 
   const handleConnectInstagram = () => {
@@ -84,6 +99,19 @@ export const DashboardPage = () => {
 
   const handleDismissTrialOverBanner = () => {
     setShowTrialOverBanner(false);
+  };
+
+  const loadBenchmarks = async () => {
+    try {
+      setIsLoadingBenchmarks(true);
+      const response = await InstagramService.getBenchmarksApiV1InstagramBenchmarksGet();
+      setBenchmarks(response.benchmarks);
+    } catch (error) {
+      console.error('Failed to load benchmarks:', error);
+      setBenchmarks([]);
+    } finally {
+      setIsLoadingBenchmarks(false);
+    }
   };
 
   // Show loading when checking connection status
@@ -119,7 +147,7 @@ export const DashboardPage = () => {
               <Button 
                 onClick={handleStartAutomation}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                disabled={!isConnected}
+                disabled={!isConnected || benchmarks.length === 0}
               >
                 <Bot className="h-4 w-4 mr-2" />
                 Execute
