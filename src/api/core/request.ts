@@ -196,6 +196,10 @@ export const getHeaders = async (config: OpenAPIConfig, options: ApiRequestOptio
 export const getRequestBody = (options: ApiRequestOptions): any => {
     if (options.body !== undefined) {
         if (options.mediaType?.includes('/json')) {
+            // 이미 문자열인 경우 다시 직렬화하지 않음 (윈도우 이중 직렬화 문제 방지)
+            if (isString(options.body)) {
+                return options.body;
+            }
             return JSON.stringify(options.body)
         } else if (isString(options.body) || isBlob(options.body) || isFormData(options.body)) {
             return options.body;
@@ -273,11 +277,14 @@ export const sendRequest = async (
             });
 
             // Response 객체와 유사한 구조로 변환
+            const responseHeaders = new Headers();
+            responseHeaders.set('Content-Type', 'application/json');
+            
             return {
                 ok: response.status >= 200 && response.status < 300,
                 status: response.status,
                 statusText: response.statusText,
-                headers: new Headers(),
+                headers: responseHeaders,
                 json: async () => response.data,
                 text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
                 blob: async () => new Blob([JSON.stringify(response.data)]),

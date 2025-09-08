@@ -74,10 +74,36 @@ export class ElectronApiService {
       const response = await (window.electronAPI as any)?.apiRequest(method, url, data, headers);
       
       console.log(`[Electron API Response] ${method} ${url}`, {
-        status: response.status,
-        data: response.data,
+        response: response,
+        responseType: typeof response,
+        status: response?.status,
+        data: response?.data,
+        statusText: response?.statusText,
         timestamp: new Date().toISOString()
       });
+      
+      // 응답이 없거나 예상과 다른 구조인 경우 에러 처리
+      if (!response) {
+        throw new Error('No response received from Electron main process');
+      }
+      
+      // 응답 구조 검증
+      if (typeof response !== 'object') {
+        throw new Error(`Invalid response type: expected object, got ${typeof response}`);
+      }
+      
+      if (!response.data && response.status !== 204) {
+        console.warn('⚠️ Warning: Response data is missing', { response });
+      }
+      
+      // 상태 코드 검증
+      if (response.status && response.status >= 400) {
+        throw {
+          data: response.data,
+          status: response.status,
+          statusText: response.statusText || 'Error'
+        };
+      }
       
       return {
         data: response.data,
@@ -120,7 +146,7 @@ export class ElectronApiService {
           'Content-Type': 'application/json',
           ...headers,
         },
-        body: data ? JSON.stringify(data) : undefined,
+        body: data ? (typeof data === 'string' ? data : JSON.stringify(data)) : undefined,
       });
 
       const responseData = await response.text();
