@@ -36,7 +36,7 @@ function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.js'),
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
@@ -411,7 +411,7 @@ app.whenReady().then(() => {
         'websql',
         'filesystem',
       ],
-      quotas: ['temporary', 'syncable'],
+      quotas: ['temporary'],
     })
 
     // 2) Clear all cookies

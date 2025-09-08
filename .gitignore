@@ -30,3 +30,8 @@ release/
 version-info.json
 build/certificate.p12
 build/installer_certificate.p12
+
+# Windows self-signed certificates
+build/certificates/*.pem
+build/certificates/*.p12
+!build/certificates/.gitkeep
