@@ -36,7 +36,7 @@ function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.js'),
       webviewTag: true, // Enable webview tag
       nodeIntegration: false,
       contextIsolation: true,
@@ -255,53 +255,95 @@ ipcMain.handle('api-request', async (event, { method, url, data, headers = {} })
       throw new Error(`Generated URL is not absolute: ${fullUrl}. This will cause file:// protocol issues.`);
     }
     
-    const requestOptions: RequestInit = {
-      method,
+    // 윈도우에서 fetch API의 인코딩 문제를 해결하기 위해 Node.js https 모듈 사용
+    const https = require('https');
+    const { URL } = require('url');
+    
+    const urlObj = new URL(fullUrl);
+    const requestBody = data && (method === 'POST' || method === 'PUT' || method === 'PATCH') 
+      ? (typeof data === 'string' ? data : JSON.stringify(data))
+      : undefined;
+
+    console.log(`[API Request] ${method} ${fullUrl}`, {
+      data: data ? { 
+        data, 
+        dataType: typeof data,
+        isString: typeof data === 'string',
+        stringified: typeof data === 'string' ? data : JSON.stringify(data),
+        requestBody: requestBody
+      } : '',
+      headers: headers,
+      timestamp: new Date().toISOString()
+    });
+
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: method,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         ...headers,
       },
     };
 
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      requestOptions.body = JSON.stringify(data);
+    if (requestBody) {
+      options.headers['Content-Length'] = Buffer.byteLength(requestBody, 'utf8');
     }
 
-    console.log(`[API Request] ${method} ${fullUrl}`, {
-      data: data ? { data } : '',
-      headers: headers,
-      timestamp: new Date().toISOString()
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let responseData = '';
+        
+        res.on('data', (chunk) => {
+          responseData += chunk;
+        });
+        
+        res.on('end', () => {
+          let parsedData;
+          
+          try {
+            parsedData = JSON.parse(responseData);
+          } catch {
+            parsedData = responseData;
+          }
+
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            console.log(`[API Response] ${method} ${fullUrl}`, {
+              status: res.statusCode,
+              data: parsedData,
+              timestamp: new Date().toISOString()
+            });
+            
+            resolve({
+              data: parsedData,
+              status: res.statusCode,
+              statusText: res.statusMessage || 'OK'
+            });
+          } else {
+            const error = new Error(`HTTP ${res.statusCode}: ${res.statusMessage || 'Unknown Error'}`);
+            (error as any).status = res.statusCode;
+            (error as any).data = parsedData;
+            reject(error);
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error(`[API Error] ${method} ${url}:`, {
+          error: error,
+          timestamp: new Date().toISOString()
+        });
+        reject(error);
+      });
+
+      if (requestBody) {
+        req.write(requestBody, 'utf8');
+      }
+      
+      req.end();
     });
-    
-    const response = await fetch(fullUrl, requestOptions);
-    
-    const responseData = await response.text();
-    let parsedData;
-    
-    try {
-      parsedData = JSON.parse(responseData);
-    } catch {
-      parsedData = responseData;
-    }
-
-    if (!response.ok) {
-      const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
-      (error as any).status = response.status;
-      (error as any).data = parsedData;
-      throw error;
-    }
-
-    console.log(`[API Response] ${method} ${fullUrl}`, {
-      status: response.status,
-      data: parsedData,
-      timestamp: new Date().toISOString()
-    });
-    
-    return {
-      data: parsedData,
-      status: response.status,
-      statusText: response.statusText
-    };
   } catch (error) {
     console.error(`[API Error] ${method} ${url}:`, {
       error: error,
@@ -411,7 +453,7 @@ app.whenReady().then(() => {
         'websql',
         'filesystem',
       ],
-      quotas: ['temporary', 'syncable'],
+      quotas: ['temporary'],
     })
 
     // 2) Clear all cookies

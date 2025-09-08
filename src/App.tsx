@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { InstagramProvider } from '@/contexts/InstagramContext';
@@ -23,7 +23,16 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import WebViewPage from '@/pages/WebViewPage';
 import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage';
 
+// Route debugging component
+const RouteDebugger = () => {
+  const location = useLocation();
+  console.log('📍 Current route:', location.pathname);
+  return null;
+};
+
 function App() {
+  console.log('🚀 App component rendering...');
+  
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -37,7 +46,11 @@ function App() {
               seed={1000}
             >
               <div className="relative w-full h-full overflow-auto">
+                <RouteDebugger />
                 <Routes>
+                {/* Test Route */}
+                <Route path="/test" element={<div style={{color: 'white', padding: '20px'}}>Test Route Working!</div>} />
+                
                 {/* Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -76,8 +89,8 @@ function App() {
                 />
                 
                 {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="*" element={<Navigate to="/login" replace />} />
               </Routes>
               
                 <Toaster />

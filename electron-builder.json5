@@ -58,7 +58,12 @@
       }
     ],
     "artifactName": "${productName}-Windows-${arch}-${version}.${ext}",
-    "icon": "build/icon.ico"
+    "icon": "build/icon.ico",
+    "certificateFile": "build/certificates/flowsonat-windows-cert.p12",
+    "certificatePassword": "flowsonat123",
+    "signAndEditExecutable": true,
+    "signDlls": true,
+    "publisherName": "FlowSonat"
   },
   "nsis": {
     "oneClick": false,

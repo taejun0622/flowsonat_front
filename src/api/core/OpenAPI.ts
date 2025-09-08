@@ -23,17 +23,24 @@ export type OpenAPIConfig = {
 };
 
 // API Base URL 설정 - 안전한 검증과 함께
-const apiBaseUrl = getSafeApiBaseUrl(import.meta.env.VITE_API_BASE_URL, 'https://api.flowsonat.com');
+// 프로덕션에서는 환경 변수가 없을 경우 기본값 사용
+const envApiUrl = import.meta.env.VITE_API_BASE_URL;
+const fallbackUrl = 'https://api.flowsonat.com';
+const apiBaseUrl = getSafeApiBaseUrl(envApiUrl, fallbackUrl);
 
 // 항상 로깅 (production에서도 API 호출 문제 디버깅용)
 console.log('🔧 API Configuration Debug:', {
-    rawEnvVar: import.meta.env.VITE_API_BASE_URL,
+    rawEnvVar: envApiUrl,
+    fallbackUrl: fallbackUrl,
+    finalApiBaseUrl: apiBaseUrl,
+    usedFallback: !envApiUrl,
     isProd: isProduction(),
     isDev: isDevelopment(),
     mode: import.meta.env.MODE,
-    finalApiBaseUrl: apiBaseUrl,
     location: window.location?.href || 'unknown',
-    timestamp: new Date().toISOString()
+    userAgent: navigator.userAgent,
+    timestamp: new Date().toISOString(),
+    allEnvVars: Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'))
 });
 
 // OpenAPI BASE 설정 확인
