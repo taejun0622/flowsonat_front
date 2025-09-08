@@ -121,7 +121,7 @@ fi
 log_info "Step 2: Building Electron app..."
 case $PLATFORM in
     "all")
-        log_info "Building for all platforms..."
+        log_info "Building for all platforms with code signing..."
         dotenv -f .env.deploy run npm run build:all
         ;;
     "mac")
@@ -129,8 +129,8 @@ case $PLATFORM in
         npm run build:mac:env
         ;;
     "win")
-        log_info "Building for Windows..."
-        dotenv -f .env.deploy run npm run build:win
+        log_info "Building for Windows with code signing..."
+        dotenv -f .env.deploy run npm run build:win:signed
         ;;
     "linux")
         log_info "Building for Linux..."
