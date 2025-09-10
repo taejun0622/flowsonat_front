@@ -4,7 +4,7 @@ const { ipcRenderer, contextBridge } = require('electron')
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+    return ipcRenderer.on(channel, (event, ...args) => (listener as Function)(event, ...args))
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
     const [channel, ...omit] = args
@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 업데이트 설치
   installUpdate: () => ipcRenderer.invoke('install-update'),
+  
+  // 업데이트 상태 조회
+  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
   
   // 업데이트 상태 변경 이벤트 리스너
   onUpdateStatus: (callback: (data: any) => void) => {

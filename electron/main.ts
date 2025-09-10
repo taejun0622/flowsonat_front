@@ -32,6 +32,10 @@ let win: BrowserWindow | null
 autoUpdater.autoDownload = false; // Disable auto-download (require user confirmation)
 autoUpdater.autoInstallOnAppQuit = true; // Auto-install on app quit
 
+// Track update state
+let updateInfo: any = null;
+let isUpdateAvailable = false;
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
@@ -86,6 +90,9 @@ autoUpdater.on('checking-for-update', () => {
 
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
+  updateInfo = info;
+  isUpdateAvailable = true;
+  
   win?.webContents.send('update-status', { 
     status: 'available', 
     message: 'A new update is available.',
@@ -109,6 +116,9 @@ autoUpdater.on('update-available', (info) => {
 
 autoUpdater.on('update-not-available', () => {
   console.log('Update not available');
+  updateInfo = null;
+  isUpdateAvailable = false;
+  
   win?.webContents.send('update-status', { 
     status: 'not-available', 
     message: 'You are using the latest version.' 
@@ -172,6 +182,24 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('download-update', async () => {
   try {
+    // Check if an update is available before attempting to download
+    if (!isUpdateAvailable || !updateInfo) {
+      // Try to check for updates first as a fallback
+      console.log('No update available, checking for updates first...');
+      try {
+        await autoUpdater.checkForUpdates();
+        // Wait a moment for the update-available event to fire
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (!isUpdateAvailable || !updateInfo) {
+          throw new Error('No update available after checking');
+        }
+      } catch (checkError) {
+        console.error('Failed to check for updates:', checkError);
+        throw new Error('Please check update first');
+      }
+    }
+    
     const result = await autoUpdater.downloadUpdate();
     return result;
   } catch (error) {
@@ -188,6 +216,15 @@ ipcMain.handle('install-update', async () => {
     console.error('Error installing update:', error);
     throw error;
   }
+});
+
+// Get current update status
+ipcMain.handle('get-update-status', async () => {
+  return {
+    isUpdateAvailable,
+    updateInfo,
+    currentVersion: app.getVersion()
+  };
 });
 
 // GA4 Analytics handlers
