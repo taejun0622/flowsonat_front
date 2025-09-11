@@ -22,6 +22,7 @@ declare global {
       checkForUpdates: () => Promise<any>
       downloadUpdate: () => Promise<any>
       installUpdate: () => Promise<any>
+      getUpdateStatus: () => Promise<any>
       onUpdateStatus: (callback: (data: any) => void) => void
       onUpdateProgress: (callback: (data: any) => void) => void
       updateAvailable: (updateResult: any) => void
