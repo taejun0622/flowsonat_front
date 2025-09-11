@@ -161,9 +161,21 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.error('AutoUpdater error:', err);
+  
+  // Handle specific error types
+  let errorMessage = `Update error: ${err.message}`;
+  if (err.message.includes('403') || err.message.includes('Access Denied')) {
+    errorMessage = 'Update server access denied. Please check your internet connection or try again later.';
+  } else if (err.message.includes('404') || err.message.includes('Not Found')) {
+    errorMessage = 'Update information not found. This may be a new release.';
+  } else if (err.message.includes('network') || err.message.includes('timeout')) {
+    errorMessage = 'Network error while checking for updates. Please check your internet connection.';
+  }
+  
   win?.webContents.send('update-status', { 
     status: 'error', 
-    message: `Update error: ${err.message}` 
+    message: errorMessage,
+    error: err.message 
   });
   // GA4 에러 추적
   ga4Service.trackError(`AutoUpdater: ${err.message}`, false).catch(console.error)
@@ -172,10 +184,22 @@ autoUpdater.on('error', (err) => {
 // IPC handlers - Handle update requests from renderer process
 ipcMain.handle('check-for-updates', async () => {
   try {
+    console.log('Checking for updates...');
     const result = await autoUpdater.checkForUpdates();
+    console.log('Update check completed:', result);
     return result;
   } catch (error) {
     console.error('Error checking for updates:', error);
+    
+    // Provide more detailed error information
+    const errorInfo = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any)?.code || 'UNKNOWN',
+      statusCode: (error as any)?.statusCode || null,
+      url: (error as any)?.url || null
+    };
+    
+    console.error('Detailed error info:', errorInfo);
     throw error;
   }
 });
