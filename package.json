@@ -1,7 +1,7 @@
 {
   "name": "flowsonat_front",
   "private": true,
-  "version": "0.0.42",
+  "version": "0.0.43",
   "type": "module",
   "author": {
     "name": "FlowSonat Team",
@@ -13,6 +13,7 @@
     "build:prod": "npm run typecheck && vite build --mode production && electron-builder --publish=never",
     "build:all": "npm run typecheck && set NODE_ENV=production && vite build --mode production && set NODE_ENV=production && electron-builder --mac --win --linux --publish=never",
     "build:mac": "npm run typecheck && vite build --mode production && electron-builder --mac --publish=never",
+    "build:mac:unsigned": "npm run typecheck && vite build --mode production && electron-builder --mac --publish=never --config.mac.identity=null",
     "build:mac:signed": "npm run typecheck && vite build --mode production && dotenv -e .env.deploy -- electron-builder --mac --publish=always",
     "build:mac:env": "npm run typecheck && vite build --mode production && dotenv -e .env.deploy -- electron-builder --mac --publish=always",
     "build:win": "npm run typecheck && set NODE_ENV=production && vite build --mode production && set NODE_ENV=production && electron-builder --win --publish=never",
