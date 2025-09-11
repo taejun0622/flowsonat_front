@@ -890,12 +890,73 @@ export class AutomationService {
 
   private async clickUnfollowButton(): Promise<boolean> {
     try {
+      // Step 1: First click Following or Requested button to open confirmation modal
+      const followingOrRequestedClicked = await this.clickFollowingOrRequestedButton();
+      
+      if (!followingOrRequestedClicked) {
+        console.log('[Automation] No Following/Requested button found, cannot unfollow');
+        return false;
+      }
+      
+      // Step 2: Wait for confirmation modal to appear
+      await this.delay(1500);
+      
+      // Step 3: Look for and click the Unfollow button in the modal
       const result = await this.webviewApi.executeScript(`
         (() => {
           try {
-            const unfollowButton = document.querySelector('button[type="button"]');
-            if (unfollowButton && unfollowButton.textContent.toLowerCase().includes('unfollow')) {
+            // Look for unfollow button in modal or anywhere on the page
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const unfollowButton = candidates.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'unfollow';
+            });
+            
+            if (unfollowButton) {
               unfollowButton.click();
+              return true;
+            }
+            
+            // Alternative: Look for buttons with specific attributes that might be unfollow
+            const modalButtons = Array.from(document.querySelectorAll('[role="dialog"] button, [aria-modal="true"] button'));
+            const modalUnfollowButton = modalButtons.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'unfollow';
+            });
+            
+            if (modalUnfollowButton) {
+              modalUnfollowButton.click();
+              return true;
+            }
+            
+            return false;
+          } catch (e) {
+            return false;
+          }
+        })();
+      `);
+      
+      return Boolean(result);
+    } catch (error) {
+      console.error('[Automation] Click unfollow error:', error);
+      return false;
+    }
+  }
+
+  private async clickFollowingOrRequestedButton(): Promise<boolean> {
+    try {
+      const result = await this.webviewApi.executeScript(`
+        (() => {
+          try {
+            // Look for Following or Requested button
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const followingOrRequestedButton = candidates.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'following' || text === 'requested';
+            });
+            
+            if (followingOrRequestedButton) {
+              followingOrRequestedButton.click();
               return true;
             }
             return false;
@@ -907,7 +968,7 @@ export class AutomationService {
       
       return Boolean(result);
     } catch (error) {
-      console.error('[Automation] Click unfollow error:', error);
+      console.error('[Automation] Click following/requested error:', error);
       return false;
     }
   }

@@ -646,17 +646,49 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     clickUnfollowButton: async () => {
       if (extensionActive) {
-        const js = `(() => {
+        // Step 1: First click Following or Requested button to open confirmation modal
+        const followingOrRequestedJs = `(() => {
           try {
-            // Instagram shows a confirmation dialog. This will click the first "Unfollow" button.
             const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
-            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'unfollow');
+            const found = candidates.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'following' || text === 'requested';
+            });
             if (found) { found.click(); return true; }
             return false;
           } catch (e) { return false; }
         })();`;
-        console.log('[WebView] CLICK_UNFOLLOW_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        
+        console.log('[WebView] CLICK_FOLLOWING_OR_REQUESTED_BUTTON');
+        const followingClicked = await safeExecuteJavaScript(followingOrRequestedJs);
+        
+        if (!followingClicked) {
+          console.log('[WebView] No Following/Requested button found');
+          return false;
+        }
+        
+        // Step 2: Wait for confirmation modal to appear
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Step 3: Now click the Unfollow button in the modal
+        const unfollowJs = `(() => {
+          try {
+            // Look for unfollow button in modal or anywhere on the page
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const found = candidates.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'unfollow');
+            if (found) { found.click(); return true; }
+            
+            // Alternative: Look specifically in modal elements
+            const modalButtons = Array.from(document.querySelectorAll('[role="dialog"] button, [aria-modal="true"] button'));
+            const modalFound = modalButtons.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === 'unfollow');
+            if (modalFound) { modalFound.click(); return true; }
+            
+            return false;
+          } catch (e) { return false; }
+        })();`;
+        
+        console.log('[WebView] CLICK_UNFOLLOW_BUTTON_IN_MODAL');
+        const res = await safeExecuteJavaScript(unfollowJs);
         return !!res;
       }
       return false;
