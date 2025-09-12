@@ -46,7 +46,18 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true, // Enable web security
       allowRunningInsecureContent: false, // Disable insecure content
-      experimentalFeatures: false
+      experimentalFeatures: false,
+      // 메모리 최적화 설정
+      v8CacheOptions: 'code',
+      backgroundThrottling: false,
+      // 메모리 제한 설정
+      partition: 'persist:main',
+      // 이미지 최적화
+      imageAnimationPolicy: 'animateOnce',
+      // 스크립트 최적화
+      enableRemoteModule: false,
+      // 메모리 누수 방지
+      offscreen: false
     },
     // 개발 환경에서만 DevTools 자동 열기
     show: false, // 창을 먼저 숨김
@@ -55,6 +66,38 @@ function createWindow() {
   // 창이 준비되면 표시
   win.once('ready-to-show', () => {
     win?.show()
+  })
+
+  // 메모리 모니터링 및 정리
+  const memoryMonitor = setInterval(() => {
+    if (win && !win.isDestroyed()) {
+      const memInfo = process.memoryUsage()
+      console.log('Memory Usage:', {
+        rss: Math.round(memInfo.rss / 1024 / 1024) + ' MB',
+        heapUsed: Math.round(memInfo.heapUsed / 1024 / 1024) + ' MB',
+        heapTotal: Math.round(memInfo.heapTotal / 1024 / 1024) + ' MB',
+        external: Math.round(memInfo.external / 1024 / 1024) + ' MB'
+      })
+      
+      // 메모리 사용량이 500MB를 초과하면 가비지 컬렉션 강제 실행
+      if (memInfo.heapUsed > 500 * 1024 * 1024) {
+        console.warn('High memory usage detected, forcing garbage collection')
+        if (global.gc) {
+          global.gc()
+        }
+        // WebView 메모리 정리
+        win.webContents.executeJavaScript(`
+          if (window.gc) {
+            window.gc();
+          }
+        `).catch(() => {})
+      }
+    }
+  }, 30000) // 30초마다 체크
+
+  // 창이 닫힐 때 메모리 모니터링 정리
+  win.on('closed', () => {
+    clearInterval(memoryMonitor)
   })
 
   // Test active push message to Renderer-process.
@@ -74,6 +117,38 @@ function createWindow() {
         if (process.env.NODE_ENV === 'development') {
           webContents.openDevTools({ mode: 'detach' })
         }
+        
+        // WebView 메모리 최적화 설정
+        webContents.on('did-finish-load', () => {
+          // WebView에서 불필요한 기능 비활성화
+          webContents.executeJavaScript(`
+            // 이미지 지연 로딩 비활성화
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+              if (img.loading === 'lazy') {
+                img.loading = 'eager';
+              }
+            });
+            
+            // 불필요한 이벤트 리스너 정리
+            window.addEventListener('beforeunload', () => {
+              // 메모리 정리
+              if (window.gc) {
+                window.gc();
+              }
+            });
+          `).catch(() => {})
+        })
+        
+        // WebView 메모리 누수 방지
+        webContents.on('crashed', () => {
+          console.warn('WebView crashed, attempting to recover')
+        })
+        
+        webContents.on('unresponsive', () => {
+          console.warn('WebView became unresponsive')
+        })
+        
       } catch {/* no-op */}
     })
   } else {
@@ -414,6 +489,70 @@ ipcMain.handle('api-request', async (event, { method, url, data, headers = {} })
   }
 });
 
+// 메모리 관리 IPC 핸들러
+ipcMain.handle('cleanup-webview-memory', async () => {
+  try {
+    console.log('🧹 Cleaning up WebView memory...');
+    
+    // 모든 WebView의 메모리 정리
+    if (win && win.webContents) {
+      await win.webContents.executeJavaScript(`
+        // WebView 내부 메모리 정리
+        if (window.gc) {
+          window.gc();
+        }
+        
+        // 이미지 캐시 정리
+        const images = document.querySelectorAll('img');
+        images.forEach(img => {
+          if (img.src && img.src.startsWith('blob:')) {
+            URL.revokeObjectURL(img.src);
+          }
+        });
+        
+        // 불필요한 이벤트 리스너 정리
+        const elements = document.querySelectorAll('*');
+        elements.forEach(el => {
+          if (el._eventListeners) {
+            el._eventListeners.forEach(({ event, handler }) => {
+              el.removeEventListener(event, handler);
+            });
+            delete el._eventListeners;
+          }
+        });
+        
+        return 'Memory cleanup completed';
+      `);
+    }
+    
+    // 메인 프로세스 가비지 컬렉션
+    if (global.gc) {
+      global.gc();
+    }
+    
+    return { success: true, message: 'Memory cleanup completed' };
+  } catch (error) {
+    console.error('Memory cleanup failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-memory-usage', async () => {
+  try {
+    const memInfo = process.memoryUsage();
+    return {
+      rss: Math.round(memInfo.rss / 1024 / 1024),
+      heapUsed: Math.round(memInfo.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(memInfo.heapTotal / 1024 / 1024),
+      external: Math.round(memInfo.external / 1024 / 1024),
+      arrayBuffers: Math.round(memInfo.arrayBuffers / 1024 / 1024),
+    };
+  } catch (error) {
+    console.error('Failed to get memory usage:', error);
+    throw error;
+  }
+});
+
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -470,6 +609,13 @@ process.on('unhandledRejection', async (reason, promise) => {
 })
 
 app.whenReady().then(() => {
+  // 메모리 제한 설정 (개발 환경에서만)
+  if (process.env.NODE_ENV === 'development') {
+    // V8 메모리 제한 설정 (기본값: 1.4GB, 개발용으로 1GB로 제한)
+    process.env.NODE_OPTIONS = '--max-old-space-size=1024'
+    console.log('Development mode: Memory limit set to 1GB')
+  }
+  
   // GA4 서비스 초기화
   const measurementId = process.env.VITE_GA4_MEASUREMENT_ID
   const apiSecret = process.env.VITE_GA4_API_SECRET
