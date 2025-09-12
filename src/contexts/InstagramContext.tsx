@@ -4,6 +4,20 @@ import { InstagramConnectResponse } from '@/api';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+// 쿠키 문자열을 객체로 변환하는 유틸리티 함수
+const parseCookies = (cookieString: string): Record<string, any> => {
+  if (!cookieString) return {};
+  
+  const cookies: Record<string, any> = {};
+  cookieString.split(';').forEach(cookie => {
+    const [name, value] = cookie.trim().split('=');
+    if (name && value) {
+      cookies[name] = value;
+    }
+  });
+  return cookies;
+};
+
 interface InstagramContextType {
   instagramAccount: InstagramConnectResponse | null;
   isConnected: boolean;
@@ -13,6 +27,8 @@ interface InstagramContextType {
   disconnectAccount: () => Promise<void>;
   refreshConnection: () => Promise<void>;
   saveInstagramSession: (sessionData: any) => Promise<InstagramConnectResponse>;
+  injectCookiesToWebView: (cookies: Record<string, any>) => Promise<boolean>;
+  restoreInstagramSession: () => Promise<boolean>;
 }
 
 const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
@@ -84,9 +100,13 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         throw new Error('Username not found in session data');
       }
       
-      // Instagram 세션 정보를 서버에 저장
+      // 쿠키 정보를 구조화된 형태로 변환
+      const cookies = sessionData?.cookies ? parseCookies(sessionData.cookies) : null;
+      
+      // Instagram 세션 정보를 서버에 저장 (쿠키 정보 포함)
       const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(username)
+        username: String(username),
+        cookies: cookies
       });
       
       setInstagramAccount(response);
@@ -95,12 +115,28 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       const extendedSessionData = {
         ...sessionData,
         connectedAt: new Date().toISOString(),
-        accountId: response.id
+        accountId: response.id,
+        cookies: cookies,
+        serverResponse: {
+          id: response.id,
+          username: response.username,
+          ig_user_id: response.ig_user_id,
+          status: response.status,
+          created_at: response.created_at,
+          updated_at: response.updated_at
+        }
       };
       
       // 로컬 스토리지에 세션 정보 저장 (개발용)
       if (process.env.NODE_ENV === 'development') {
         localStorage.setItem('instagram_session_data', JSON.stringify(extendedSessionData));
+        console.log('Instagram session data saved to localStorage:', extendedSessionData);
+      }
+      
+      // 쿠키 정보만 별도로 저장 (디버깅용)
+      if (cookies) {
+        localStorage.setItem('instagram_cookies', JSON.stringify(cookies));
+        console.log('Instagram cookies saved to localStorage:', cookies);
       }
       
       toast({
@@ -173,6 +209,11 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         console.log('🗂️ instagram_session_data 삭제 시도');
         localStorage.removeItem('instagram_session_data');
         console.log('✅ instagram_session_data 삭제 완료');
+        
+        // 쿠키 정보도 삭제
+        console.log('🗂️ instagram_cookies 삭제 시도');
+        localStorage.removeItem('instagram_cookies');
+        console.log('✅ instagram_cookies 삭제 완료');
         
         // Instagram 관련 모든 로컬 스토리지 키 정리
         console.log('🔍 localStorage 키 검색 시작');
@@ -475,6 +516,115 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     await checkConnection();
   }, [checkConnection]);
 
+  // 쿠키를 WebView에 주입하는 함수
+  const injectCookiesToWebView = React.useCallback(async (cookies: Record<string, any>): Promise<boolean> => {
+    try {
+      console.log('Injecting cookies to WebView:', cookies);
+      
+      // Electron 환경에서 쿠키 주입
+      if (window.electronAPI && typeof window.electronAPI.injectCookies === 'function') {
+        await window.electronAPI.injectCookies(cookies);
+        console.log('Cookies injected via Electron API');
+        return true;
+      }
+      
+      // WebView에 직접 쿠키 주입 (Electron WebView API 사용)
+      if (window.IG && typeof window.IG.injectCookies === 'function') {
+        await window.IG.injectCookies(cookies);
+        console.log('Cookies injected via IG API');
+        return true;
+      }
+      
+      // 일반 웹 환경에서 쿠키 주입 (제한적)
+      if (typeof document !== 'undefined') {
+        Object.entries(cookies).forEach(([name, value]) => {
+          if (name && value) {
+            // Instagram 도메인에 대한 쿠키 설정
+            document.cookie = `${name}=${value}; domain=.instagram.com; path=/; secure; samesite=none`;
+            document.cookie = `${name}=${value}; domain=instagram.com; path=/; secure; samesite=none`;
+          }
+        });
+        console.log('Cookies injected via document.cookie (limited)');
+        return true;
+      }
+      
+      console.warn('No cookie injection method available');
+      return false;
+    } catch (error) {
+      console.error('Failed to inject cookies:', error);
+      return false;
+    }
+  }, []);
+
+  // Instagram 세션 복원 함수
+  const restoreInstagramSession = React.useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('Restoring Instagram session...');
+      
+      // 1. 서버에서 Instagram 계정 정보 가져오기
+      const account = await InstagramService.getMyInstagramAccountApiV1InstagramMeGet();
+      console.log('Retrieved account from server:', account);
+      
+      if (!account || !account.cookies) {
+        console.log('No cookies found in account data');
+        return false;
+      }
+      
+      // 2. 쿠키를 WebView에 주입
+      const injectionSuccess = await injectCookiesToWebView(account.cookies);
+      if (!injectionSuccess) {
+        console.warn('Failed to inject cookies');
+        return false;
+      }
+      
+      // 3. 로컬 상태 업데이트
+      setInstagramAccount(account);
+      
+      // 4. 로컬 스토리지에 복원된 세션 정보 저장
+      const restoredSessionData = {
+        username: account.username,
+        isLoggedIn: true,
+        dsUserId: account.cookies.ds_user_id || null,
+        hasSessionId: !!account.cookies.sessionid,
+        timestamp: new Date().toISOString(),
+        url: 'https://www.instagram.com/',
+        cookies: account.cookies,
+        restored: true,
+        restoredAt: new Date().toISOString()
+      };
+      
+      if (process.env.NODE_ENV === 'development') {
+        localStorage.setItem('instagram_session_data', JSON.stringify(restoredSessionData));
+        localStorage.setItem('instagram_cookies', JSON.stringify(account.cookies));
+        console.log('Restored session data saved to localStorage');
+      }
+      
+      toast({
+        title: "Instagram Session Restored",
+        description: `Successfully restored Instagram session for @${account.username}.`,
+      });
+      
+      console.log('Instagram session restored successfully');
+      return true;
+    } catch (error: any) {
+      console.error('Failed to restore Instagram session:', error);
+      
+      // 404 에러는 연결된 계정이 없다는 의미
+      if (error.status === 404) {
+        console.log('No Instagram account connected (404)');
+        return false;
+      }
+      
+      toast({
+        title: "Session Restore Failed",
+        description: "Failed to restore Instagram session. Please reconnect your account.",
+        variant: "destructive",
+      });
+      
+      return false;
+    }
+  }, [injectCookiesToWebView, toast]);
+
   // 사용자가 로그인하면 Instagram 연결 상태를 확인
   React.useEffect(() => {
     if (user && token) {
@@ -496,6 +646,8 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     disconnectAccount,
     refreshConnection,
     saveInstagramSession,
+    injectCookiesToWebView,
+    restoreInstagramSession,
   };
 
   return (

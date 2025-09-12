@@ -11,7 +11,7 @@ import {
 } from '@/types/instagram';
 
 export const useInstagramWebView = () => {
-  const { isConnected, connectAccount, disconnectAccount, saveInstagramSession } = useInstagram();
+  const { isConnected, connectAccount, disconnectAccount, saveInstagramSession, restoreInstagramSession, injectCookiesToWebView } = useInstagram();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -370,7 +370,32 @@ export const useInstagramWebView = () => {
   const handleAction = useCallback(async (action: InstagramWebViewAction) => {
     switch (action) {
       case 'connect_instagram':
-        // Proactively clear any residual Instagram data before starting a new login
+        // 먼저 기존 세션 복원 시도
+        try {
+          console.log('Attempting to restore existing Instagram session...');
+          const restored = await restoreInstagramSession();
+          if (restored) {
+            console.log('Instagram session restored successfully');
+            setWebViewStatus((prev: InstagramWebViewStatus) => ({
+              ...prev,
+              state: 'instagram_logged_in',
+              isInstagramLoggedIn: true,
+              isServerRegistered: true,
+              lastChecked: new Date()
+            }));
+            toast({
+              title: "Instagram Session Restored",
+              description: "Your Instagram session has been restored successfully.",
+              variant: "default"
+            });
+            navigate('/dashboard');
+            return null;
+          }
+        } catch (error) {
+          console.log('Failed to restore session, proceeding with new login:', error);
+        }
+        
+        // 세션 복원 실패 시 새로운 로그인 진행
         try {
           // If running in Electron, clear known Instagram sessions (default + persisted partitions)
           // Passing undefined lets main clear default + known partitions even without a webview id
@@ -411,7 +436,32 @@ export const useInstagramWebView = () => {
         return 'https://www.instagram.com/';
         
       case 'login_instagram':
-        // Instagram 로그인 페이지로 이동
+        // 먼저 기존 세션 복원 시도
+        try {
+          console.log('Attempting to restore existing Instagram session for login...');
+          const restored = await restoreInstagramSession();
+          if (restored) {
+            console.log('Instagram session restored successfully for login');
+            setWebViewStatus((prev: InstagramWebViewStatus) => ({
+              ...prev,
+              state: 'instagram_logged_in',
+              isInstagramLoggedIn: true,
+              isServerRegistered: true,
+              lastChecked: new Date()
+            }));
+            toast({
+              title: "Instagram Session Restored",
+              description: "Your Instagram session has been restored successfully.",
+              variant: "default"
+            });
+            navigate('/dashboard');
+            return null;
+          }
+        } catch (error) {
+          console.log('Failed to restore session for login, proceeding with new login:', error);
+        }
+        
+        // 세션 복원 실패 시 새로운 로그인 진행
         return 'https://www.instagram.com/accounts/login/';
         
       case 'logout_instagram':
@@ -441,7 +491,7 @@ export const useInstagramWebView = () => {
       default:
         return null;
     }
-  }, [disconnectAccount, toast, handleConfirmConnection, handleManualUsername]);
+  }, [disconnectAccount, toast, handleConfirmConnection, handleManualUsername, restoreInstagramSession, navigate]);
 
   // 초기 상태 설정
   useEffect(() => {

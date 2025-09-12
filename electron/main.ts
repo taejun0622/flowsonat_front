@@ -698,6 +698,87 @@ app.whenReady().then(() => {
     return true
   })
 
+  /** Renderer request: Inject cookies to Instagram WebView */
+  ipcMain.handle('ig:inject-cookies', async (event, cookies: Record<string, any>) => {
+    try {
+      console.log('Injecting cookies to Instagram WebView:', cookies)
+      
+      // Instagram 세션에 쿠키 설정
+      const igSession = session.fromPartition('persist:ig')
+      
+      // 각 쿠키를 Instagram 도메인에 설정
+      for (const [name, value] of Object.entries(cookies)) {
+        if (name && value) {
+          try {
+            await igSession.cookies.set({
+              url: 'https://www.instagram.com',
+              name: name,
+              value: String(value),
+              domain: '.instagram.com',
+              path: '/',
+              secure: true,
+              httpOnly: false,
+              sameSite: 'no-restriction'
+            })
+            console.log(`Cookie set: ${name}=${value}`)
+          } catch (cookieError) {
+            console.warn(`Failed to set cookie ${name}:`, cookieError)
+          }
+        }
+      }
+      
+      // 쿠키 저장소 플러시
+      await igSession.cookies.flushStore()
+      console.log('Cookies injected successfully')
+      
+      return true
+    } catch (error) {
+      console.error('Failed to inject cookies:', error)
+      return false
+    }
+  })
+
+  /** Renderer request: Clear Instagram data for specific web contents */
+  ipcMain.handle('ig:clear-instagram-data', async (event, webContentsId?: number) => {
+    try {
+      console.log('Clearing Instagram data for web contents:', webContentsId)
+      
+      // 기본 Instagram 파티션 정리
+      await clearInstagramData('persist:ig')
+      
+      // 특정 WebContents ID가 제공된 경우 해당 WebContents의 세션도 정리
+      if (webContentsId) {
+        const webContents = win?.webContents
+        if (webContents && webContents.id === webContentsId) {
+          // WebView 내부 데이터 정리
+          await webContents.executeJavaScript(`
+            // 모든 WebView 요소 찾기
+            const webviews = document.querySelectorAll('webview');
+            webviews.forEach(webview => {
+              try {
+                webview.executeJavaScript(\`
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                  });
+                \`);
+              } catch (e) {
+                console.warn('Failed to clear WebView data:', e);
+              }
+            });
+          `)
+        }
+      }
+      
+      console.log('Instagram data cleared successfully')
+      return true
+    } catch (error) {
+      console.error('Failed to clear Instagram data:', error)
+      return false
+    }
+  })
+
   // Check for updates on app start (only when not in development mode)
   if (!VITE_DEV_SERVER_URL) {
     // Wait a bit after app is ready before checking for updates

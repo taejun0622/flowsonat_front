@@ -40,6 +40,19 @@ export const InstagramWebViewScripts = {
             }
           }
           
+          // 쿠키 정보를 구조화된 형태로 수집
+          var allCookies = document.cookie.split(';').map(function(cookie) {
+            var parts = cookie.trim().split('=');
+            return { name: parts[0], value: parts[1] || '' };
+          });
+          
+          var structuredCookies = {};
+          allCookies.forEach(function(cookie) {
+            if (cookie.name) {
+              structuredCookies[cookie.name] = cookie.value;
+            }
+          });
+          
           var sessionData = {
             username: username || null, // DOM 추출 실패시 null로 설정
             isLoggedIn: true,
@@ -47,7 +60,8 @@ export const InstagramWebViewScripts = {
             hasSessionId: !!sessionId,
             timestamp: new Date().toISOString(),
             url: window.location.href,
-            cookies: document.cookie
+            cookies: structuredCookies, // 구조화된 쿠키 객체
+            rawCookies: document.cookie // 원본 쿠키 문자열도 보존
           };
           
           return JSON.stringify({
@@ -184,6 +198,14 @@ export const InstagramWebViewScripts = {
                 }
               }
               
+              // 쿠키 정보를 구조화된 형태로 수집
+              var structuredCookies = {};
+              allCookies.forEach(function(cookie) {
+                if (cookie.name) {
+                  structuredCookies[cookie.name] = cookie.value;
+                }
+              });
+              
               // 세션 정보 수집
               var sessionData = {
                 username: username || 'instagram_user',
@@ -198,7 +220,8 @@ export const InstagramWebViewScripts = {
                 hasPsnOne: hasPsnOne,
                 timestamp: new Date().toISOString(),
                 url: window.location.href,
-                cookies: document.cookie,
+                cookies: structuredCookies, // 구조화된 쿠키 객체
+                rawCookies: document.cookie, // 원본 쿠키 문자열도 보존
                 userAgent: navigator.userAgent
               };
               

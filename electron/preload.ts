@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 contextBridge.exposeInMainWorld('IG', {
   clearSession: () => ipcRenderer.invoke('ig:clear-session'),
   disconnectAndReload: () => ipcRenderer.invoke('ig:disconnect-and-reload'),
+  injectCookies: (cookies: Record<string, any>) => ipcRenderer.invoke('ig:inject-cookies', cookies),
   onReloadRequest: (cb: () => void) => {
     ipcRenderer.on('ig:reload-webview', cb)
   },
@@ -87,5 +88,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cleanupWebViewMemory: () => ipcRenderer.invoke('cleanup-webview-memory'),
   
   // 메모리 사용량 조회
-  getMemoryUsage: () => ipcRenderer.invoke('get-memory-usage')
+  getMemoryUsage: () => ipcRenderer.invoke('get-memory-usage'),
+  
+  // 쿠키 주입
+  injectCookies: (cookies: Record<string, any>) => ipcRenderer.invoke('ig:inject-cookies', cookies),
+  
+  // Instagram 데이터 정리
+  clearInstagramDataForWebContents: (webContentsId?: number) => 
+    ipcRenderer.invoke('ig:clear-instagram-data', webContentsId)
 })
