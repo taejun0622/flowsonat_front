@@ -3,6 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
+// 개발 환경에서 메모리 모니터링 초기화
+if (process.env.NODE_ENV === 'development') {
+  import('./utils/memoryMonitor').then(({ memoryMonitor }) => {
+    console.log('🔍 Memory monitoring initialized for development');
+  });
+}
+
 // Initialize environment debugging
 import { envDebugger, logEnvironmentDebug, validateEnvironment } from './utils/envDebugger'
 import { initializeProductionValidation } from './utils/productionValidator'

@@ -81,5 +81,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // API 요청 (Main Process를 통해)
   apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => 
-    ipcRenderer.invoke('api-request', { method, url, data, headers })
+    ipcRenderer.invoke('api-request', { method, url, data, headers }),
+  
+  // 메모리 정리
+  cleanupWebViewMemory: () => ipcRenderer.invoke('cleanup-webview-memory'),
+  
+  // 메모리 사용량 조회
+  getMemoryUsage: () => ipcRenderer.invoke('get-memory-usage')
 })

@@ -65,6 +65,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
   const [extensionActive, setExtensionActive] = useState(false);
   const [isDomReady, setIsDomReady] = useState(false);
+  const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to safely execute JavaScript in WebView
   const safeExecuteJavaScript = async (script: string, retries = 3): Promise<any> => {
@@ -714,14 +715,19 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return;
     }
 
-    const interval = setInterval(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    let isCleanedUp = false;
+
+    const interval = () => {
+      if (isCleanedUp) return;
+      
       const now = Date.now();
       if (now - lastCheckTime < 3000) return; // 3초마다 체크
       
       setLastCheckTime(now);
       
       safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript()).then((result: string) => {
-        if (!result) return;
+        if (!result || isCleanedUp) return;
         
         try {
           const data = JSON.parse(result);
@@ -738,11 +744,21 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           console.error('Error parsing periodic check result:', error);
         }
       }).catch((error: any) => {
-        console.error('Error in periodic check:', error);
+        if (!isCleanedUp) {
+          console.error('Error in periodic check:', error);
+        }
       });
-    }, 5000); // 5초로 늘림
+    };
 
-    return () => clearInterval(interval);
+    intervalId = setInterval(interval, 5000); // 5초로 늘림
+
+    return () => {
+      isCleanedUp = true;
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
   }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState]);
 
   useEffect(() => {
@@ -761,9 +777,55 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       onError?.(event);
     };
 
+    // 메모리 정리 함수
+    const cleanupMemory = () => {
+      try {
+        if (webview && webview.executeJavaScript) {
+          webview.executeJavaScript(`
+            // 메모리 정리 스크립트
+            if (window.gc) {
+              window.gc();
+            }
+            
+            // 불필요한 이벤트 리스너 정리
+            const elements = document.querySelectorAll('*');
+            elements.forEach(el => {
+              if (el._eventListeners) {
+                el._eventListeners.forEach(({ event, handler }) => {
+                  el.removeEventListener(event, handler);
+                });
+                delete el._eventListeners;
+              }
+            });
+            
+            // 이미지 캐시 정리
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+              if (img.src && img.src.startsWith('blob:')) {
+                URL.revokeObjectURL(img.src);
+              }
+            });
+          `).catch(() => {});
+        }
+      } catch (error) {
+        console.warn('Memory cleanup failed:', error);
+      }
+    };
+
   const handleDomReady = () => {
       setIsLoading(false);
       setIsDomReady(true);
+      
+      // 주기적 메모리 정리 시작 (5분마다)
+      if (memoryCleanupIntervalRef.current) {
+        clearInterval(memoryCleanupIntervalRef.current);
+      }
+      
+      memoryCleanupIntervalRef.current = setInterval(() => {
+        if (webviewRef.current && isDomReady) {
+          cleanupMemory();
+        }
+      }, 5 * 60 * 1000); // 5분마다
       
       // Instagram 페이지인지 확인
       const isInstagram = src.includes('instagram.com');
@@ -898,6 +960,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       webview.removeEventListener('did-navigate', handleDidNavigate as any);
       webview.removeEventListener('did-navigate-in-page', handleDidNavigate as any);
       window.removeEventListener('message', handleMessage);
+      
+      // 메모리 정리 인터벌 정리
+      if (memoryCleanupIntervalRef.current) {
+        clearInterval(memoryCleanupIntervalRef.current);
+        memoryCleanupIntervalRef.current = null;
+      }
+      
+      // 메모리 정리 실행
+      cleanupMemory();
     };
   }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
 
