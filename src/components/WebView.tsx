@@ -43,6 +43,7 @@ interface WebViewProps {
   instagramState?: string; // Instagram 상태 추가
   enableExtension?: boolean; // 확장프로그램 활성화 여부
   disablePointerEvents?: boolean; // 사용자 물리적 입력 차단
+  onPrepareWebView?: (serverRegistered: boolean) => Promise<boolean>; // WebView 준비 콜백
   // Optional: when true, a parent intends to mount WebView on a fresh partition.
   // Current implementation ignores it to keep changes minimal for stability.
   freshPartition?: boolean;
@@ -58,7 +59,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   className = "",
   instagramState,
   enableExtension = false,
-  disablePointerEvents = false
+  disablePointerEvents = false,
+  onPrepareWebView
 }, ref) => {
   const webviewRef = useRef<any>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -118,6 +120,49 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       console.log('[WebView] URL is the same, skipping update to preserve session');
     }
   }, [src, currentSrc]);
+
+  // Instagram 상태에 따른 쿠키 처리 (WebView 로드 전)
+  useEffect(() => {
+    if (!src.includes('instagram.com') || !onPrepareWebView || !instagramState) {
+      return;
+    }
+
+    const prepareWebView = async () => {
+      try {
+        console.log('[WebView] Preparing WebView for Instagram state:', instagramState);
+        
+        // 서버 등록 상태 확인 - 더 정확한 로직
+        let isServerRegistered = false;
+        
+        if (instagramState === 'instagram_logged_in_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_logged_out_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_login_detected') {
+          // 로그인 감지된 상태는 아직 서버 등록되지 않은 상태
+          isServerRegistered = false;
+        } else {
+          // 기본적으로 미등록 상태로 처리
+          isServerRegistered = false;
+        }
+        
+        console.log('[WebView] Server registration status:', isServerRegistered);
+        
+        // 상태에 따른 쿠키 처리
+        const prepared = await onPrepareWebView(isServerRegistered);
+        
+        if (prepared) {
+          console.log('[WebView] ✅ WebView prepared successfully for state:', instagramState);
+        } else {
+          console.warn('[WebView] ⚠️ WebView preparation failed for state:', instagramState);
+        }
+      } catch (error) {
+        console.error('[WebView] ❌ Failed to prepare WebView:', error);
+      }
+    };
+
+    prepareWebView();
+  }, [src, instagramState, onPrepareWebView]);
 
   // Instagram disconnect 후 강제 리렌더링 이벤트 감지
   useEffect(() => {
@@ -717,9 +762,14 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   useEffect(() => {
     if (!webviewRef.current || !src.includes('instagram.com')) return;
     
-    // instagram_logged_out_server_unregistered 상태에서만 주기적 체크 실행
-    if (instagramState !== 'instagram_logged_out_server_unregistered') {
-      console.log('Periodic check skipped - not in unregistered state:', instagramState);
+    // 주기적 체크가 필요한 상태들
+    const needsPeriodicCheck = [
+      'instagram_logged_out_server_unregistered',
+      'instagram_login_detected'
+    ];
+    
+    if (!needsPeriodicCheck.includes(instagramState)) {
+      console.log('Periodic check skipped - not in unregistered or login_detected state:', instagramState);
       return;
     }
 
@@ -828,13 +878,26 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       
       console.log('[WebView] DOM Ready - WebView is now ready for script execution');
       
-      // If this is Instagram and we're waiting for login detection, trigger it now
+      // If this is Instagram, trigger login detection and process the result
       if (src.includes('instagram.com')) {
         setTimeout(() => {
           console.log('[WebView] DOM ready - triggering Instagram detection');
-          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript()).catch((error) => {
-            console.warn('Instagram detection on DOM ready failed:', error);
-          });
+          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+            .then((result: string) => {
+              if (!result) return;
+              try {
+                const parsed = JSON.parse(result);
+                if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                  console.log('Instagram login detected via executeScript:', parsed.data);
+                  onInstagramLogin?.(parsed.data);
+                }
+              } catch (e) {
+                console.warn('Could not parse detailed login check result:', e);
+              }
+            })
+            .catch((error) => {
+              console.warn('Instagram detection on DOM ready failed:', error);
+            });
         }, 1000);
       }
       
@@ -852,38 +915,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       // Instagram 페이지인지 확인
       const isInstagram = src.includes('instagram.com');
       
-      if (isInstagram && (onInstagramLogin || onLoginStatusCheck)) {
-        // Instagram은 동적으로 콘텐츠를 로드하므로 지연 후 실행
-        setTimeout(() => {
-          const checkAndExecute = async (retries = 5, delay = 1000) => {
-            for (let i = 0; i < retries; i++) {
-              const webview = webviewRef.current;
-              if (!webview || !(webview.isConnected ?? document.body.contains(webview))) {
-                console.warn(`WebView is detached, aborting script execution.`);
-                return;
-              }
-
-              if (webview.isLoadingMainFrame() === false) {
-                console.log(`🔍 Executing Instagram login check script (attempt ${i + 1})...`);
-                try {
-                  await safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript());
-                  console.log('✅ Instagram login check script executed successfully.');
-                  return; // Success
-                } catch (error) {
-                  console.warn(`Failed to execute Instagram login check script (attempt ${i + 1}):`, error);
-                }
-              }
-              
-              if (i < retries - 1) {
-                console.log(`⚠️ WebView not ready, retrying in ${delay}ms... (isLoading: ${webview.isLoadingMainFrame()})`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-              }
-            }
-            console.error('❌ All attempts to execute Instagram login check script failed.');
-          };
-
-          checkAndExecute();
-        }, 3000); // Increased delay to 3 seconds
+      if (isInstagram && onLoginStatusCheck) {
+        // URL-based check is handled by did-navigate listener
       }
       
       // Instagram 로그인 페이지에서 강제 리렌더링 트리거
@@ -958,16 +991,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     };
 
     const handleMessage = (event: any) => {
+      // This listener is now only for extension-related messages, not login detection.
       console.log('WebView message received:', event);
-      console.log('Message data:', JSON.stringify(event.data));
-      
-      if (event.data && event.data.type === 'INSTAGRAM_LOGIN_SUCCESS') {
-        console.log('Instagram login detected:', event.data.data);
-        onInstagramLogin?.(event.data.data);
-      } else if (event.data && event.data.type === 'INSTAGRAM_LOGIN_STATUS_CHECK') {
-        console.log('Instagram login status check:', event.data.data);
-        onLoginStatusCheck?.(event.data.data.isLoggedIn);
-      }
     };
 
     // URL-based login detection as requested: if it redirects away from /accounts/login -> logged in

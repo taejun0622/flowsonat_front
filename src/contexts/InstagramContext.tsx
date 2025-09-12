@@ -18,6 +18,8 @@ interface InstagramContextType {
   saveInstagramSession: (sessionData: any) => Promise<InstagramConnectResponse>;
   injectCookiesToWebView: (cookies: Record<string, any>) => Promise<boolean>;
   restoreInstagramSession: () => Promise<boolean>;
+  clearWebViewCookies: () => Promise<boolean>;
+  prepareWebViewForState: (serverRegistered: boolean) => Promise<boolean>;
   setNavigate: (navigate: NavigateFunction) => void;
 }
 
@@ -38,19 +40,13 @@ interface InstagramProviderProps {
 export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   const [instagramAccount, setInstagramAccount] = React.useState<InstagramConnectResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [navigate, setNavigate] = React.useState<NavigateFunction | null>(null);
-  const [needsConnectionFlow, setNeedsConnectionFlow] = React.useState(false);
+  const navigateRef = React.useRef<NavigateFunction | null>(null);
   const { user, token } = useAuth();
   const { toast } = useToast();
 
-  React.useEffect(() => {
-    console.log('Navigation effect check:', { needsConnectionFlow, hasNavigate: !!navigate });
-    if (needsConnectionFlow && navigate) {
-      console.log('Navigating to connection flow because it was needed.');
-      navigate('/instagram-connection-flow');
-      setNeedsConnectionFlow(false); // Reset the trigger
-    }
-  }, [needsConnectionFlow, navigate]);
+  const setNavigate = (navigate: NavigateFunction) => {
+    navigateRef.current = navigate;
+  };
 
   const checkConnection = React.useCallback(async () => {
     if (!token || !user) {
@@ -65,9 +61,11 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     } catch (error: any) {
       // 404 means no connected account
       if (error.status === 404) {
-        console.log('Instagram not connected (404), flagging for navigation to connection flow.');
+        console.log('Instagram not connected (404), navigating to connection flow.');
         setInstagramAccount(null);
-        setNeedsConnectionFlow(true);
+        if (navigateRef.current) {
+          navigateRef.current('/instagram-connection-flow');
+        }
       } else {
         console.error('Failed to check Instagram connection:', error);
         setInstagramAccount(null);
@@ -233,6 +231,55 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     }
   }, [instagramAccount, injectCookiesToWebView]);
 
+  const clearWebViewCookies = React.useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🧹 Clearing WebView cookies for fresh start...');
+      
+      // Method 1: Electron API
+      if ((window as any).electronAPI?.clearWebViewCookies) {
+        console.log('Using Electron API for cookie clearing');
+        const result = await (window as any).electronAPI.clearWebViewCookies();
+        console.log('Electron cookie clearing result:', result);
+        return result;
+      }
+      
+      // Method 2: IPC Renderer
+      if (window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
+        console.log('Using IPC Renderer for cookie clearing');
+        const result = await window.ipcRenderer.invoke('clear-webview-cookies');
+        console.log('IPC cookie clearing result:', result);
+        return result;
+      }
+      
+      console.warn('No available method for cookie clearing');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to clear WebView cookies:', error);
+      return false;
+    }
+  }, []);
+
+  const prepareWebViewForState = React.useCallback(async (serverRegistered: boolean): Promise<boolean> => {
+    try {
+      console.log('🔧 Preparing WebView for state:', serverRegistered ? 'server_registered' : 'server_unregistered');
+      
+      if (serverRegistered) {
+        // 서버 등록 상태: 서버에서 받은 쿠키를 주입
+        console.log('📥 Server registered - injecting server cookies');
+        return await restoreInstagramSession();
+      } else {
+        // 서버 미등록 상태: 기존 쿠키를 모두 삭제
+        console.log('🗑️ Server unregistered - clearing existing cookies');
+        return await clearWebViewCookies();
+      }
+      
+    } catch (error) {
+      console.error('Failed to prepare WebView for state:', error);
+      return false;
+    }
+  }, [restoreInstagramSession, clearWebViewCookies]);
+
   // Initialize connection check on mount
   React.useEffect(() => {
     if (token && user) {
@@ -251,7 +298,9 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     saveInstagramSession,
     injectCookiesToWebView,
     restoreInstagramSession,
-    setNavigate: setNavigate as (navigate: NavigateFunction) => void,
+    clearWebViewCookies,
+    prepareWebViewForState,
+    setNavigate: setNavigate,
   };
 
   return (

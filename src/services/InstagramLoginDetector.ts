@@ -200,7 +200,6 @@ export class InstagramLoginDetector {
         try {
           console.log('=== Instagram Login Detection Debug ===');
           
-          // Same detection logic as periodic script but with more logging
           function getCookie(name) {
             var value = ' ' + document.cookie;
             var parts = value.split(' ' + name + '=');
@@ -213,7 +212,6 @@ export class InstagramLoginDetector {
           
           console.log('Core cookies:', { dsUserId: dsUserId, hasSessionId: !!sessionId });
           
-          // Check ps_n cookies for additional validation
           var allCookies = document.cookie.split(';').map(function(cookie) {
             var parts = cookie.trim().split('=');
             return { name: parts[0], value: parts[1] || '' };
@@ -234,7 +232,6 @@ export class InstagramLoginDetector {
           console.log('Final login status:', isLoggedIn);
           
           if (isLoggedIn) {
-            // Extract username from DOM
             var username = null;
             var profileImages = document.querySelectorAll('img[alt*="profile picture"]');
             
@@ -257,7 +254,6 @@ export class InstagramLoginDetector {
             
             console.log('Username extraction:', username);
             
-            // Collect all cookies
             var structuredCookies = {};
             allCookies.forEach(function(cookie) {
               if (cookie.name) {
@@ -279,25 +275,23 @@ export class InstagramLoginDetector {
               hasPsnZero: hasPsnZero
             };
             
-            console.log('Sending login success:', sessionData);
+            console.log('Returning login success data:', sessionData);
             console.log('=== End Debug ===');
             
-            // Send to parent window
-            window.parent.postMessage({
+            return JSON.stringify({
               type: 'INSTAGRAM_LOGIN_SUCCESS',
               data: sessionData
-            }, '*');
+            });
             
           } else {
-            console.log('Not logged in - no message sent');
+            console.log('Not logged in - returning logout status');
             console.log('=== End Debug ===');
+            return JSON.stringify({ type: 'INSTAGRAM_LOGOUT' });
           }
-          
-          return 'Instagram detailed detection script executed';
           
         } catch (error) {
           console.error('Detection script error:', error);
-          return 'Error: ' + error.message;
+          return JSON.stringify({ type: 'ERROR', error: error.message });
         }
       })();
     `;

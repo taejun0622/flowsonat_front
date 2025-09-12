@@ -16,7 +16,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
   className = "" 
 }) => {
   const navigate = useNavigate();
-  const { disconnectAccount } = useInstagram();
+  const { disconnectAccount, prepareWebViewForState } = useInstagram();
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
   const [webviewKey, setWebviewKey] = useState(0);
@@ -172,6 +172,8 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
           onError={handleWebViewError}
           onInstagramLogin={handleInstagramLogin}
           onLoginStatusCheck={handleInstagramStatusCheck}
+          instagramState={webViewStatus.state}
+          onPrepareWebView={prepareWebViewForState}
           className="w-full h-full"
         />
         

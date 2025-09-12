@@ -24,7 +24,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { disconnectAccount, instagramAccount } = useInstagram();
+  const { disconnectAccount, instagramAccount, prepareWebViewForState } = useInstagram();
   
   // Check URL parameters for initial URL and auto-execution
   const params = new URLSearchParams(location.search);
@@ -544,6 +544,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           instagramState={webViewStatus.state}
           freshPartition={freshParam}
           enableExtension={extensionActive}
+          onPrepareWebView={prepareWebViewForState}
           // Do not block native pointer events until server registration is done
           disablePointerEvents={extensionActive && blockNativeInput && webViewStatus.isServerRegistered}
           className="w-full h-full"
