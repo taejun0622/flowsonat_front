@@ -43,6 +43,9 @@ interface WebViewProps {
   instagramState?: string; // Instagram 상태 추가
   enableExtension?: boolean; // 확장프로그램 활성화 여부
   disablePointerEvents?: boolean; // 사용자 물리적 입력 차단
+  // Optional: when true, a parent intends to mount WebView on a fresh partition.
+  // Current implementation ignores it to keep changes minimal for stability.
+  freshPartition?: boolean;
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -65,20 +68,25 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
   const [extensionActive, setExtensionActive] = useState(false);
   const [isDomReady, setIsDomReady] = useState(false);
+  const isDomReadyRef = useRef(false);
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to safely execute JavaScript in WebView
   const safeExecuteJavaScript = async (script: string, retries = 3): Promise<any> => {
-    const webview = webviewRef.current;
-    if (!webview || !isDomReady) {
+    const webview = webviewRef.current as any;
+    // Ensure DOM-ready and the <webview> is still attached to DOM
+    if (!webview || !isDomReadyRef.current || !(webview.isConnected ?? document.body.contains(webview))) {
       console.warn('WebView not ready for JavaScript execution');
       return null;
     }
 
     for (let i = 0; i < retries; i++) {
       try {
-        // Check if WebView is properly attached and ready
         if (webview.executeJavaScript && typeof webview.executeJavaScript === 'function') {
+          // Avoid running while main frame is loading
+          if (webview.isLoadingMainFrame === true) {
+            await new Promise((r) => setTimeout(r, 250));
+          }
           return await webview.executeJavaScript(script);
         } else {
           throw new Error('executeJavaScript method not available');
@@ -89,7 +97,6 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           console.error('All JavaScript execution attempts failed');
           return null;
         }
-        // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
       }
     }
@@ -106,6 +113,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       setCurrentSrc(src);
       // New navigation; wait for next dom-ready
       setIsDomReady(false);
+      isDomReadyRef.current = false;
     } else {
       console.log('[WebView] URL is the same, skipping update to preserve session');
     }
@@ -696,7 +704,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     },
     executeScript: async (script: string) => {
       // Wait a bit for DOM to be ready if not already
-      if (!isDomReady) {
+      if (!isDomReadyRef.current) {
         console.log('[WebView] DOM not ready, waiting...');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -780,7 +788,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     // 메모리 정리 함수
     const cleanupMemory = () => {
       try {
-        if (webview && webview.executeJavaScript) {
+        // Only attempt cleanup when DOM-ready and still attached
+        if (isDomReadyRef.current && webview && (webview.isConnected ?? document.body.contains(webview)) && webview.executeJavaScript) {
           webview.executeJavaScript(`
             // 메모리 정리 스크립트
             if (window.gc) {
@@ -815,6 +824,19 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const handleDomReady = () => {
       setIsLoading(false);
       setIsDomReady(true);
+      isDomReadyRef.current = true;
+      
+      console.log('[WebView] DOM Ready - WebView is now ready for script execution');
+      
+      // If this is Instagram and we're waiting for login detection, trigger it now
+      if (src.includes('instagram.com')) {
+        setTimeout(() => {
+          console.log('[WebView] DOM ready - triggering Instagram detection');
+          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript()).catch((error) => {
+            console.warn('Instagram detection on DOM ready failed:', error);
+          });
+        }, 1000);
+      }
       
       // 주기적 메모리 정리 시작 (5분마다)
       if (memoryCleanupIntervalRef.current) {
@@ -822,7 +844,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
       
       memoryCleanupIntervalRef.current = setInterval(() => {
-        if (webviewRef.current && isDomReady) {
+        if (webviewRef.current && isDomReadyRef.current) {
           cleanupMemory();
         }
       }, 5 * 60 * 1000); // 5분마다
@@ -833,19 +855,39 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       if (isInstagram && (onInstagramLogin || onLoginStatusCheck)) {
         // Instagram은 동적으로 콘텐츠를 로드하므로 지연 후 실행
         setTimeout(() => {
-          // Ensure WebView is ready before executing JavaScript
-          if (webview && webview.executeJavaScript) {
-            try {
-              webview.executeJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript());
-            } catch (error) {
-              console.warn('Failed to execute Instagram login check script:', error);
+          const checkAndExecute = async (retries = 5, delay = 1000) => {
+            for (let i = 0; i < retries; i++) {
+              const webview = webviewRef.current;
+              if (!webview || !(webview.isConnected ?? document.body.contains(webview))) {
+                console.warn(`WebView is detached, aborting script execution.`);
+                return;
+              }
+
+              if (webview.isLoadingMainFrame() === false) {
+                console.log(`🔍 Executing Instagram login check script (attempt ${i + 1})...`);
+                try {
+                  await safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript());
+                  console.log('✅ Instagram login check script executed successfully.');
+                  return; // Success
+                } catch (error) {
+                  console.warn(`Failed to execute Instagram login check script (attempt ${i + 1}):`, error);
+                }
+              }
+              
+              if (i < retries - 1) {
+                console.log(`⚠️ WebView not ready, retrying in ${delay}ms... (isLoading: ${webview.isLoadingMainFrame()})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
             }
-          }
-        }, 2000); // 2초 지연
+            console.error('❌ All attempts to execute Instagram login check script failed.');
+          };
+
+          checkAndExecute();
+        }, 3000); // Increased delay to 3 seconds
       }
       
       // Instagram 로그인 페이지에서 강제 리렌더링 트리거
-      if (isInstagram && src.includes('/accounts/login/')) {
+      if (isInstagram && src.includes('/accounts/login/') && !extensionActive) {
         setTimeout(() => {
           setForceReload(prev => prev + 1);
         }, 1000);
@@ -917,6 +959,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
 
     const handleMessage = (event: any) => {
       console.log('WebView message received:', event);
+      console.log('Message data:', JSON.stringify(event.data));
       
       if (event.data && event.data.type === 'INSTAGRAM_LOGIN_SUCCESS') {
         console.log('Instagram login detected:', event.data.data);
@@ -952,6 +995,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     webview.addEventListener('did-navigate', handleDidNavigate as any);
     webview.addEventListener('did-navigate-in-page', handleDidNavigate as any);
     window.addEventListener('message', handleMessage);
+    
 
     return () => {
       webview.removeEventListener('did-finish-load', handleLoad);
@@ -967,8 +1011,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         memoryCleanupIntervalRef.current = null;
       }
       
-      // 메모리 정리 실행
-      cleanupMemory();
+      // 메모리 정리 실행 (안전할 때만)
+      if (webviewRef.current && isDomReadyRef.current && (webviewRef.current.isConnected ?? document.body.contains(webviewRef.current))) {
+        cleanupMemory();
+      }
+      isDomReadyRef.current = false;
     };
   }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
 

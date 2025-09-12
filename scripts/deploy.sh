@@ -66,7 +66,7 @@ if [ -z "$S3_BUCKET_NAME" ]; then
 fi
 
 if [ -z "$AWS_REGION" ]; then
-    export AWS_REGION=ap-northeast-2
+    export AWS_REGION=us-east-1
 fi
 
 # 버전 정보 표시
@@ -158,11 +158,11 @@ fi
        
        # Update metadata files 수동 업로드 (electron-builder가 완전하지 않을 수 있음)
        log_info "Uploading update metadata files..."
-       aws s3 cp release/$CURRENT_VERSION/latest-mac.yml s3://$S3_BUCKET_NAME/latest-mac.yml --cache-control "no-cache,no-store,must-revalidate"
-       aws s3 cp release/$CURRENT_VERSION/latest.yml s3://$S3_BUCKET_NAME/latest.yml --cache-control "no-cache,no-store,must-revalidate"
-       aws s3 cp release/$CURRENT_VERSION/latest-linux.yml s3://$S3_BUCKET_NAME/latest-linux.yml --cache-control "no-cache,no-store,must-revalidate"
-       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm.yml s3://$S3_BUCKET_NAME/latest-linux-arm.yml --cache-control "no-cache,no-store,must-revalidate"
-       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm64.yml s3://$S3_BUCKET_NAME/latest-linux-arm64.yml --cache-control "no-cache,no-store,must-revalidate"
+       aws s3 cp release/$CURRENT_VERSION/latest-mac.yml s3://$S3_BUCKET_NAME/latest-mac.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest.yml s3://$S3_BUCKET_NAME/latest.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux.yml s3://$S3_BUCKET_NAME/latest-linux.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm.yml s3://$S3_BUCKET_NAME/latest-linux-arm.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm64.yml s3://$S3_BUCKET_NAME/latest-linux-arm64.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
        log_success "Update metadata files uploaded to S3"
 
 # 버전 정보 업데이트 및 업로드

@@ -63,7 +63,15 @@ export const DashboardPage = () => {
     // 로그아웃 상태면 바로 Instagram WebView로 이동
     if (!isConnected) {
       console.log('Instagram not connected, navigating to WebView...');
-      navigate('/webview');
+      // If a fresh partition was requested (disconnect), append fresh=1
+      let fresh = false;
+      try { fresh = sessionStorage.getItem('ig_force_fresh_partition') === '1'; } catch {}
+      if (fresh) {
+        try { sessionStorage.removeItem('ig_force_fresh_partition'); } catch {}
+        navigate('/webview?fresh=1');
+      } else {
+        navigate('/webview');
+      }
     }
   }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 

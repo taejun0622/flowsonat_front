@@ -144,9 +144,15 @@ function createWindow() {
         webContents.on('crashed', () => {
           console.warn('WebView crashed, attempting to recover')
         })
-        
         webContents.on('unresponsive', () => {
           console.warn('WebView became unresponsive')
+        })
+        webContents.on('render-process-gone', (_e, details) => {
+          console.error('WebView render-process-gone:', details)
+          win?.webContents.send('ig:webview-gone', details)
+        })
+        webContents.on('child-process-gone', (_e, details) => {
+          console.error('WebView child-process-gone:', details)
         })
         
       } catch {/* no-op */}
@@ -644,43 +650,147 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  /** Clear Instagram domain-specific data */
+  // Log main window render process issues
+  win?.webContents.on('render-process-gone', (_e, details) => {
+    console.error('Renderer render-process-gone:', details)
+  })
+  win?.webContents.on('child-process-gone', (_e, details) => {
+    console.error('Renderer child-process-gone:', details)
+  })
+
+  /** Clear Instagram domain-specific data - COMPLETE NUCLEAR OPTION */
   async function clearInstagramData(partition = 'persist:ig') {
+    console.log(`🧹 Starting complete Instagram data cleanup for partition: ${partition}`)
     const sess = session.fromPartition(partition)
 
-    // 1) Delete origin-based storage/cache
-    await sess.clearStorageData({
-      origin: 'https://www.instagram.com',
-      storages: [
-        'cookies',
-        'localstorage',
-        'indexdb',
-        'serviceworkers',
-        'cachestorage',
-        'websql',
-        'filesystem',
-      ],
-      quotas: ['temporary'],
-    })
-
-    // 2) Clear all cookies
     try {
-      const cookies = await sess.cookies.get({})
-      for (const cookie of cookies) {
-        const cookieUrl = `https://${cookie.domain}${cookie.path}`
-        await sess.cookies.remove(cookieUrl, cookie.name)
+      // Helper to normalize cookie removal URL
+      const buildCookieRemovalUrl = (cookie: Electron.Cookie) => {
+        const secure = cookie.secure ? 'https://' : 'http://'
+        const domain = (cookie.domain || '').replace(/^\./, '') || 'instagram.com'
+        const path = cookie.path || '/'
+        return `${secure}${domain}${path}`
       }
-      console.log('Cleared all cookies')
+
+      const igOrigins = [
+        'https://www.instagram.com',
+        'https://instagram.com',
+        'https://i.instagram.com',
+        'https://static.cdninstagram.com',
+        'https://edge-chat.instagram.com',
+      ]
+
+      // 1) Delete origin-based storage/cache (Instagram specific)
+      console.log('🗑️ Clearing Instagram-specific storage data...')
+      for (const origin of igOrigins) {
+        try {
+          await sess.clearStorageData({
+            origin,
+            storages: [
+              'cookies',
+              'localstorage',
+              'indexdb',
+              'serviceworkers',
+              'cachestorage',
+              'websql',
+              'filesystem',
+            ],
+            quotas: ['temporary', 'persistent'],
+          })
+          console.log(`  ✅ Cleared storage for ${origin}`)
+        } catch (e) {
+          console.warn(`  ⚠️ Failed clearing storage for ${origin}:`, e)
+        }
+      }
+
+      // 2) Clear ALL cookies (not just Instagram)
+      console.log('🍪 Clearing ALL cookies...')
+      try {
+        const cookies = await sess.cookies.get({})
+        console.log(`Found ${cookies.length} cookies to clear`)
+        
+        for (const cookie of cookies) {
+          try {
+            const url = buildCookieRemovalUrl(cookie)
+            await sess.cookies.remove(url, cookie.name)
+            console.log(`Removed cookie: ${cookie.name} (${url})`)
+          } catch (cookieError) {
+            console.warn(`Failed to remove cookie ${cookie.name}:`, cookieError)
+          }
+        }
+        console.log('✅ All cookies cleared')
+      } catch (error) {
+        console.error('❌ Failed to clear cookies:', error)
+      }
+
+      // 3) Clear auth cache (HTTP auth)
+      console.log('🔐 Clearing auth cache...')
+      await sess.clearAuthCache()
+
+      // 4) Clear ALL storage data (nuclear option)
+      console.log('💥 Clearing ALL storage data (nuclear option)...')
+      await sess.clearStorageData({
+        storages: [
+          'cookies',
+          'localstorage',
+          'indexdb',
+          'serviceworkers',
+          'cachestorage',
+          'websql',
+          'filesystem',
+        ],
+        quotas: ['temporary', 'persistent'],
+      })
+
+      // 5) Clear cache
+      console.log('🗂️ Clearing cache...')
+      await sess.clearCache()
+
+      // 6) Force changes to be written to disk
+      console.log('💾 Flushing changes to disk...')
+      await sess.cookies.flushStore()
+
+      // 6.5) Try clearing host resolver cache (just in case)
+      try { await (sess as any).clearHostResolverCache?.() } catch {}
+
+      // 7) Clear all partitions (if partition is default)
+      if (partition === 'persist:ig') {
+        console.log('🌐 Clearing all Instagram-related partitions...')
+        try {
+          // Clear default partition too
+          const defaultSess = session.defaultSession
+          for (const origin of igOrigins) {
+            try {
+              await defaultSess.clearStorageData({
+                origin,
+                storages: [
+                  'cookies',
+                  'localstorage',
+                  'indexdb',
+                  'serviceworkers',
+                  'cachestorage',
+                  'websql',
+                  'filesystem',
+                ],
+                quotas: ['temporary', 'persistent'],
+              })
+              console.log(`  ✅ Cleared default storage for ${origin}`)
+            } catch (e) {
+              console.warn(`  ⚠️ Failed default storage clear for ${origin}:`, e)
+            }
+          }
+          await defaultSess.clearCache()
+          await defaultSess.clearAuthCache()
+          console.log('✅ Default partition cleared')
+        } catch (defaultError) {
+          console.warn('⚠️ Failed to clear default partition:', defaultError)
+        }
+      }
+
+      console.log('🎉 Complete Instagram data cleanup finished!')
     } catch (error) {
-      console.error('Failed to clear cookies:', error)
+      console.error('❌ Error during Instagram data cleanup:', error)
     }
-
-    // 3) Clear auth cache (HTTP auth)
-    await sess.clearAuthCache()
-
-    // 4) Force changes to be written to disk
-    await sess.cookies.flushStore()
-    await sess.clearCache()
   }
 
   /** Renderer request: Clear Instagram session */
@@ -696,6 +806,40 @@ app.whenReady().then(() => {
       win.webContents.send('ig:reload-webview')
     }
     return true
+  })
+
+  /** Renderer request: NUCLEAR Instagram cleanup - clear everything */
+  ipcMain.handle('ig:nuclear-cleanup', async () => {
+    console.log('💥 NUCLEAR Instagram cleanup requested')
+    
+    try {
+      // Clear all known Instagram partitions
+      const partitions = ['persist:ig', 'persist:instagram', 'persist:ig_session']
+      
+      for (const partition of partitions) {
+        try {
+          await clearInstagramData(partition)
+          console.log(`✅ Cleared partition: ${partition}`)
+        } catch (error) {
+          console.warn(`⚠️ Failed to clear partition ${partition}:`, error)
+        }
+      }
+      
+      // Clear default session too
+      await clearInstagramData('default')
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc()
+        console.log('🗑️ Forced garbage collection')
+      }
+      
+      console.log('🎉 NUCLEAR Instagram cleanup completed!')
+      return true
+    } catch (error) {
+      console.error('❌ NUCLEAR cleanup failed:', error)
+      return false
+    }
   })
 
   /** Renderer request: Inject cookies to Instagram WebView */

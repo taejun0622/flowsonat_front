@@ -29,6 +29,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // Check URL parameters for initial URL and auto-execution
   const params = new URLSearchParams(location.search);
   const urlParam = params.get('url');
+  const freshParam = params.get('fresh') === '1';
   const autoExecute = params.get('autoExecute') === '1';
   const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
   
@@ -163,7 +164,9 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     setIsLoading(false);
     setIsWebViewReady(true);
     console.log('[WebView] Load completed, WebView is ready');
-  }, []);
+    
+    // Instagram detection will be handled directly by WebView component on dom-ready
+  }, [currentUrl]);
 
   // WebView 에러 핸들러
   const handleWebViewError = useCallback((error: any) => {
@@ -189,7 +192,8 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const forceExtension = (() => {
     try { return new URLSearchParams(window.location.search).get('forceExtension') === '1'; } catch { return false; }
   })();
-  const extensionActive = (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) || forceExtension;
+  // Always activate extension on Instagram WebView (independent of login/registration)
+  const extensionActive = true;
 
   // Block-only handler: physical mouse events are blocked from reaching the WebView
   const blockOnly = useCallback((e: React.SyntheticEvent) => {
@@ -538,8 +542,10 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           onLoginStatusCheck={handleInstagramStatusCheck}
           onUrlChange={handleUrlChange}
           instagramState={webViewStatus.state}
+          freshPartition={freshParam}
           enableExtension={extensionActive}
-          disablePointerEvents={extensionActive && blockNativeInput}
+          // Do not block native pointer events until server registration is done
+          disablePointerEvents={extensionActive && blockNativeInput && webViewStatus.isServerRegistered}
           className="w-full h-full"
         />
 
