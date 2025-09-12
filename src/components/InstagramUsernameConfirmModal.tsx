@@ -1,13 +1,5 @@
 import React from 'react';
 import { Instagram, Check, X } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -26,24 +18,39 @@ export const InstagramUsernameConfirmModal = ({
   onConfirm,
   onCancel
 }: InstagramUsernameConfirmModalProps) => {
+  console.log('InstagramUsernameConfirmModal render:', { open, username, sessionData: !!sessionData });
+  
   const loginTime = sessionData?.timestamp
     ? new Date(sessionData.timestamp).toLocaleString('en-US')
     : 'Unknown';
   const sessionIdStatus = sessionData?.sessionid ? 'Verified' : 'None';
   const userId = sessionData?.ds_user_id || 'None';
 
+  if (!open) {
+    console.log('Modal not open, not rendering');
+    return null;
+  }
+  
+  console.log('Modal is open, rendering modal');
+  
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancel(); }}>
-      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-[100]">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80">
+      <div className="bg-black/90 border border-white/30 text-white shadow-2xl max-w-md w-full mx-4 p-6 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-white flex items-center gap-2 text-lg font-semibold">
             <Instagram className="h-5 w-5 text-pink-500" />
             Connect Instagram Account
-          </DialogTitle>
-          <DialogDescription className="text-gray-300">
-            You wanna connect @{username} to flowsonat?
-          </DialogDescription>
-        </DialogHeader>
+          </h2>
+          <button 
+            onClick={onCancel}
+            className="text-white hover:text-gray-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="text-gray-300 mb-4">
+          You wanna connect @{username} to flowsonat?
+        </p>
         
         <div className="space-y-4">
           <Card className="bg-black/20 border-black/30 pointer-events-auto">
@@ -68,7 +75,7 @@ export const InstagramUsernameConfirmModal = ({
           </div>
         </div>
         
-        <DialogFooter className="flex-col sm:flex-row gap-2 pointer-events-auto relative z-50">
+        <div className="flex flex-col sm:flex-row gap-2 mt-6">
           <Button
             onClick={() => {
               console.log('=== InstagramUsernameConfirmModal OK button clicked ===');
@@ -76,7 +83,7 @@ export const InstagramUsernameConfirmModal = ({
               onConfirm();
               console.log('=== OK button click completed ===');
             }}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none pointer-events-auto relative z-50"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none"
           >
             <Check className="h-4 w-4 mr-2" />
             OK
@@ -89,13 +96,13 @@ export const InstagramUsernameConfirmModal = ({
               onCancel();
               console.log('=== Cancel button click completed ===');
             }}
-            className="border-black/30 text-white hover:bg-black/20 flex-1 sm:flex-none pointer-events-auto relative z-50"
+            className="border-white/30 text-white hover:bg-white/10 flex-1 sm:flex-none"
           >
             <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 };

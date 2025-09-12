@@ -77,11 +77,17 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to safely execute JavaScript in WebView
-  const safeExecuteJavaScript = async (script: string, retries = 3): Promise<any> => {
+  const safeExecuteJavaScript = async (script: string, retries = 3, forceExecute = false): Promise<any> => {
     const webview = webviewRef.current as any;
     // Ensure DOM-ready and the <webview> is still attached to DOM
-    if (!webview || !isDomReadyRef.current || !(webview.isConnected ?? document.body.contains(webview))) {
+    if (!webview || !(webview.isConnected ?? document.body.contains(webview))) {
       console.warn('WebView not ready for JavaScript execution');
+      return null;
+    }
+    
+    // Check DOM ready only if not forcing execution
+    if (!forceExecute && !isDomReadyRef.current) {
+      console.warn('WebView DOM not ready for JavaScript execution');
       return null;
     }
 
@@ -128,7 +134,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       const missing = required.filter((k) => !cookies[k]);
       const isLoggedIn = missing.length === 0;
       console.log('[CookieCheck] URL host ok:', isInstagramHost, 'missing:', missing, 'isLoggedIn:', isLoggedIn);
-      onLoginStatusCheck?.(isLoggedIn);
+      onLoginStatusCheck?.(isLoggedIn, undefined);
       // If logged in by cookies, try to fetch current user via main (no DOM required)
       if (isLoggedIn) {
         try {
@@ -151,23 +157,49 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
               return true;
             }
           }
-        } catch {/* ignore */}
+        } catch (error) {
+          console.log('getInstagramCurrentUser failed:', error);
+        }
+        
         // Fallback: run detailed detection after DOM is ready
-        if (isDomReadyRef.current) {
+        console.log('Electron API failed, triggering detailed detection...');
+        console.log('isDomReadyRef.current:', isDomReadyRef.current);
+        
+        // Wait for DOM to be ready if not already
+        const runDetailedDetection = (forceExecute = false) => {
+          console.log('Running detailed detection script...', forceExecute ? '(forced)' : '');
           setTimeout(() => {
-            safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+            safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript(), 3, forceExecute)
               .then((result: string) => {
+                console.log('Detailed detection script result:', result);
                 if (!result) return;
                 try {
                   const parsed = JSON.parse(result);
                   if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                    console.log('Instagram login detected via detailed script:', parsed.data);
                     onInstagramLogin?.(parsed.data);
                   }
-                } catch {}
+                } catch (e) {
+                  console.warn('Could not parse detailed login check result:', e);
+                }
               })
-              .catch(() => {});
+              .catch((error) => {
+                console.warn('Detailed login detection failed:', error);
+              });
           }, 500);
-        }
+        };
+
+        // Try to run detailed detection immediately, regardless of DOM ready state
+        console.log('Attempting to run detailed detection...');
+        runDetailedDetection(true);
+        
+        // Also try again after a delay in case DOM becomes ready
+        setTimeout(() => {
+          if (isDomReadyRef.current) {
+            console.log('DOM became ready, running detailed detection again...');
+            runDetailedDetection();
+          }
+        }, 2000);
       }
       return isLoggedIn;
     } catch {
@@ -950,20 +982,25 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     };
 
   const handleDomReady = () => {
+      console.log('[WebView] DOM Ready event triggered!');
       setIsLoading(false);
       setIsDomReady(true);
       isDomReadyRef.current = true;
       
       console.log('[WebView] DOM Ready - WebView is now ready for script execution');
+      console.log('[WebView] isDomReadyRef.current set to:', isDomReadyRef.current);
       
       // If this is Instagram, trigger login detection and process the result
       if (src.includes('instagram.com')) {
         setTimeout(() => {
           console.log('[WebView] DOM ready - triggering Instagram detection');
+          console.log('[WebView] isDomReadyRef.current:', isDomReadyRef.current);
           // Quick cookie-based check first
           checkLoginViaCookies();
+          // Also run detailed detection script
           safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
             .then((result: string) => {
+              console.log('[WebView] Detailed detection script result:', result);
               if (!result) return;
               try {
                 const parsed = JSON.parse(result);

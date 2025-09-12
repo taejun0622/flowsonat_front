@@ -39,23 +39,25 @@ export const useInstagramWebView = () => {
       console.log('Current isConnected state:', isConnected);
       console.log('Username from session:', sessionData?.username);
       console.log('Suppressed for dsUserId:', suppressedForDsUserId);
+      console.log('Current modal state:', modalState);
       
       // 로그아웃 플로우에서는 즉시 연결하지 않고 확인 모달을 띄움
       if (!isConnected) {
-        // If user is already interacting with a modal, or explicitly suppressed for this dsUserId, don't re-open confirm
-        if (modalState.showConfirmModal || modalState.showManualModal || (suppressedForDsUserId && suppressedForDsUserId === sessionData?.dsUserId)) {
-          setWebViewStatus((prev: InstagramWebViewStatus) => ({
-            ...prev,
-            state: 'instagram_login_detected',
-            isInstagramLoggedIn: true,
-            isServerRegistered: false,
-            username: sessionData.username,
-            dsUserId: sessionData.dsUserId,
-            detectedSessionData: sessionData,
-            lastChecked: new Date()
-          }));
-          console.log('Auto-confirm suppressed; keeping current modal state.');
-          return;
+        // Always show modal for new login detection, regardless of current modal state
+        console.log('Forcing modal display for new login detection...');
+        
+        // Reset any existing modal state
+        setModalState({
+          showConfirmModal: false,
+          showManualModal: false,
+          detectedUsername: undefined,
+          detectedSessionData: undefined
+        });
+        
+        // Reset suppression for new user
+        if (suppressedForDsUserId && suppressedForDsUserId !== sessionData?.dsUserId) {
+          console.log('Different user detected, resetting suppression...');
+          setSuppressedForDsUserId(null);
         }
         console.log('User not connected, showing confirmation modal...');
         
@@ -70,7 +72,8 @@ export const useInstagramWebView = () => {
           lastChecked: new Date()
         }));
 
-        // 확인 모달 띄우기
+        // 확인 모달 띄우기 (강제로 모달 상태 초기화)
+        console.log('Setting modal state to show confirmation modal...');
         setModalState({
           showConfirmModal: true,
           showManualModal: false,
@@ -138,6 +141,9 @@ export const useInstagramWebView = () => {
       // will be triggered by the WebView component.
       if (!isConnected && !sessionData) {
         console.log('URL-based login detected, waiting for detailed detection...');
+        console.log('Current webViewStatus:', webViewStatus);
+        console.log('isConnected:', isConnected);
+        console.log('sessionData:', sessionData);
       }
     } else {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
