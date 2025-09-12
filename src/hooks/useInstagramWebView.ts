@@ -446,6 +446,8 @@ export const useInstagramWebView = () => {
             description: "Your Instagram account has been disconnected.",
             variant: "default"
           });
+          // After disconnect, navigate WebView to the Instagram login page
+          return 'https://www.instagram.com/accounts/login/';
         } catch (error) {
           toast({
             title: "Disconnect Failed",

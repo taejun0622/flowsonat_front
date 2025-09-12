@@ -192,8 +192,8 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const forceExtension = (() => {
     try { return new URLSearchParams(window.location.search).get('forceExtension') === '1'; } catch { return false; }
   })();
-  // Always activate extension on Instagram WebView (independent of login/registration)
-  const extensionActive = true;
+  // Activate extension only when IG is logged in AND server-registered, unless forced via query
+  const extensionActive = (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) || forceExtension;
 
   // Block-only handler: physical mouse events are blocked from reaching the WebView
   const blockOnly = useCallback((e: React.SyntheticEvent) => {

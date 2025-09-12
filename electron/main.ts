@@ -808,6 +808,68 @@ app.whenReady().then(() => {
     return true
   })
 
+  /** Renderer request: Clear Instagram data for a given WebContents (or default) */
+  ipcMain.handle('ig:clear-instagram-data', async (_event, _webContentsId?: number) => {
+    try {
+      await clearInstagramData('persist:ig')
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
+  /** Renderer request: Inject cookies into IG session partition */
+  ipcMain.handle('ig:inject-cookies', async (_event, cookies: Record<string, any>) => {
+    try {
+      const sess = session.fromPartition('persist:ig')
+      const list: any[] = Array.isArray(cookies)
+        ? cookies
+        : Object.values(cookies || {})
+      for (const c of list) {
+        if (!c || !c.name || typeof c.value === 'undefined') continue
+        const cookie = {
+          url: (c.secure ? 'https://' : 'http://') + (c.domain ? c.domain.replace(/^\./, '') : 'instagram.com') + (c.path || '/'),
+          name: c.name,
+          value: String(c.value),
+          domain: c.domain || '.instagram.com',
+          path: c.path || '/',
+          secure: !!c.secure,
+          httpOnly: !!c.httpOnly,
+          expirationDate: typeof c.expirationDate === 'number' ? c.expirationDate : undefined,
+          sameSite: c.sameSite as any,
+        } as Electron.CookiesSetDetails
+        try { await sess.cookies.set(cookie) } catch (e) { console.warn('Failed to set cookie', c?.name, e) }
+      }
+      await sess.cookies.flushStore()
+      return { success: true }
+    } catch (e) {
+      console.error('ig:inject-cookies failed', e)
+      return { success: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
+  /** Misc: Cleanup WebView memory */
+  ipcMain.handle('cleanup-webview-memory', async () => {
+    try {
+      const sess = session.fromPartition('persist:ig')
+      await sess.clearCache()
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
+  /** Misc: Return process memory usage */
+  ipcMain.handle('get-memory-usage', async () => {
+    const m = process.memoryUsage()
+    return {
+      rss: m.rss,
+      heapTotal: m.heapTotal,
+      heapUsed: m.heapUsed,
+      external: m.external,
+    }
+  })
+
   /** Renderer request: NUCLEAR Instagram cleanup - clear everything */
   ipcMain.handle('ig:nuclear-cleanup', async () => {
     console.log('💥 NUCLEAR Instagram cleanup requested')
