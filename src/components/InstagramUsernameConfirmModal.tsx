@@ -34,7 +34,7 @@ export const InstagramUsernameConfirmModal = ({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancel(); }}>
-      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-50">
+      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-[100]">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Instagram className="h-5 w-5 text-pink-500" />

@@ -94,4 +94,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Instagram 데이터 정리
   clearInstagramDataForWebContents: (webContentsId?: number) => 
     ipcRenderer.invoke('ig:clear-instagram-data', webContentsId)
+  ,
+  // WebView cookie/session helpers expected by renderer context
+  injectCookiesToWebView: (cookies: Record<string, any>) =>
+    ipcRenderer.invoke('inject-cookies-to-webview', cookies),
+  clearWebViewCookies: () =>
+    ipcRenderer.invoke('clear-webview-cookies'),
+  getInstagramCookies: () =>
+    ipcRenderer.invoke('ig:get-instagram-cookies'),
+  getInstagramCurrentUser: () =>
+    ipcRenderer.invoke('ig:get-current-user')
 })

@@ -47,6 +47,8 @@ interface WebViewProps {
   // Optional: when true, a parent intends to mount WebView on a fresh partition.
   // Current implementation ignores it to keep changes minimal for stability.
   freshPartition?: boolean;
+  // When true, temporarily hide the guest view (webview) for overlay/modals to show above.
+  obscured?: boolean;
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -60,7 +62,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   instagramState,
   enableExtension = false,
   disablePointerEvents = false,
-  onPrepareWebView
+  onPrepareWebView,
+  obscured = false
 }, ref) => {
   const webviewRef = useRef<any>(null);
   const [currentSrc, setCurrentSrc] = useState(src);
@@ -105,6 +108,73 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     return null;
   };
 
+  // Cookie-based login status check via Electron session (persist:ig)
+  const checkLoginViaCookies = React.useCallback(async () => {
+    try {
+      const webview = webviewRef.current as any;
+      const url = (webview && typeof webview.getURL === 'function') ? webview.getURL() : currentSrc;
+      const isInstagramHost = typeof url === 'string' && url.includes('instagram.com');
+      if (!isInstagramHost) {
+        onLoginStatusCheck?.(false);
+        return false;
+      }
+      const api: any = (window as any).electronAPI;
+      if (!api || typeof api.getInstagramCookies !== 'function') {
+        return false;
+      }
+      const result = await api.getInstagramCookies();
+      const cookies: Record<string, string> = result?.cookies || {};
+      const required = ['csrftoken', 'ds_user_id', 'ig_did', 'ig_nrcb', 'mid', 'rur', 'sessionid'];
+      const missing = required.filter((k) => !cookies[k]);
+      const isLoggedIn = missing.length === 0;
+      console.log('[CookieCheck] URL host ok:', isInstagramHost, 'missing:', missing, 'isLoggedIn:', isLoggedIn);
+      onLoginStatusCheck?.(isLoggedIn);
+      // If logged in by cookies, try to fetch current user via main (no DOM required)
+      if (isLoggedIn) {
+        try {
+          const api: any = (window as any).electronAPI;
+          if (api && typeof api.getInstagramCurrentUser === 'function') {
+            const resp = await api.getInstagramCurrentUser();
+            if (resp?.ok) {
+              const sessionData = {
+                isLoggedIn: true,
+                username: resp.username || 'instagram_user',
+                dsUserId: resp.dsUserId,
+                sessionId: null,
+                cookies,
+                rawCookies: '',
+                detectionMethod: 'cookies',
+                timestamp: new Date().toISOString(),
+                url
+              };
+              onInstagramLogin?.(sessionData);
+              return true;
+            }
+          }
+        } catch {/* ignore */}
+        // Fallback: run detailed detection after DOM is ready
+        if (isDomReadyRef.current) {
+          setTimeout(() => {
+            safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+              .then((result: string) => {
+                if (!result) return;
+                try {
+                  const parsed = JSON.parse(result);
+                  if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                    onInstagramLogin?.(parsed.data);
+                  }
+                } catch {}
+              })
+              .catch(() => {});
+          }, 500);
+        }
+      }
+      return isLoggedIn;
+    } catch {
+      return false;
+    }
+  }, [currentSrc, onLoginStatusCheck, onInstagramLogin]);
+
   useEffect(() => {
     console.log('[WebView] Source URL changed:', src);
     console.log('[WebView] Previous source:', currentSrc);
@@ -130,17 +200,19 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     const prepareWebView = async () => {
       try {
         console.log('[WebView] Preparing WebView for Instagram state:', instagramState);
-        
+
         // 서버 등록 상태 확인 - 더 정확한 로직
         let isServerRegistered = false;
-        
+
         if (instagramState === 'instagram_logged_in_server_registered') {
           isServerRegistered = true;
         } else if (instagramState === 'instagram_logged_out_server_registered') {
           isServerRegistered = true;
         } else if (instagramState === 'instagram_login_detected') {
-          // 로그인 감지된 상태는 아직 서버 등록되지 않은 상태
-          isServerRegistered = false;
+          // IMPORTANT: When login is detected via cookies/URL, do NOT clear cookies.
+          // We skip preparation entirely to preserve the just-established session.
+          console.log('[WebView] Skipping WebView preparation to preserve cookies on login_detected');
+          return;
         } else {
           // 기본적으로 미등록 상태로 처리
           isServerRegistered = false;
@@ -784,6 +856,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       
       setLastCheckTime(now);
       
+      // First, fast cookie-based detection via Electron (HttpOnly-safe)
+      checkLoginViaCookies();
+      // Then, run the in-page script as a secondary signal (only when DOM is ready)
+      if (!isDomReadyRef.current) {
+        return;
+      }
       safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript()).then((result: string) => {
         if (!result || isCleanedUp) return;
         
@@ -817,7 +895,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         intervalId = null;
       }
     };
-  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState]);
+  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState, checkLoginViaCookies]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -882,6 +960,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       if (src.includes('instagram.com')) {
         setTimeout(() => {
           console.log('[WebView] DOM ready - triggering Instagram detection');
+          // Quick cookie-based check first
+          checkLoginViaCookies();
           safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
             .then((result: string) => {
               if (!result) return;
@@ -1000,12 +1080,41 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       try {
         const url: string = e?.url || webview.getURL?.() || '';
         const isInstagramHost = url.includes('instagram.com');
-        const onLoginPage = /instagram\.com\/accounts\/login/.test(url);
+
         if (isInstagramHost) {
-          const inferredLoggedIn = !onLoginPage;
-          console.log('🔎 URL-based status:', { url, inferredLoggedIn });
+          const onLoginPage = /instagram\.com\/accounts\/login/.test(url);
+          const onSignupPage = /instagram\.com\/accounts\/emailsignup/.test(url);
+          const onPasswordResetPage = /instagram\.com\/accounts\/password\/reset/.test(url);
+          const isLoggedOutPage = onLoginPage || onSignupPage || onPasswordResetPage;
+
+          const inferredLoggedIn = !isLoggedOutPage;
+
+          console.log('🔎 URL-based status:', { url, inferredLoggedIn, isLoggedOutPage });
           onLoginStatusCheck?.(inferredLoggedIn);
-          
+
+          // If URL-based detection suggests login but we need session data, trigger detailed detection
+          if (inferredLoggedIn && isDomReadyRef.current) {
+            console.log('🔍 URL suggests login, triggering detailed detection...');
+            setTimeout(() => {
+              safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+                .then((result: string) => {
+                  if (!result) return;
+                  try {
+                    const parsed = JSON.parse(result);
+                    if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                      console.log('Instagram login confirmed via detailed detection:', parsed.data);
+                      onInstagramLogin?.(parsed.data);
+                    }
+                  } catch (e) {
+                    console.warn('Could not parse detailed login check result:', e);
+                  }
+                })
+                .catch((error) => {
+                  console.warn('Detailed login detection failed:', error);
+                });
+            }, 2000); // Wait 2 seconds for page to fully load
+          }
+
           // Notify parent component of URL change
           onUrlChange?.(url);
         }
@@ -1086,8 +1195,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         partition="persist:ig"
         webpreferences="contextIsolation=yes, nodeIntegration=no"
         allowpopups="true"
-        security="true"
-        style={{ pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const }}
+        style={{ 
+          pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const,
+          // Hide the webview when obscured so portal-based modals render above it reliably.
+          visibility: obscured ? 'hidden' as const : 'visible' as const
+        }}
         key={`webview-${forceReload}`} // 강제 리렌더링을 위한 key
       />
     </div>

@@ -174,6 +174,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
           onLoginStatusCheck={handleInstagramStatusCheck}
           instagramState={webViewStatus.state}
           onPrepareWebView={prepareWebViewForState}
+          obscured={modalState.showConfirmModal || modalState.showManualModal}
           className="w-full h-full"
         />
         

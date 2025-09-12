@@ -26,7 +26,13 @@ process.env.APP_ROOT = path.join(__dirname, '..')
 try {
   if (process.platform === 'darwin') {
     app.disableHardwareAcceleration()
-    app.commandLine.appendSwitch('js-flags', '--jitless')
+    // IMPORTANT: Do not enable V8 jitless here — it disables WebAssembly in many
+    // Chromium/V8 builds and breaks sites like Instagram/Facebook login flows.
+    // If you ever need jitless for stability, guard it behind an env flag.
+    // Example:
+    // if (process.env.ELECTRON_JITLESS === '1') {
+    //   app.commandLine.appendSwitch('js-flags', '--jitless')
+    // }
   }
 } catch (e) {
   console.warn('Failed to apply V8/GPU mitigations', e)
@@ -343,6 +349,158 @@ ipcMain.handle('get-update-status', async () => {
     updateInfo,
     currentVersion: app.getVersion()
   };
+});
+
+// ========== Instagram/WebView session helpers ==========
+// Inject cookies into the persistent IG partition
+async function injectInstagramCookies(cookies: Record<string, any>): Promise<boolean> {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const cookieList = Object.entries(cookies || {});
+    if (!cookieList.length) return false;
+
+    // Use secure URL for cookie scope
+    const url = 'https://www.instagram.com';
+
+    for (const [name, value] of cookieList) {
+      // Minimal cookie set; extend as needed
+      await igSession.cookies.set({
+        url,
+        name,
+        value: String(value),
+        domain: '.instagram.com',
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        sameSite: 'lax',
+      });
+    }
+    return true;
+  } catch (e) {
+    console.error('injectInstagramCookies failed:', e);
+    return false;
+  }
+}
+
+// Clear cookies and storage for Instagram in IG partition
+async function clearInstagramDataForPartition(): Promise<boolean> {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    // Clear cookies for instagram domains
+    const all = await igSession.cookies.get({ domain: 'instagram.com' });
+    for (const c of all) {
+      try {
+        await igSession.cookies.remove('https://' + (c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain), c.name);
+      } catch {}
+    }
+
+    // Clear storage data for Instagram origins
+    await igSession.clearStorageData({
+      origin: 'https://www.instagram.com',
+      storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+    });
+    await igSession.clearCache();
+    return true;
+  } catch (e) {
+    console.error('clearInstagramDataForPartition failed:', e);
+    return false;
+  }
+}
+
+// IPC: legacy and current channels used by renderer
+ipcMain.handle('inject-cookies-to-webview', async (_event, cookies) => {
+  return injectInstagramCookies(cookies || {});
+});
+
+ipcMain.handle('clear-webview-cookies', async () => {
+  return clearInstagramDataForPartition();
+});
+
+// Aliases used by preload/renderer
+ipcMain.handle('ig:inject-cookies', async (_event, cookies) => {
+  return injectInstagramCookies(cookies || {});
+});
+
+ipcMain.handle('ig:clear-instagram-data', async (_event, _webContentsId?: number) => {
+  // For now, clear the known IG partition regardless of id
+  return clearInstagramDataForPartition();
+});
+
+// Get cookies for instagram.com from IG partition
+ipcMain.handle('ig:get-instagram-cookies', async () => {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const listA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const listB = await igSession.cookies.get({ domain: '.instagram.com' });
+    // de-duplicate by name
+    const all = [...listA, ...listB];
+    const byName: Record<string, string> = {};
+    for (const c of all) {
+      if (c && c.name) byName[c.name] = c.value ?? '';
+    }
+    return { cookies: byName, raw: all };
+  } catch (e) {
+    console.error('get-instagram-cookies failed:', e);
+    return { cookies: {}, raw: [] };
+  }
+});
+
+// Get current user info via IG partition cookies
+ipcMain.handle('ig:get-current-user', async () => {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const listA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const listB = await igSession.cookies.get({ domain: '.instagram.com' });
+    const all = [...listA, ...listB];
+    const cookieMap: Record<string, string> = {};
+    const cookiePairs: string[] = [];
+    for (const c of all) {
+      if (c && c.name) {
+        cookieMap[c.name] = c.value ?? '';
+        cookiePairs.push(`${c.name}=${c.value ?? ''}`);
+      }
+    }
+    const cookieHeader = cookiePairs.join('; ');
+
+    const https = require('https');
+    const options = {
+      method: 'GET',
+      hostname: 'www.instagram.com',
+      path: '/api/v1/accounts/current_user/?edit=true',
+      headers: {
+        'Cookie': cookieHeader,
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://www.instagram.com/',
+      }
+    };
+
+    const result = await new Promise<{ status: number; body: any }>((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk: any) => { data += chunk; });
+        res.on('end', () => {
+          let parsed: any = null;
+          try { parsed = JSON.parse(data); } catch { parsed = null; }
+          resolve({ status: res.statusCode || 0, body: parsed ?? data });
+        });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    if (result.status === 200 && result.body) {
+      const body = result.body as any;
+      const username = (body?.user?.username) || body?.username || null;
+      const dsUserId = String((body?.user?.pk) || body?.user?.id || body?.user_id || cookieMap['ds_user_id'] || '');
+      return { ok: true, username, dsUserId, cookies: cookieMap };
+    }
+
+    return { ok: false, status: result.status };
+  } catch (e) {
+    console.error('ig:get-current-user failed:', e);
+    return { ok: false, error: String(e) };
+  }
 });
 
 // GA4 Analytics handlers

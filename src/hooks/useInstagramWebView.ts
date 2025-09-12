@@ -120,7 +120,7 @@ export const useInstagramWebView = () => {
   // Instagram 로그인 상태 체크 시 호출
   const handleInstagramStatusCheck = useCallback((isLoggedIn: boolean, sessionData?: any) => {
     console.log('Instagram status check:', { isLoggedIn, sessionData });
-    
+
     if (isLoggedIn) {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
@@ -128,10 +128,17 @@ export const useInstagramWebView = () => {
         state: isConnected ? 'instagram_logged_in' : 'instagram_login_detected',
         isInstagramLoggedIn: true,
         isServerRegistered: isConnected,
-        username: sessionData?.username,
-        dsUserId: sessionData?.dsUserId,
+        username: sessionData?.username ?? prev.username,
+        dsUserId: sessionData?.dsUserId ?? prev.dsUserId,
+        detectedSessionData: sessionData ?? prev.detectedSessionData,
         lastChecked: new Date()
       }));
+
+      // If not connected and no sessionData (URL-based detection), a detailed detection
+      // will be triggered by the WebView component.
+      if (!isConnected && !sessionData) {
+        console.log('URL-based login detected, waiting for detailed detection...');
+      }
     } else {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
@@ -140,6 +147,7 @@ export const useInstagramWebView = () => {
         isServerRegistered: isConnected,
         username: undefined,
         dsUserId: undefined,
+        detectedSessionData: undefined,
         lastChecked: new Date()
       }));
     }

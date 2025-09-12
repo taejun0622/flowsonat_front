@@ -545,6 +545,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           freshPartition={freshParam}
           enableExtension={extensionActive}
           onPrepareWebView={prepareWebViewForState}
+          obscured={modalState.showConfirmModal || modalState.showManualModal}
           // Do not block native pointer events until server registration is done
           disablePointerEvents={extensionActive && blockNativeInput && webViewStatus.isServerRegistered}
           className="w-full h-full"
@@ -594,26 +595,22 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         )}
       </div>
 
-      {/* Modals (hidden in minimal mode) */}
-      {!minimal && (
-        <>
-          <InstagramUsernameConfirmModal
-            open={modalState.showConfirmModal}
-            username={modalState.detectedUsername || ''}
-            sessionData={modalState.detectedSessionData}
-            onConfirm={handleConfirmConnection}
-            onCancel={handleManualUsername}
-          />
-          
-          <InstagramManualUsernameModal
-            open={modalState.showManualModal}
-            sessionData={modalState.detectedSessionData}
-            onConfirm={handleManualUsernameConfirm}
-            onSecondary={handleClearAndExit}
-            secondaryLabel="Disconnect"
-          />
-        </>
-      )}
+      {/* Modals (always rendered; minimal hides headers only) */}
+      <InstagramUsernameConfirmModal
+        open={modalState.showConfirmModal}
+        username={modalState.detectedUsername || ''}
+        sessionData={modalState.detectedSessionData}
+        onConfirm={handleConfirmConnection}
+        onCancel={handleManualUsername}
+      />
+      
+      <InstagramManualUsernameModal
+        open={modalState.showManualModal}
+        sessionData={modalState.detectedSessionData}
+        onConfirm={handleManualUsernameConfirm}
+        onSecondary={handleClearAndExit}
+        secondaryLabel="Disconnect"
+      />
     </div>
   );
 };

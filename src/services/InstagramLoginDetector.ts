@@ -147,25 +147,61 @@ export class InstagramLoginDetector {
           var isLoggedInByCookies = hasInstagramLoginCookies(cookies);
           var dsUserId = cookies.ds_user_id;
           var sessionId = cookies.sessionid;
-          
-          if (!isLoggedInByCookies) {
-            return JSON.stringify({
-              type: 'INSTAGRAM_LOGIN_STATUS_CHECK',
-              data: {
-                isLoggedIn: false,
-                cookies: cookies,
-                rawCookies: rawCookies,
-                detectionMethod: 'cookies',
-                timestamp: timestamp,
-                url: url
+
+          async function networkFallback() {
+            try {
+              var res = await fetch('https://www.instagram.com/api/v1/accounts/current_user/?edit=true', { credentials: 'include' });
+              if (res.status === 200) {
+                var j = await res.json();
+                var uname = (j && (j.user && (j.user.username || j.user.usernme))) || j.username || null;
+                var uid = (j && (j.user && (j.user.pk || j.user.id))) || j.user_id || dsUserId || null;
+                return {
+                  ok: true,
+                  username: uname,
+                  dsUserId: uid ? String(uid) : null
+                };
               }
+            } catch (e) {}
+            return { ok: false };
+          }
+
+          if (!isLoggedInByCookies) {
+            // Try network-based detection when cookies are HttpOnly
+            return networkFallback().then(function(nr) {
+              if (nr.ok) {
+                return JSON.stringify({
+                  type: 'INSTAGRAM_LOGIN_SUCCESS',
+                  data: {
+                    isLoggedIn: true,
+                    username: nr.username,
+                    dsUserId: nr.dsUserId,
+                    sessionId: null,
+                    cookies: cookies,
+                    rawCookies: rawCookies,
+                    detectionMethod: 'network',
+                    timestamp: timestamp,
+                    url: url
+                  }
+                });
+              }
+              return JSON.stringify({
+                type: 'INSTAGRAM_LOGIN_STATUS_CHECK',
+                data: {
+                  isLoggedIn: false,
+                  cookies: cookies,
+                  rawCookies: rawCookies,
+                  detectionMethod: 'cookies',
+                  timestamp: timestamp,
+                  url: url
+                }
+              });
             });
           }
-          
+
           // Extract username if logged in
           var username = extractUsernameFromProfileImage();
           var detectionMethod = username ? 'cookies_and_dom' : 'cookies';
-          
+
           return JSON.stringify({
             type: 'INSTAGRAM_LOGIN_SUCCESS',
             data: {
@@ -231,6 +267,19 @@ export class InstagramLoginDetector {
           
           console.log('Final login status:', isLoggedIn);
           
+          async function networkFallbackDetailed() {
+            try {
+              var res = await fetch('https://www.instagram.com/api/v1/accounts/current_user/?edit=true', { credentials: 'include' });
+              if (res.status === 200) {
+                var j = await res.json();
+                var uname = (j && (j.user && (j.user.username || j.user.usernme))) || j.username || null;
+                var uid = (j && (j.user && (j.user.pk || j.user.id))) || j.user_id || dsUserId || null;
+                return { ok: true, username: uname, dsUserId: uid ? String(uid) : null };
+              }
+            } catch (e) {}
+            return { ok: false };
+          }
+
           if (isLoggedIn) {
             var username = null;
             var profileImages = document.querySelectorAll('img[alt*="profile picture"]');
@@ -284,9 +333,38 @@ export class InstagramLoginDetector {
             });
             
           } else {
-            console.log('Not logged in - returning logout status');
-            console.log('=== End Debug ===');
-            return JSON.stringify({ type: 'INSTAGRAM_LOGOUT' });
+            // Try network-based detection if cookies are HttpOnly
+            return networkFallbackDetailed().then(function(nr) {
+              if (nr.ok) {
+                var allCookies = document.cookie.split(';').map(function(cookie) {
+                  var parts = cookie.trim().split('=');
+                  return { name: parts[0], value: parts[1] || '' };
+                });
+                var structuredCookies = {};
+                allCookies.forEach(function(cookie) {
+                  if (cookie.name) structuredCookies[cookie.name] = cookie.value;
+                });
+                var sessionData2 = {
+                  isLoggedIn: true,
+                  username: nr.username || 'instagram_user',
+                  dsUserId: nr.dsUserId,
+                  sessionId: null,
+                  cookies: structuredCookies,
+                  rawCookies: document.cookie,
+                  detectionMethod: 'network',
+                  timestamp: new Date().toISOString(),
+                  url: window.location.href,
+                  psnCookies: psnCookies,
+                  hasPsnZero: hasPsnZero
+                };
+                console.log('Returning login success via network fallback:', sessionData2);
+                console.log('=== End Debug ===');
+                return JSON.stringify({ type: 'INSTAGRAM_LOGIN_SUCCESS', data: sessionData2 });
+              }
+              console.log('Not logged in - returning logout status');
+              console.log('=== End Debug ===');
+              return JSON.stringify({ type: 'INSTAGRAM_LOGOUT' });
+            });
           }
           
         } catch (error) {
