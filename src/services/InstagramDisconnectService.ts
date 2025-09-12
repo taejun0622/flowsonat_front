@@ -39,43 +39,10 @@ export class InstagramDisconnectService {
    * Clear WebView session data via Electron APIs
    */
   static async clearWebViewSession(): Promise<void> {
-    console.log('💥 Clearing WebView session...');
+    console.log('🧹 Clearing WebView session...');
     
     try {
-      // Method 1: Electron IG API
-      if (window.IG && typeof window.IG.disconnectAndReload === 'function') {
-        console.log('🔧 Using Electron IG API');
-        await window.IG.disconnectAndReload();
-        console.log('✅ Electron IG API cleanup complete');
-      }
-    } catch (error) {
-      console.warn('⚠️ Electron IG API failed:', error);
-    }
-
-    try {
-      // Method 2: IPC Nuclear cleanup
-      if (window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
-        console.log('💥 Using Electron nuclear cleanup API');
-        await window.ipcRenderer.invoke('ig:nuclear-cleanup');
-        console.log('✅ Nuclear cleanup complete');
-      }
-    } catch (error) {
-      console.warn('⚠️ Nuclear cleanup failed:', error);
-    }
-
-    try {
-      // Method 3: Direct session cleanup
-      if (window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
-        console.log('🔧 Using direct session cleanup');
-        await window.ipcRenderer.invoke('ig:clear-session');
-        console.log('✅ Direct session cleanup complete');
-      }
-    } catch (error) {
-      console.warn('⚠️ Direct session cleanup failed:', error);
-    }
-
-    try {
-      // Method 4: Clear known Instagram data via Electron API
+      // Clear known Instagram data via Electron API
       if ((window as any).electronAPI?.clearInstagramDataForWebContents) {
         console.log('🧹 Clearing Instagram data via Electron API');
         await (window as any).electronAPI.clearInstagramDataForWebContents(undefined);

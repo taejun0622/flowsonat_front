@@ -24,8 +24,6 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 contextBridge.exposeInMainWorld('IG', {
-  clearSession: () => ipcRenderer.invoke('ig:clear-session'),
-  disconnectAndReload: () => ipcRenderer.invoke('ig:disconnect-and-reload'),
   injectCookies: (cookies: Record<string, any>) => ipcRenderer.invoke('ig:inject-cookies', cookies),
   onReloadRequest: (cb: () => void) => {
     ipcRenderer.on('ig:reload-webview', cb)

@@ -806,20 +806,6 @@ app.whenReady().then(() => {
     }
   }
 
-  /** Renderer request: Clear Instagram session */
-  ipcMain.handle('ig:clear-session', async () => {
-    await clearInstagramData('persist:ig')
-    return true
-  })
-
-  /** Renderer request: Clear Instagram session and reload */
-  ipcMain.handle('ig:disconnect-and-reload', async () => {
-    await clearInstagramData('persist:ig')
-    if (win) {
-      win.webContents.send('ig:reload-webview')
-    }
-    return true
-  })
 
   
 
@@ -827,39 +813,6 @@ app.whenReady().then(() => {
 
   
 
-  /** Renderer request: NUCLEAR Instagram cleanup - clear everything */
-  ipcMain.handle('ig:nuclear-cleanup', async () => {
-    console.log('💥 NUCLEAR Instagram cleanup requested')
-    
-    try {
-      // Clear all known Instagram partitions
-      const partitions = ['persist:ig', 'persist:instagram', 'persist:ig_session']
-      
-      for (const partition of partitions) {
-        try {
-          await clearInstagramData(partition)
-          console.log(`✅ Cleared partition: ${partition}`)
-        } catch (error) {
-          console.warn(`⚠️ Failed to clear partition ${partition}:`, error)
-        }
-      }
-      
-      // Clear default session too
-      await clearInstagramData('default')
-      
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc()
-        console.log('🗑️ Forced garbage collection')
-      }
-      
-      console.log('🎉 NUCLEAR Instagram cleanup completed!')
-      return true
-    } catch (error) {
-      console.error('❌ NUCLEAR cleanup failed:', error)
-      return false
-    }
-  })
 
   /** Renderer request: Clear WebView cookies */
   ipcMain.handle('clear-webview-cookies', async () => {
