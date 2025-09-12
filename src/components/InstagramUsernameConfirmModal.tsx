@@ -33,7 +33,7 @@ export const InstagramUsernameConfirmModal = ({
   const userId = sessionData?.ds_user_id || 'None';
 
   return (
-    <Dialog open={open} onOpenChange={() => onCancel()}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancel(); }}>
       <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-50">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">

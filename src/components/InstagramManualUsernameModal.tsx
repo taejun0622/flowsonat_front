@@ -59,7 +59,7 @@ export const InstagramManualUsernameModal = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => onSecondary()}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onSecondary(); }}>
       <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-50">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">

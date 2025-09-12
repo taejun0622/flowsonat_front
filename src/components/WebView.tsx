@@ -84,7 +84,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       try {
         if (webview.executeJavaScript && typeof webview.executeJavaScript === 'function') {
           // Avoid running while main frame is loading
-          if (webview.isLoadingMainFrame === true) {
+          if (typeof webview.isLoadingMainFrame === 'function' && webview.isLoadingMainFrame()) {
             await new Promise((r) => setTimeout(r, 250));
           }
           return await webview.executeJavaScript(script);
