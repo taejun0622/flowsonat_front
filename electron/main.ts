@@ -19,6 +19,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
 
+// Mitigations for stability on recent macOS + Electron/V8 stacks
+// - Disable GPU to avoid potential driver/GPU-process crashes
+// - Run V8 in jitless mode to avoid rare JIT-related crashes
+//   (can be toggled off later if unnecessary)
+try {
+  if (process.platform === 'darwin') {
+    app.disableHardwareAcceleration()
+    app.commandLine.appendSwitch('js-flags', '--jitless')
+  }
+} catch (e) {
+  console.warn('Failed to apply V8/GPU mitigations', e)
+}
+
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
@@ -751,7 +764,7 @@ app.whenReady().then(() => {
       await sess.cookies.flushStore()
 
       // 6.5) Try clearing host resolver cache (just in case)
-      try { await (sess as any).clearHostResolverCache?.() } catch {}
+      try { await (sess as any).clearHostResolverCache?.() } catch (e) { console.warn('clearHostResolverCache failed', e) }
 
       // 7) Clear all partitions (if partition is default)
       if (partition === 'persist:ig') {
