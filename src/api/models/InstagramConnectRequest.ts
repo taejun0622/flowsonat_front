@@ -4,5 +4,6 @@
 /* eslint-disable */
 export type InstagramConnectRequest = {
     username: string;
+    cookies?: (Record<string, any> | null);
 };
 

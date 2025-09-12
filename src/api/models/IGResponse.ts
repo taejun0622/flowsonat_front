@@ -6,6 +6,7 @@ import type { StatusEnum } from './StatusEnum';
 export type IGResponse = {
     username: string;
     ig_user_id?: (string | null);
+    cookies?: (Record<string, any> | null);
     id: string;
     status: StatusEnum;
     created_at: string;
