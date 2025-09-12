@@ -34,7 +34,7 @@ export const InstagramUsernameConfirmModal = ({
 
   return (
     <Dialog open={open} onOpenChange={() => onCancel()}>
-      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md">
+      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-50">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Instagram className="h-5 w-5 text-pink-500" />
@@ -46,8 +46,8 @@ export const InstagramUsernameConfirmModal = ({
         </DialogHeader>
         
         <div className="space-y-4">
-          <Card className="bg-black/20 border-black/30">
-            <CardContent className="p-4">
+          <Card className="bg-black/20 border-black/30 pointer-events-auto">
+            <CardContent className="p-4 pointer-events-auto">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                   <Instagram className="h-6 w-6 text-white" />
@@ -68,10 +68,15 @@ export const InstagramUsernameConfirmModal = ({
           </div>
         </div>
         
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2 pointer-events-auto relative z-50">
           <Button
-            onClick={onConfirm}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none"
+            onClick={() => {
+              console.log('=== InstagramUsernameConfirmModal OK button clicked ===');
+              console.log('onConfirm function:', onConfirm);
+              onConfirm();
+              console.log('=== OK button click completed ===');
+            }}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none pointer-events-auto relative z-50"
           >
             <Check className="h-4 w-4 mr-2" />
             OK
@@ -84,7 +89,7 @@ export const InstagramUsernameConfirmModal = ({
               onCancel();
               console.log('=== Cancel button click completed ===');
             }}
-            className="border-black/30 text-white hover:bg-black/20 flex-1 sm:flex-none"
+            className="border-black/30 text-white hover:bg-black/20 flex-1 sm:flex-none pointer-events-auto relative z-50"
           >
             <X className="h-4 w-4 mr-2" />
             Cancel

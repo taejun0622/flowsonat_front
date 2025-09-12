@@ -212,15 +212,39 @@ export const useInstagramWebView = () => {
 
   // 수동 사용자명 확인 핸들러
   const handleManualUsernameConfirm = useCallback(async (username: string) => {
-    if (!modalState.detectedSessionData) return;
+    console.log('=== handleManualUsernameConfirm called ===');
+    console.log('username:', username);
+    console.log('modalState.detectedSessionData:', modalState.detectedSessionData);
+    console.log('Full modalState:', modalState);
+    
+    // detectedSessionData가 없으면 webViewStatus에서 가져오기 시도
+    let sessionData = modalState.detectedSessionData;
+    if (!sessionData) {
+      console.log('No detectedSessionData in modalState, trying to get from webViewStatus or other sources');
+      // webViewStatus에서 기본 세션 데이터 구성
+      sessionData = {
+        username: username,
+        dsUserId: webViewStatus.dsUserId,
+        timestamp: new Date().toISOString()
+      };
+      console.log('Constructed session data from webViewStatus:', sessionData);
+    }
+    
+    if (!sessionData) {
+      console.log('No session data available, returning early');
+      return;
+    }
 
     try {
       const updatedSessionData = {
-        ...modalState.detectedSessionData,
+        ...sessionData,
         username: username
       };
 
+      console.log('Updated session data:', updatedSessionData);
+      console.log('Calling saveInstagramSession...');
       const response = await saveInstagramSession(updatedSessionData);
+      console.log('saveInstagramSession response:', response);
       
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
@@ -228,7 +252,7 @@ export const useInstagramWebView = () => {
         isInstagramLoggedIn: true,
         isServerRegistered: true,
         username: username,
-        dsUserId: modalState.detectedSessionData?.dsUserId,
+        dsUserId: sessionData.dsUserId || webViewStatus.dsUserId,
         lastChecked: new Date()
       }));
 

@@ -40,7 +40,18 @@ export const InstagramManualUsernameModal = ({
   }, [username]);
 
   const handleConfirm = () => {
-    if (isValid) onConfirm(username);
+    console.log('=== handleConfirm function called ===');
+    console.log('isValid:', isValid);
+    console.log('username:', username);
+    console.log('onConfirm function:', onConfirm);
+    
+    if (isValid) {
+      console.log('Calling onConfirm with username:', username);
+      onConfirm(username);
+      console.log('onConfirm call completed');
+    } else {
+      console.log('Not calling onConfirm because isValid is false');
+    }
   };
 
   const handleKeyPress = (e: any) => {
@@ -49,7 +60,7 @@ export const InstagramManualUsernameModal = ({
 
   return (
     <Dialog open={open} onOpenChange={() => onSecondary()}>
-      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md">
+      <DialogContent className="bg-black/20 backdrop-blur-md border-black/30 text-white shadow-2xl max-w-md pointer-events-auto relative z-50">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Instagram className="h-5 w-5 text-pink-500" />
@@ -101,19 +112,31 @@ export const InstagramManualUsernameModal = ({
           </div>
         </div>
         
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2 pointer-events-auto relative z-50">
           <Button
-            onClick={handleConfirm}
+            onClick={() => {
+              console.log('=== InstagramManualUsernameModal Connect button clicked ===');
+              console.log('handleConfirm function:', handleConfirm);
+              console.log('isValid:', isValid);
+              handleConfirm();
+              console.log('=== Connect button click completed ===');
+            }}
             disabled={!isValid}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none disabled:opacity-50"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex-1 sm:flex-none disabled:opacity-50 pointer-events-auto relative z-50"
           >
             <Check className="h-4 w-4 mr-2" />
             Connect
           </Button>
           <Button
             variant="outline"
-            onClick={onSecondary}
-            className={`flex-1 sm:flex-none ${secondaryLabel.toLowerCase() === 'disconnect' ? 'border-red-500/20 text-red-400 hover:bg-red-500/10' : 'border-black/30 text-white hover:bg-black/20'}`}
+            onClick={() => {
+              console.log('=== InstagramManualUsernameModal Secondary button clicked ===');
+              console.log('onSecondary function:', onSecondary);
+              console.log('secondaryLabel:', secondaryLabel);
+              onSecondary();
+              console.log('=== Secondary button click completed ===');
+            }}
+            className={`flex-1 sm:flex-none pointer-events-auto relative z-50 ${secondaryLabel.toLowerCase() === 'disconnect' ? 'border-red-500/20 text-red-400 hover:bg-red-500/10' : 'border-black/30 text-white hover:bg-black/20'}`}
           >
             <X className="h-4 w-4 mr-2" />
             {secondaryLabel}
