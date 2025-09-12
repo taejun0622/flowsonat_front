@@ -301,17 +301,41 @@ export const sendRequest = async (
             } as Response;
         } catch (error: any) {
             // 에러를 Response 형태로 변환
-            const status = error.status || 500;
-            const statusText = error.statusText || 'Internal Server Error';
+            let status = 500;
+            let statusText = 'Internal Server Error';
+
+            // Electron API 에러의 경우, 에러 메시지에서 상태 코드 파싱 시도
+            const errorMessage = error.message || (typeof error === 'string' ? error : '');
+            const statusMatch = errorMessage.match(/HTTP (\d{3})/);
+
+            if (statusMatch && statusMatch[1]) {
+                status = parseInt(statusMatch[1], 10);
+            } else if (error.status) {
+                status = error.status;
+            }
+
+            if (error.statusText) {
+                statusText = error.statusText;
+            } else {
+                // 상태 코드에 맞는 기본 statusText 설정
+                if (status === 400) statusText = 'Bad Request';
+                if (status === 401) statusText = 'Unauthorized';
+                if (status === 403) statusText = 'Forbidden';
+                if (status === 404) statusText = 'Not Found';
+                if (status === 502) statusText = 'Bad Gateway';
+                if (status === 503) statusText = 'Service Unavailable';
+            }
             
+            console.log(`Electron API error caught. Parsed status: ${status}`, { originalError: error });
+
             return {
                 ok: false,
                 status,
                 statusText,
                 headers: new Headers(),
-                json: async () => error.data || error.message,
-                text: async () => typeof error.data === 'string' ? error.data : JSON.stringify(error.data || error.message),
-                blob: async () => new Blob([JSON.stringify(error.data || error.message)]),
+                json: async () => error.data || errorMessage,
+                text: async () => typeof error.data === 'string' ? error.data : JSON.stringify(error.data || errorMessage),
+                blob: async () => new Blob([JSON.stringify(error.data || errorMessage)]),
                 arrayBuffer: async () => new ArrayBuffer(0),
                 formData: async () => new FormData(),
                 clone: () => ({ ...error } as any),

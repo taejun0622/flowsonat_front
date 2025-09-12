@@ -117,11 +117,32 @@ export class ElectronApiService {
       });
       
       // 에러 응답 구조화
-      const status = error.status || 500;
-      const statusText = error.message || 'Internal Server Error';
-      
+      let status = error.status || 500;
+      let statusText = error.message || 'Internal Server Error';
+      let data = error.data;
+
+      // The actual error message might be nested.
+      const nestedError = error.error;
+      const errorMessage = nestedError?.message || (typeof error === 'string' ? error : (error.message || ''));
+
+      if (errorMessage) {
+          const statusMatch = errorMessage.match(/HTTP (\d{3})/);
+          if (statusMatch && statusMatch[1]) {
+              status = parseInt(statusMatch[1], 10);
+          }
+          if (!data) {
+            data = errorMessage;
+          }
+      }
+
+      // Set statusText based on parsed status
+      if (status === 404) statusText = 'Not Found';
+      else if (status === 401) statusText = 'Unauthorized';
+      else if (status === 403) statusText = 'Forbidden';
+      else if (status === 400) statusText = 'Bad Request';
+
       throw {
-        data: error.data || error.message,
+        data: data || statusText,
         status,
         statusText
       };

@@ -23,12 +23,24 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import WebViewPage from '@/pages/WebViewPage';
 import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage';
 
+import { useInstagram } from '@/contexts/InstagramContext';
+import { useNavigate } from 'react-router-dom';
+
 // Route debugging component
 const RouteDebugger = () => {
   const location = useLocation();
   console.log('📍 Current route:', location.pathname);
   return null;
 };
+
+const NavigationHandler = () => {
+  const navigate = useNavigate();
+  const { setNavigate } = useInstagram();
+  React.useEffect(() => {
+    setNavigate(navigate);
+  }, [navigate, setNavigate]);
+  return null;
+}
 
 function App() {
   console.log('🚀 App component rendering...');
@@ -38,6 +50,7 @@ function App() {
       <AuthProvider>
         <InstagramProvider>
           <Router>
+            <NavigationHandler />
             <AnalyticsProvider>
             <DynamicBackground
               type="blur-dot"

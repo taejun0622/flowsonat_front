@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { parseCookies } from '@/utils/instagramUtils';
 import { InstagramDisconnectService } from '@/services/InstagramDisconnectService';
+import { NavigateFunction } from 'react-router-dom';
 
 interface InstagramContextType {
   instagramAccount: InstagramConnectResponse | null;
@@ -17,6 +18,7 @@ interface InstagramContextType {
   saveInstagramSession: (sessionData: any) => Promise<InstagramConnectResponse>;
   injectCookiesToWebView: (cookies: Record<string, any>) => Promise<boolean>;
   restoreInstagramSession: () => Promise<boolean>;
+  setNavigate: (navigate: NavigateFunction) => void;
 }
 
 const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
@@ -36,8 +38,19 @@ interface InstagramProviderProps {
 export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   const [instagramAccount, setInstagramAccount] = React.useState<InstagramConnectResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [navigate, setNavigate] = React.useState<NavigateFunction | null>(null);
+  const [needsConnectionFlow, setNeedsConnectionFlow] = React.useState(false);
   const { user, token } = useAuth();
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    console.log('Navigation effect check:', { needsConnectionFlow, hasNavigate: !!navigate });
+    if (needsConnectionFlow && navigate) {
+      console.log('Navigating to connection flow because it was needed.');
+      navigate('/instagram-connection-flow');
+      setNeedsConnectionFlow(false); // Reset the trigger
+    }
+  }, [needsConnectionFlow, navigate]);
 
   const checkConnection = React.useCallback(async () => {
     if (!token || !user) {
@@ -52,8 +65,9 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     } catch (error: any) {
       // 404 means no connected account
       if (error.status === 404) {
-        console.log('Instagram not connected (404)');
+        console.log('Instagram not connected (404), flagging for navigation to connection flow.');
         setInstagramAccount(null);
+        setNeedsConnectionFlow(true);
       } else {
         console.error('Failed to check Instagram connection:', error);
         setInstagramAccount(null);
@@ -237,6 +251,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     saveInstagramSession,
     injectCookiesToWebView,
     restoreInstagramSession,
+    setNavigate: setNavigate as (navigate: NavigateFunction) => void,
   };
 
   return (

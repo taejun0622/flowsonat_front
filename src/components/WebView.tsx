@@ -1060,7 +1060,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         className="w-full h-full"
         partition="persist:ig"
         webpreferences="contextIsolation=yes, nodeIntegration=no"
-        allowpopups={true}
+        allowpopups="true"
         security="true"
         style={{ pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const }}
         key={`webview-${forceReload}`} // 강제 리렌더링을 위한 key
