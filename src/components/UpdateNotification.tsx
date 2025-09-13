@@ -76,11 +76,26 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ classNam
       setIsDownloading(true);
       
       if (window.electronAPI && 'downloadUpdate' in window.electronAPI) {
+        // First check for updates to ensure an update is available
+        await (window.electronAPI as any).checkForUpdates();
+        // Then download the update
         await (window.electronAPI as any).downloadUpdate();
       }
     } catch (error) {
       console.error('Failed to start update download:', error);
       setIsDownloading(false);
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      if (errorMessage.includes('Please check update first')) {
+        console.log('Update not available, checking for updates first...');
+        // Try to check for updates first
+        try {
+          await (window.electronAPI as any).checkForUpdates();
+        } catch (checkError) {
+          console.error('Failed to check for updates:', checkError);
+        }
+      }
     }
   };
 

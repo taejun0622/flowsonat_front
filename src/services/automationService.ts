@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate, TargetBulkUpdate } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -55,8 +55,9 @@ export class AutomationService {
     this.benchmark = benchmark;
     this.profileCollectionService = new ProfileCollectionService(webviewApi);
     this.options = {
-      scrollDelay: options.scrollDelay || 1000,
-      pageLoadDelay: options.pageLoadDelay || 3000,
+      // Faster defaults; higher reliability via polling instead of long sleeps
+      scrollDelay: options.scrollDelay ?? 600,
+      pageLoadDelay: options.pageLoadDelay ?? 1200,
       onProgress: options.onProgress,
       onAction: options.onAction
     };
@@ -187,8 +188,26 @@ export class AutomationService {
         `);
       }
 
-      // Wait for page to load
-      await this.delay(this.options.pageLoadDelay);
+      // Wait for URL to update and for main elements to render (fast polling)
+      try {
+        const fragment = '${profileUrl}'.replace('https://www.instagram.com/', '');
+        await this.waitForUrlContains(fragment, Math.max(1200, this.options.pageLoadDelay));
+      } catch {}
+      try {
+        // Wait for a common layout element on profile/suggested pages
+        await this.waitForSelector('main, header', 1500);
+      } catch {}
+      
+      // Check for page unavailable error after navigation
+      try {
+        const isPageUnavailable = await this.checkForPageUnavailableError();
+        if (isPageUnavailable) {
+          console.log(`[Automation] Page unavailable detected after navigation to ${profileUrl}`);
+          // Don't throw error, let the caller handle the page unavailable state
+        }
+      } catch (error) {
+        console.warn('[Automation] Error checking for page unavailable after navigation:', error);
+      }
 
       // Collect profile information and send to history API
       try {
@@ -298,7 +317,6 @@ export class AutomationService {
       // Navigate to profile
       const profileUrl = `https://www.instagram.com/${this.instagramUsername}`;
       await this.navigateToProfile(profileUrl);
-      await this.delay(this.options.pageLoadDelay);
       
       // Collect followers
       const followersCollected = await this.collectFollowers();
@@ -326,7 +344,22 @@ export class AutomationService {
         try {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          // Small human-like settle before interacting
+          await this.randomDelay(200, 600);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username}, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            unfollowedCount++;
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
           
           // Check if unfollow button exists and click it
           const unfollowed = await this.clickUnfollowButton();
@@ -339,7 +372,7 @@ export class AutomationService {
             this.options.onAction?.('unfollow', target.ig.username, true);
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Unfollow error for ${target.ig.username}:`, error);
         }
@@ -382,7 +415,14 @@ export class AutomationService {
           
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Benchmark profile ${benchmark.ig.username} is unavailable, skipping target collection`);
+            continue;
+          }
           
           // Check if follow button exists
           const canFollow = await this.checkIfCanFollow();
@@ -450,8 +490,8 @@ export class AutomationService {
                       return { targetsCollected };
                     }
                     
-                    // Small delay between batches
-                    await this.delay(100);
+                    // Human-like small delay between batches
+                    await this.randomDelay(80, 220);
                   } catch (batchError) {
                     console.error(`[Automation] Batch creation failed, falling back to individual creation for batch:`, batchError);
                     
@@ -481,7 +521,7 @@ export class AutomationService {
             }
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Target collection error for ${benchmark.ig.username}:`, error);
         }
@@ -507,7 +547,20 @@ export class AutomationService {
         try {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username} during follow, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
           
           // Check if we can follow
           const canFollow = await this.checkIfCanFollow();
@@ -529,7 +582,7 @@ export class AutomationService {
             this.options.onAction?.('already_following', target.ig.username, true);
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Follow error for ${target.ig.username}:`, error);
         }
@@ -550,7 +603,6 @@ export class AutomationService {
       // Navigate to Instagram Suggested page
       const suggestedUrl = 'https://www.instagram.com/explore/people/suggested/';
       await this.navigateToProfile(suggestedUrl);
-      await this.delay(this.options.pageLoadDelay);
       
       // Extract usernames from the Suggested page
       const usernames = await this.extractUsernamesFromSuggestedPage();
@@ -569,8 +621,8 @@ export class AutomationService {
           suggestionsCollected++;
           this.options.onAction?.('suggestion_created', username, true);
           
-          // Small delay between API calls
-          await this.delay(100);
+          // Human-like small delay between API calls
+          await this.randomDelay(80, 220);
         } catch (error) {
           console.error(`[Automation] Failed to create suggestion for ${username}:`, error);
           this.options.onAction?.('suggestion_failed', username, false);
@@ -597,8 +649,8 @@ export class AutomationService {
         throw new Error('Failed to open followers modal');
       }
       
-      console.log('[Automation] Waiting for followers modal to load...');
-      await this.delay(3000);
+      console.log('[Automation] Waiting for followers modal to load (selector)...');
+      await this.waitForSelector('[role="dialog"], [aria-modal="true"]', 2000);
       
       // Collect usernames from modal with scrolling
       const followers = await this.collectUsernamesFromModalWithScroll();
@@ -628,8 +680,8 @@ export class AutomationService {
         throw new Error('Failed to open following modal');
       }
       
-      console.log('[Automation] Waiting for following modal to load...');
-      await this.delay(3000);
+      console.log('[Automation] Waiting for following modal to load (selector)...');
+      await this.waitForSelector('[role="dialog"], [aria-modal="true"]', 2000);
       
       // Collect usernames from modal with scrolling
       const following = await this.collectUsernamesFromModalWithScroll();
@@ -660,7 +712,8 @@ export class AutomationService {
       console.log(`[Automation] Current usernames: ${usernames.length}`);
 
       try {
-        await this.delay(1000);
+        // Short settle time before reading
+        await this.delay(300);
 
         // Extract usernames from current view
         const snapshotUsernames = await this.extractUsernamesFromModal();
@@ -688,18 +741,34 @@ export class AutomationService {
           this.options.onProgress?.(usernames.length, usernames.length, `Collected ${usernames.length} usernames...`);
         }
 
-        // Scroll down to load more
+        // Scroll down to load more with human-like variance
         console.log('[Automation] Scrolling down...');
         this.options.onProgress?.(usernames.length, usernames.length, 'Scrolling to load more...');
-        const scrolled = await this.webviewApi.scrollForemost(1000);
+        const delta = 800 + Math.floor(Math.random() * 601); // 800-1400
+        const scrolled = await this.webviewApi.scrollForemost(delta);
         if (!scrolled) {
           console.log('[Automation] Cannot scroll further');
           break;
         }
 
-        // Wait for new content to load
-        console.log('[Automation] Waiting for new content to load...');
-        await this.delay(this.options.scrollDelay + 1000);
+        // Wait for new content to load by polling anchor count change
+        console.log('[Automation] Waiting for new content to load (polling)...');
+        const start = Date.now();
+        const maxWait = Math.max(1500, this.options.scrollDelay);
+        let changed = false;
+        let lastCount = snapshotUsernames.length;
+        while (Date.now() - start < maxWait) {
+          const countStr = await this.webviewApi.executeScript(`(() => { try {
+            var d = document.querySelector('[role="dialog"], [aria-modal="true"]') || document;
+            return String(d.querySelectorAll('a').length || 0);
+          } catch (e) { return '0'; } })();`);
+          const count = parseInt(countStr || '0', 10);
+          if (count > lastCount) { changed = true; break; }
+          await this.delay(120);
+        }
+        if (!changed) {
+          console.log('[Automation] No new anchors detected after scroll');
+        }
       } catch (error) {
         console.error('[Automation] Error during collection:', error);
         unchangedScrolls++;
@@ -820,6 +889,32 @@ export class AutomationService {
     }
   }
 
+  private async getAllRequestedTargets(): Promise<TargetResponse[]> {
+    try {
+      // Get all targets with REQUESTED stage (no date filtering)
+      const allTargets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
+        this.benchmark.id,
+        StageEnum.REQUESTED
+      );
+      
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      let targetsArray: TargetResponse[] = [];
+      if (Array.isArray(allTargets)) {
+        targetsArray = allTargets;
+      } else if (allTargets && Array.isArray(allTargets.targets)) {
+        targetsArray = allTargets.targets;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', allTargets);
+        return [];
+      }
+      
+      return targetsArray;
+    } catch (error) {
+      console.error('[Automation] Get all requested targets error:', error);
+      return [];
+    }
+  }
+
   private async getPendingTargets(): Promise<TargetResponse[]> {
     try {
       const targets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
@@ -890,12 +985,73 @@ export class AutomationService {
 
   private async clickUnfollowButton(): Promise<boolean> {
     try {
+      // Step 1: First click Following or Requested button to open confirmation modal
+      const followingOrRequestedClicked = await this.clickFollowingOrRequestedButton();
+      
+      if (!followingOrRequestedClicked) {
+        console.log('[Automation] No Following/Requested button found, cannot unfollow');
+        return false;
+      }
+      
+      // Step 2: Wait for confirmation modal to appear (selector-based, faster)
+      await this.waitForSelector('[role="dialog"] button, [aria-modal="true"] button', 1200);
+      
+      // Step 3: Look for and click the Unfollow button in the modal
       const result = await this.webviewApi.executeScript(`
         (() => {
           try {
-            const unfollowButton = document.querySelector('button[type="button"]');
-            if (unfollowButton && unfollowButton.textContent.toLowerCase().includes('unfollow')) {
+            // Look for unfollow button in modal or anywhere on the page
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const unfollowButton = candidates.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'unfollow';
+            });
+            
+            if (unfollowButton) {
               unfollowButton.click();
+              return true;
+            }
+            
+            // Alternative: Look for buttons with specific attributes that might be unfollow
+            const modalButtons = Array.from(document.querySelectorAll('[role="dialog"] button, [aria-modal="true"] button'));
+            const modalUnfollowButton = modalButtons.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'unfollow';
+            });
+            
+            if (modalUnfollowButton) {
+              modalUnfollowButton.click();
+              return true;
+            }
+            
+            return false;
+          } catch (e) {
+            return false;
+          }
+        })();
+      `);
+      
+      return Boolean(result);
+    } catch (error) {
+      console.error('[Automation] Click unfollow error:', error);
+      return false;
+    }
+  }
+
+  private async clickFollowingOrRequestedButton(): Promise<boolean> {
+    try {
+      const result = await this.webviewApi.executeScript(`
+        (() => {
+          try {
+            // Look for Following or Requested button
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+            const followingOrRequestedButton = candidates.find(el => {
+              const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+              return text === 'following' || text === 'requested';
+            });
+            
+            if (followingOrRequestedButton) {
+              followingOrRequestedButton.click();
               return true;
             }
             return false;
@@ -907,7 +1063,7 @@ export class AutomationService {
       
       return Boolean(result);
     } catch (error) {
-      console.error('[Automation] Click unfollow error:', error);
+      console.error('[Automation] Click following/requested error:', error);
       return false;
     }
   }
@@ -946,7 +1102,8 @@ export class AutomationService {
         return [];
       }
       
-      await this.delay(3000);
+      await this.waitForSelector('[role\="dialog\"], [aria-modal\="true\"]', 2000);
+      await this.randomDelay(150, 400);
       
       // Collect usernames with scrolling
       const followers = await this.collectUsernamesFromModalWithScroll();
@@ -963,49 +1120,68 @@ export class AutomationService {
   }
 
   /**
-   * Send followers to API using BulkFollowRequest1
-   * Multiple followers following one account (my account)
+   * Send followers to API using TargetBulkUpdate
+   * Update only REQUESTED stage followers to FOLLOW_BACK
    */
   private async sendFollowersToAPI(followers: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${followers.length} followers to API...`);
+      console.log(`[Automation] Filtering REQUESTED stage targets from ${followers.length} followers...`);
+      
+      // Get all REQUESTED stage targets (no date filtering)
+      const requestedTargets = await this.getAllRequestedTargets();
+      console.log(`[Automation] Found ${requestedTargets.length} REQUESTED stage targets`);
+      
+      // Filter followers that are in REQUESTED stage targets
+      const requestedUsernames = requestedTargets.map(target => target.ig.username);
+      const followersToUpdate = followers.filter(follower => 
+        requestedUsernames.includes(follower)
+      );
+      
+      console.log(`[Automation] Found ${followersToUpdate.length} followers that are REQUESTED stage targets`);
+      
+      if (followersToUpdate.length === 0) {
+        console.log(`[Automation] No REQUESTED stage followers found to update`);
+        return;
+      }
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 followers at a time
       const batches = [];
       
-      for (let i = 0; i < followers.length; i += batchSize) {
-        batches.push(followers.slice(i, i + batchSize));
+      for (let i = 0; i < followersToUpdate.length; i += batchSize) {
+        batches.push(followersToUpdate.slice(i, i + batchSize));
       }
       
       let totalSent = 0;
       for (const batch of batches) {
         try {
-          const bulkRequest: BulkFollowRequest1 = {
-            follower_usernames: batch,
-            following_username: this.instagramUsername
+          const bulkUpdateRequest: TargetBulkUpdate = {
+            updates: batch.map(username => ({
+              ig_username: username,
+              stage: StageEnum.FOLLOW_BACK
+            }))
           };
           
-          await InstagramService.updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
-            bulkRequest
+          await InstagramService.bulkUpdateTargetsApiV1InstagramTargetsBulkPut(
+            bulkUpdateRequest
           );
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} followers to API (${totalSent}/${followers.length})`);
+          console.log(`[Automation] Updated ${batch.length} REQUESTED followers to FOLLOW_BACK stage (${totalSent}/${followersToUpdate.length})`);
           
-          // Small delay between batches
-          await this.delay(200);
+          // Human-like small delay between batches
+          await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send followers batch:`, error);
+          console.error(`[Automation] Failed to update followers batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${followers.length} followers to API`);
+      console.log(`[Automation] Successfully updated ${totalSent}/${followersToUpdate.length} REQUESTED followers to FOLLOW_BACK stage`);
       
     } catch (error) {
-      console.error('[Automation] Error sending followers to API:', error);
+      console.error('[Automation] Error updating REQUESTED followers to FOLLOW_BACK stage:', error);
     }
   }
 
@@ -1015,7 +1191,7 @@ export class AutomationService {
    */
   private async sendFollowingToAPI(following: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${following.length} following to API...`);
+      console.log(`[Automation] Would send ${following.length} following to API (API call disabled)...`);
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 following at a time
@@ -1033,31 +1209,134 @@ export class AutomationService {
             following_usernames: batch
           };
           
-          await InstagramService.updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
-            bulkRequest
-          );
+          // API call removed - just log what would be sent
+          console.log(`[Automation] Would send batch of ${batch.length} following:`, bulkRequest);
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} following to API (${totalSent}/${following.length})`);
+          console.log(`[Automation] Would send ${batch.length} following to API (${totalSent}/${following.length})`);
           
-          // Small delay between batches
-          await this.delay(200);
+          // Human-like small delay between batches
+          await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send following batch:`, error);
+          console.error(`[Automation] Failed to process following batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${following.length} following to API`);
+      console.log(`[Automation] Would have sent ${totalSent}/${following.length} following to API`);
       
     } catch (error) {
-      console.error('[Automation] Error sending following to API:', error);
+      console.error('[Automation] Error processing following:', error);
     }
   }
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Fast polling helpers to reduce fixed waiting
+  private async waitForSelector(selector: string, timeout = 2000, interval = 100): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const ok = await this.webviewApi.executeScript(`(() => { try { return !!document.querySelector(${JSON.stringify(selector)}); } catch (e) { return false; } })();`);
+      if (ok) return true;
+      await this.delay(interval);
+    }
+    return false;
+  }
+
+  private async waitForUrlContains(fragment: string, timeout = 2000, interval = 100): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const href = await this.webviewApi.executeScript(`(() => { try { return window.location && window.location.href || ''; } catch (e) { return ''; } })();`);
+      if (typeof href === 'string' && href.indexOf(fragment) !== -1) return true;
+      await this.delay(interval);
+    }
+    return false;
+  }
+
+  // Human-like timing helpers
+  private randInt(min: number, max: number): number {
+    if (max < min) [min, max] = [max, min];
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  private async randomDelay(minMs: number, maxMs: number): Promise<void> {
+    const ms = this.randInt(Math.max(0, Math.floor(minMs)), Math.max(0, Math.floor(maxMs)));
+    return this.delay(ms);
+  }
+
+  private async delayAround(baseMs: number, jitterRatio = 0.5): Promise<void> {
+    const base = Math.max(0, Math.floor(baseMs || 0));
+    const jitter = Math.max(0, Math.min(0.95, jitterRatio));
+    const min = Math.floor(base * (1 - jitter));
+    const max = Math.floor(base * (1 + jitter));
+    return this.randomDelay(min, max);
+  }
+
+  /**
+   * Check if the current page shows "Sorry, this page isn't available" error
+   */
+  private async checkForPageUnavailableError(): Promise<boolean> {
+    try {
+      const result = await this.webviewApi.executeScript(`
+        (function() {
+          try {
+            // Look for the "Sorry, this page isn't available" error message
+            const errorTexts = [
+              "Sorry, this page isn't available",
+              "Sorry, this page isn't available.",
+              "Sorry, this page isn't available.",
+              "This page isn't available",
+              "Page not found",
+              "User not found"
+            ];
+            
+            // Check page title
+            const title = document.title || '';
+            if (errorTexts.some(text => title.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for error messages in the page content
+            const bodyText = document.body ? document.body.innerText || document.body.textContent || '' : '';
+            if (errorTexts.some(text => bodyText.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for specific error elements
+            const errorSelectors = [
+              'h2:contains("Sorry, this page isn\'t available")',
+              '[data-testid="error-page"]',
+              '.error-page',
+              'main h2',
+              'main h1'
+            ];
+            
+            for (const selector of errorSelectors) {
+              const elements = document.querySelectorAll(selector);
+              for (const element of elements) {
+                const text = element.innerText || element.textContent || '';
+                if (errorTexts.some(errorText => text.toLowerCase().includes(errorText.toLowerCase()))) {
+                  return true;
+                }
+              }
+            }
+            
+            return false;
+          } catch (e) {
+            console.error('Error checking for page unavailable:', e);
+            return false;
+          }
+        })();
+      `);
+      
+      return result === true;
+    } catch (error) {
+      console.error('[Automation] Error checking for page unavailable:', error);
+      return false;
+    }
   }
 
   /**

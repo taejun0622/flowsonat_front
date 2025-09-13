@@ -117,8 +117,8 @@ else
     log_warning "No changes to commit"
 fi
 
-# 2. Electron 앱 빌드
-log_info "Step 2: Building Electron app..."
+# 2. Electron 앱 빌드 및 퍼블리시
+log_info "Step 2: Building and publishing Electron app..."
 case $PLATFORM in
     "all")
         log_info "Building for all platforms with code signing..."
@@ -126,11 +126,11 @@ case $PLATFORM in
         ;;
     "mac")
         log_info "Building for macOS with code signing and notarization..."
-        npm run build:mac:env
+        npm run build:mac
         ;;
     "win")
         log_info "Building for Windows with code signing..."
-        dotenv -f .env.deploy run npm run build:win:signed
+        dotenv -f .env.deploy run npm run build:win
         ;;
     "linux")
         log_info "Building for Linux..."
@@ -153,12 +153,36 @@ if [ -d "release/$UPLOAD_VERSION" ]; then
         --recursive \
         --exclude "*" \
         --include "*.zip" \
-        --include "*.dmg" \
         --include "*.exe" \
         --include "*.deb" \
         --cache-control "max-age=31536000,public"
     
     log_success "Version $UPLOAD_VERSION files uploaded to S3"
+    
+    # 업데이트 메타데이터 파일들 수정 및 업로드 (electron-updater용)
+    log_info "Updating metadata files with version paths..."
+    
+    # 각 metadata 파일의 URL을 버전 경로를 포함하도록 수정
+    for yml_file in latest-mac.yml latest.yml latest-linux.yml latest-linux-arm.yml latest-linux-arm64.yml; do
+        if [ -f "release/$UPLOAD_VERSION/$yml_file" ]; then
+            # 임시 파일 생성하여 URL에 버전 경로 추가
+            sed "s|url: |url: $UPLOAD_VERSION/|g" "release/$UPLOAD_VERSION/$yml_file" > "/tmp/$yml_file"
+            # path 필드도 버전 경로 포함하도록 수정
+            sed -i "" "s|^path: |path: $UPLOAD_VERSION/|g" "/tmp/$yml_file"
+            log_info "Updated $yml_file with version paths"
+        fi
+    done
+    
+    log_info "Uploading update metadata files..."
+    aws s3 cp /tmp/latest-mac.yml s3://$S3_BUCKET_NAME/latest-mac.yml --cache-control "no-cache,no-store,must-revalidate" 2>/dev/null || log_warning "latest-mac.yml not found"
+    aws s3 cp /tmp/latest.yml s3://$S3_BUCKET_NAME/latest.yml --cache-control "no-cache,no-store,must-revalidate" 2>/dev/null || log_warning "latest.yml not found"
+    aws s3 cp /tmp/latest-linux.yml s3://$S3_BUCKET_NAME/latest-linux.yml --cache-control "no-cache,no-store,must-revalidate" 2>/dev/null || log_warning "latest-linux.yml not found"
+    aws s3 cp /tmp/latest-linux-arm.yml s3://$S3_BUCKET_NAME/latest-linux-arm.yml --cache-control "no-cache,no-store,must-revalidate" 2>/dev/null || log_warning "latest-linux-arm.yml not found"
+    aws s3 cp /tmp/latest-linux-arm64.yml s3://$S3_BUCKET_NAME/latest-linux-arm64.yml --cache-control "no-cache,no-store,must-revalidate" 2>/dev/null || log_warning "latest-linux-arm64.yml not found"
+    
+    # 임시 파일 정리
+    rm -f /tmp/latest-*.yml
+    log_success "Update metadata files uploaded to S3"
 else
     log_error "Build folder release/$UPLOAD_VERSION not found"
     exit 1
@@ -180,10 +204,13 @@ fi
 # 5. CloudFront 캐시 무효화
 if [ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
     log_info "Step 5: Invalidating CloudFront cache..."
+    
+    # 버전별 파일들과 업데이트 메타데이터 파일들 무효화
     aws cloudfront create-invalidation \
         --distribution-id $CLOUDFRONT_DISTRIBUTION_ID \
-        --paths "/version-info.json" > /dev/null
-    log_success "CloudFront cache invalidated"
+        --paths "/$UPLOAD_VERSION/*" "/latest-mac.yml" "/latest.yml" "/latest-linux.yml" "/latest-linux-arm.yml" "/latest-linux-arm64.yml" "/version-info.json" > /dev/null
+    
+    log_success "CloudFront cache invalidated for version $UPLOAD_VERSION and update metadata files"
 else
     log_warning "CloudFront distribution ID not found. Skipping cache invalidation."
 fi

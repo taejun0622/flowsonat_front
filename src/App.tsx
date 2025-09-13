@@ -21,7 +21,12 @@ import { DashboardPage } from '@/pages/DashboardPage';
 
 // WebView
 import WebViewPage from '@/pages/WebViewPage';
+import LoginWebViewPage from '@/pages/LoginWebViewPage';
+import AutomationWebViewPage from '@/pages/AutomationWebViewPage';
 import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage';
+
+import { useInstagram } from '@/contexts/InstagramContext';
+import { useNavigate } from 'react-router-dom';
 
 // Route debugging component
 const RouteDebugger = () => {
@@ -29,6 +34,15 @@ const RouteDebugger = () => {
   console.log('📍 Current route:', location.pathname);
   return null;
 };
+
+const NavigationHandler = () => {
+  const navigate = useNavigate();
+  const { setNavigate } = useInstagram();
+  React.useEffect(() => {
+    setNavigate(navigate);
+  }, [navigate, setNavigate]);
+  return null;
+}
 
 function App() {
   console.log('🚀 App component rendering...');
@@ -38,6 +52,7 @@ function App() {
       <AuthProvider>
         <InstagramProvider>
           <Router>
+            <NavigationHandler />
             <AnalyticsProvider>
             <DynamicBackground
               type="blur-dot"
@@ -45,7 +60,7 @@ function App() {
               loop={true}
               seed={1000}
             >
-              <div className="relative w-full h-full overflow-auto">
+              <div className="relative w-full h-full min-h-0 overflow-auto">
                 <RouteDebugger />
                 <Routes>
                 {/* Test Route */}
@@ -68,15 +83,25 @@ function App() {
                   }
                 />
                 
-                {/* WebView Route - Full screen webview */}
+                {/* WebView Routes - split for login and automation */}
                 <Route
-                  path="/webview"
+                  path="/webview/login"
                   element={
                     <ProtectedRoute>
-                      <WebViewPage />
+                      <LoginWebViewPage />
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/webview/automation"
+                  element={
+                    <ProtectedRoute>
+                      <AutomationWebViewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Backward compatibility: redirect /webview to /webview/automation */}
+                <Route path="/webview" element={<Navigate to="/webview/automation" replace />} />
 
                 {/* Instagram Connection Flow Route */}
                 <Route

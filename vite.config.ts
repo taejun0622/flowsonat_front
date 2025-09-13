@@ -110,6 +110,13 @@ export default defineConfig(({ mode }) => {
         rewrite: (path) => path.replace(/^\/ga4-mp/, '')
       }
     }
+  },
+  // Vitest configuration for unit tests
+  test: {
+    environment: 'jsdom',
+    globals: false,
+    css: true,
+    setupFiles: [],
   }
   }
 })

@@ -1,32 +1,5 @@
 /* FlowSonat Instagram Controller Styles */
 
-/* Custom cursor */
-.flowsonat-cursor {
-  position: fixed;
-  width: 24px;
-  height: 24px;
-  pointer-events: none;
-  z-index: 999999;
-  transform: translate(-50%, -50%);
-  transition: all 0.1s ease-out;
-  filter: drop-shadow(0 2px 8px rgba(102, 126, 234, 0.3));
-}
-
-.flowsonat-cursor svg {
-  width: 100%;
-  height: 100%;
-}
-
-/* Cursor states */
-.flowsonat-cursor.clicking {
-  transform: translate(-50%, -50%) scale(0.8);
-  filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.5));
-}
-
-.flowsonat-cursor.hovering {
-  transform: translate(-50%, -50%) scale(1.1);
-  filter: drop-shadow(0 3px 10px rgba(102, 126, 234, 0.4));
-}
 
 /* Overlay to prevent physical mouse interaction */
 .flowsonat-overlay {
@@ -46,9 +19,6 @@
   pointer-events: none !important;
 }
 
-.flowsonat-overlay-active .flowsonat-cursor {
-  pointer-events: auto;
-}
 
 /* Scrollable area indicator */
 .flowsonat-scrollable-indicator {

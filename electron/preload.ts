@@ -4,7 +4,7 @@ const { ipcRenderer, contextBridge } = require('electron')
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+    return ipcRenderer.on(channel, (event, ...args) => (listener as Function)(event, ...args))
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
     const [channel, ...omit] = args
@@ -24,8 +24,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 contextBridge.exposeInMainWorld('IG', {
-  clearSession: () => ipcRenderer.invoke('ig:clear-session'),
-  disconnectAndReload: () => ipcRenderer.invoke('ig:disconnect-and-reload'),
+  injectCookies: (cookies: Record<string, any>) => ipcRenderer.invoke('ig:inject-cookies', cookies),
   onReloadRequest: (cb: () => void) => {
     ipcRenderer.on('ig:reload-webview', cb)
   },
@@ -61,6 +60,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 업데이트 설치
   installUpdate: () => ipcRenderer.invoke('install-update'),
   
+  // 업데이트 상태 조회
+  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
+  
   // 업데이트 상태 변경 이벤트 리스너
   onUpdateStatus: (callback: (data: any) => void) => {
     ipcRenderer.on('update-status', (_event, data) => callback(data))
@@ -78,5 +80,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // API 요청 (Main Process를 통해)
   apiRequest: (method: string, url: string, data?: any, headers?: Record<string, string>) => 
-    ipcRenderer.invoke('api-request', { method, url, data, headers })
+    ipcRenderer.invoke('api-request', { method, url, data, headers }),
+  
+  // 메모리 정리
+  cleanupWebViewMemory: () => ipcRenderer.invoke('cleanup-webview-memory'),
+  
+  // 메모리 사용량 조회
+  getMemoryUsage: () => ipcRenderer.invoke('get-memory-usage'),
+  
+  // 쿠키 주입
+  injectCookies: (cookies: Record<string, any>) => ipcRenderer.invoke('ig:inject-cookies', cookies),
+  
+  // Instagram 데이터 정리
+  clearInstagramDataForWebContents: (webContentsId?: number) => 
+    ipcRenderer.invoke('ig:clear-instagram-data', webContentsId)
+  ,
+  // WebView cookie/session helpers expected by renderer context
+  injectCookiesToWebView: (cookies: Record<string, any>) =>
+    ipcRenderer.invoke('inject-cookies-to-webview', cookies),
+  clearWebViewCookies: () =>
+    ipcRenderer.invoke('clear-webview-cookies'),
+  getInstagramCookies: () =>
+    ipcRenderer.invoke('ig:get-instagram-cookies'),
+  getInstagramCurrentUser: () =>
+    ipcRenderer.invoke('ig:get-current-user')
 })

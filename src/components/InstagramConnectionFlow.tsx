@@ -16,7 +16,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
   className = "" 
 }) => {
   const navigate = useNavigate();
-  const { disconnectAccount } = useInstagram();
+  const { disconnectAccount, prepareWebViewForState } = useInstagram();
   const [currentUrl, setCurrentUrl] = useState<string>('https://www.instagram.com/accounts/login/');
   const [isLoading, setIsLoading] = useState(false);
   const [webviewKey, setWebviewKey] = useState(0);
@@ -82,7 +82,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
     console.log('=== InstagramLogoutFlow: Instagram Login Handler ===');
     console.log('Session data received in component:', sessionData);
     console.log('Calling handleInstagramLoginDetected...');
-    handleInstagramLoginDetected(sessionData);
+    handleInstagramLoginDetected(sessionData, window.location.pathname);
   }, [handleInstagramLoginDetected]);
 
   return (
@@ -139,11 +139,11 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
       <div className="flex items-center justify-between p-4 bg-black/10 border-b border-black/20">
         <div className="flex items-center space-x-2">
           <Button
-            onClick={() => handleActionClick(uiConfig.primaryAction.action)}
-            variant={uiConfig.primaryAction.variant || 'default'}
+            onClick={() => uiConfig.primaryAction?.action && handleActionClick(uiConfig.primaryAction.action)}
+            variant={uiConfig.primaryAction?.variant || 'default'}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
           >
-            {uiConfig.primaryAction.label}
+            {uiConfig.primaryAction?.label}
           </Button>
           
           {uiConfig.secondaryAction && (
@@ -158,7 +158,7 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
         </div>
         
         <div className="text-xs text-white/60">
-          {webViewStatus.lastChecked.toLocaleTimeString()}
+          {webViewStatus.lastChecked?.toLocaleTimeString()}
         </div>
       </div>
 
@@ -172,6 +172,9 @@ export const InstagramConnectionFlow: React.FC<InstagramConnectionFlowProps> = (
           onError={handleWebViewError}
           onInstagramLogin={handleInstagramLogin}
           onLoginStatusCheck={handleInstagramStatusCheck}
+          instagramState={webViewStatus.state}
+          onPrepareWebView={prepareWebViewForState}
+          obscured={modalState.showConfirmModal || modalState.showManualModal}
           className="w-full h-full"
         />
         

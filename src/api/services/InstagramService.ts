@@ -25,6 +25,8 @@ import type { StatusEnum } from '../models/StatusEnum';
 import type { SuggestionCreate } from '../models/SuggestionCreate';
 import type { SuggestionListResponse } from '../models/SuggestionListResponse';
 import type { SuggestionResponse } from '../models/SuggestionResponse';
+import type { TargetBulkUpdate } from '../models/TargetBulkUpdate';
+import type { TargetBulkUpdateResponse } from '../models/TargetBulkUpdateResponse';
 import type { TargetCreate } from '../models/TargetCreate';
 import type { TargetListResponse } from '../models/TargetListResponse';
 import type { TargetResponse } from '../models/TargetResponse';
@@ -409,6 +411,26 @@ export class InstagramService {
             path: {
                 'benchmark_id': benchmarkId,
             },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Bulk Update Targets
+     * Bulk update targets by Instagram username and stage
+     * @param requestBody
+     * @returns TargetBulkUpdateResponse Successful Response
+     * @throws ApiError
+     */
+    public static bulkUpdateTargetsApiV1InstagramTargetsBulkPut(
+        requestBody: TargetBulkUpdate,
+    ): CancelablePromise<TargetBulkUpdateResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/instagram/targets/bulk',
             body: requestBody,
             mediaType: 'application/json',
             errors: {

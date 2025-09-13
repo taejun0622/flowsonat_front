@@ -66,7 +66,7 @@ if [ -z "$S3_BUCKET_NAME" ]; then
 fi
 
 if [ -z "$AWS_REGION" ]; then
-    export AWS_REGION=ap-northeast-2
+    export AWS_REGION=us-east-1
 fi
 
 # 버전 정보 표시
@@ -113,23 +113,23 @@ for env_file in ".env.deploy" ".env.production" ".env.local" ".env"; do
 done
 echo "================================"
 
-# 플랫폼별 Electron 빌드
+# 플랫폼별 Electron 빌드 및 퍼블리시
 case $PLATFORM in
     "all")
-        log_info "Building for all platforms..."
-        npm run build:all
+        log_info "Building and publishing for all platforms..."
+        npm run publish:all
         ;;
     "mac")
-        log_info "Building for macOS with code signing and notarization..."
-        npm run build:mac:env
+        log_info "Building and publishing for macOS with code signing and notarization..."
+        npm run publish:mac
         ;;
     "win")
-        log_info "Building for Windows..."
-        npm run build:win
+        log_info "Building and publishing for Windows..."
+        npm run publish:win
         ;;
     "linux")
-        log_info "Building for Linux..."
-        npm run build:linux
+        log_info "Building and publishing for Linux..."
+        npm run publish:linux
         ;;
     *)
         log_error "Unknown platform: $PLATFORM"
@@ -153,20 +153,17 @@ else
     fi
 fi
 
-       # Electron 앱 빌드 파일 업로드 (필요한 파일만)
-       log_info "Uploading Electron app builds to S3..."
+       # Electron-builder가 자동으로 S3에 업로드하므로 수동 업로드는 생략
+       log_info "Electron-builder automatically uploaded files to S3 with publish=always"
        
-       # 필요한 파일들만 선택적으로 업로드
-       aws s3 cp release/ s3://$S3_BUCKET_NAME/ \
-           --recursive \
-           --exclude "*" \
-           --include "*.zip" \
-           --include "*.dmg" \
-           --include "*.exe" \
-           --include "*.deb" \
-           --cache-control "max-age=31536000,public"
-       
-       log_info "Uploaded only distribution files (zip, dmg, exe, deb)"
+       # Update metadata files 수동 업로드 (electron-builder가 완전하지 않을 수 있음)
+       log_info "Uploading update metadata files..."
+       aws s3 cp release/$CURRENT_VERSION/latest-mac.yml s3://$S3_BUCKET_NAME/latest-mac.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest.yml s3://$S3_BUCKET_NAME/latest.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux.yml s3://$S3_BUCKET_NAME/latest-linux.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm.yml s3://$S3_BUCKET_NAME/latest-linux-arm.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       aws s3 cp release/$CURRENT_VERSION/latest-linux-arm64.yml s3://$S3_BUCKET_NAME/latest-linux-arm64.yml --cache-control "no-cache,no-store,must-revalidate" --region $AWS_REGION
+       log_success "Update metadata files uploaded to S3"
 
 # 버전 정보 업데이트 및 업로드
 log_info "Updating version information..."

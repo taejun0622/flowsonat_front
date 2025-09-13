@@ -10,17 +10,27 @@ import {
   InstagramModalState
 } from '@/types/instagram';
 
+import { useLocation } from 'react-router-dom';
+
 export const useInstagramWebView = () => {
-  const { isConnected, connectAccount, disconnectAccount, saveInstagramSession } = useInstagram();
+  const location = useLocation();
+  const { isConnected, connectAccount, disconnectAccount, saveInstagramSession, restoreInstagramSession, injectCookiesToWebView } = useInstagram();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [webViewStatus, setWebViewStatus] = useState<InstagramWebViewStatus>({
-    state: 'instagram_logged_out_server_unregistered',
+  // Initialize WebView status based on current server registration to enable
+  // early cookie injection before the WebView starts navigating.
+  const [webViewStatus, setWebViewStatus] = useState<InstagramWebViewStatus>(() => ({
+    state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered',
+    data: {
+      isWebViewLoggedIn: false,
+      hasServerStorage: !!isConnected,
+      lastChecked: new Date()
+    },
     isInstagramLoggedIn: false,
-    isServerRegistered: false,
+    isServerRegistered: !!isConnected,
     lastChecked: new Date()
-  });
+  }));
 
   const [modalState, setModalState] = useState<InstagramModalState>({
     showConfirmModal: false,
@@ -31,36 +41,88 @@ export const useInstagramWebView = () => {
   // While the user chooses manual input or dismisses confirm, suppress auto-confirm for this dsUserId
   const [suppressedForDsUserId, setSuppressedForDsUserId] = useState<string | null>(null);
 
+  // Keep WebView state aligned with server registration so the WebView
+  // can decide cookie handling before load.
+  useEffect(() => {
+    setWebViewStatus((prev) => {
+      // If server is connected but state isn't marked as registered yet, update it
+      if (isConnected && !prev.isServerRegistered) {
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            hasServerStorage: true,
+            lastChecked: new Date()
+          },
+          isServerRegistered: true,
+          state: prev.isInstagramLoggedIn ? 'instagram_logged_in' : 'instagram_logged_out_server_registered',
+          lastChecked: new Date()
+        };
+      }
+
+      // If server is disconnected but state still marked as registered, reset
+      if (!isConnected && prev.isServerRegistered) {
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            hasServerStorage: false,
+            username: undefined,
+            dsUserId: undefined,
+            lastChecked: new Date()
+          },
+          isServerRegistered: false,
+          state: prev.isInstagramLoggedIn ? 'instagram_login_detected' : 'instagram_logged_out_server_unregistered',
+          username: undefined,
+          dsUserId: undefined,
+          detectedSessionData: undefined,
+          lastChecked: new Date()
+        };
+      }
+      return prev;
+    });
+  }, [isConnected]);
+
   // Instagram 로그인 상태 감지 시 호출 (로그아웃 플로우용)
-  const handleInstagramLoginDetected = useCallback(async (sessionData: any) => {
+  const handleInstagramLoginDetected = useCallback(async (sessionData: any, pathname: string) => {
     try {
       console.log('=== Instagram Login Detection Flow ===');
       console.log('Session data received:', sessionData);
       console.log('Current isConnected state:', isConnected);
       console.log('Username from session:', sessionData?.username);
       console.log('Suppressed for dsUserId:', suppressedForDsUserId);
+      console.log('Current modal state:', modalState);
       
       // 로그아웃 플로우에서는 즉시 연결하지 않고 확인 모달을 띄움
       if (!isConnected) {
-        // If user is already interacting with a modal, or explicitly suppressed for this dsUserId, don't re-open confirm
-        if (modalState.showConfirmModal || modalState.showManualModal || (suppressedForDsUserId && suppressedForDsUserId === sessionData?.dsUserId)) {
-          setWebViewStatus((prev: InstagramWebViewStatus) => ({
-            ...prev,
-            state: 'instagram_login_detected',
-            isInstagramLoggedIn: true,
-            isServerRegistered: false,
-            username: sessionData.username,
-            dsUserId: sessionData.dsUserId,
-            detectedSessionData: sessionData,
-            lastChecked: new Date()
-          }));
-          console.log('Auto-confirm suppressed; keeping current modal state.');
-          return;
+        // Always show modal for new login detection, regardless of current modal state
+        console.log('Forcing modal display for new login detection...');
+        
+        // Reset any existing modal state
+        setModalState({
+          showConfirmModal: false,
+          showManualModal: false,
+          detectedUsername: undefined,
+          detectedSessionData: undefined
+        });
+        
+        // Reset suppression for new user
+        if (suppressedForDsUserId && suppressedForDsUserId !== sessionData?.dsUserId) {
+          console.log('Different user detected, resetting suppression...');
+          setSuppressedForDsUserId(null);
         }
         console.log('User not connected, showing confirmation modal...');
         
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: true,
+            hasServerStorage: false,
+            username: sessionData.username,
+            dsUserId: sessionData.dsUserId,
+            lastChecked: new Date()
+          },
           state: 'instagram_login_detected',
           isInstagramLoggedIn: true,
           isServerRegistered: false,
@@ -70,7 +132,8 @@ export const useInstagramWebView = () => {
           lastChecked: new Date()
         }));
 
-        // 확인 모달 띄우기
+        // 확인 모달 띄우기 (강제로 모달 상태 초기화)
+        console.log('Setting modal state to show confirmation modal...');
         setModalState({
           showConfirmModal: true,
           showManualModal: false,
@@ -89,6 +152,14 @@ export const useInstagramWebView = () => {
         
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: true,
+            hasServerStorage: true,
+            username: sessionData.username,
+            dsUserId: sessionData.dsUserId,
+            lastChecked: new Date()
+          },
           state: 'instagram_logged_in',
           isInstagramLoggedIn: true,
           isServerRegistered: true,
@@ -103,8 +174,30 @@ export const useInstagramWebView = () => {
           variant: "default"
         });
 
-        // 이미 서버에 연결된 상태에서 로그인 감지되면 바로 Dashboard로 돌아가기
-        navigate('/dashboard');
+        // Determine navigation based on context and current page
+        const urlParams = new URLSearchParams(window.location.search);
+        const isMinimalMode = urlParams.get('minimal') === '1';
+        const isAutoExecuteMode = urlParams.get('autoExecute') === '1';
+        const fromAutomation = urlParams.get('from') === 'automation';
+        const currentPath = window.location.pathname;
+
+        // Context-aware navigation logic
+        if (currentPath === '/webview/login') {
+          // Login WebView: After successful login, decide where to go
+          if (fromAutomation) {
+            console.log('Login successful from automation context, navigating back to automation');
+            navigate('/webview/automation');
+          } else {
+            console.log('Login successful, navigating to dashboard');
+            navigate('/dashboard');
+          }
+        } else if (currentPath === '/webview/automation' || currentPath === '/webview' || isMinimalMode || isAutoExecuteMode) {
+          // Automation or WebView contexts: Stay to allow automation/session usage
+          console.log('Login successful in webview/automation context, staying on current page');
+        } else {
+          // For all other contexts, avoid forcing navigation to reduce unintended unmounts
+          console.log('Login successful in non-webview context, staying on current page');
+        }
       }
 
     } catch (error) {
@@ -120,26 +213,59 @@ export const useInstagramWebView = () => {
   // Instagram 로그인 상태 체크 시 호출
   const handleInstagramStatusCheck = useCallback((isLoggedIn: boolean, sessionData?: any) => {
     console.log('Instagram status check:', { isLoggedIn, sessionData });
-    
+
+    // 이미 로그인된 상태에서 서버에도 연결되어 있다면 체크 건너뛰기
+    if (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) {
+      console.log('Already logged in and server registered, skipping status check');
+      return;
+    }
+
     if (isLoggedIn) {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: isConnected,
+          username: sessionData?.username ?? prev.username,
+          dsUserId: sessionData?.dsUserId ?? prev.dsUserId,
+          lastChecked: new Date()
+        },
         // If logged-in on Instagram but not server-registered yet, reflect 'login_detected'
         state: isConnected ? 'instagram_logged_in' : 'instagram_login_detected',
         isInstagramLoggedIn: true,
         isServerRegistered: isConnected,
-        username: sessionData?.username,
-        dsUserId: sessionData?.dsUserId,
+        username: sessionData?.username ?? prev.username,
+        dsUserId: sessionData?.dsUserId ?? prev.dsUserId,
+        detectedSessionData: sessionData ?? prev.detectedSessionData,
         lastChecked: new Date()
       }));
+
+      // If not connected and no sessionData (URL-based detection), a detailed detection
+      // will be triggered by the WebView component.
+      if (!isConnected && !sessionData) {
+        console.log('URL-based login detected, waiting for detailed detection...');
+        console.log('Current webViewStatus:', webViewStatus);
+        console.log('isConnected:', isConnected);
+        console.log('sessionData:', sessionData);
+      }
     } else {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: false,
+          hasServerStorage: isConnected,
+          username: undefined,
+          dsUserId: undefined,
+          lastChecked: new Date()
+        },
         state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered',
         isInstagramLoggedIn: false,
         isServerRegistered: isConnected,
         username: undefined,
         dsUserId: undefined,
+        detectedSessionData: undefined,
         lastChecked: new Date()
       }));
     }
@@ -154,6 +280,14 @@ export const useInstagramWebView = () => {
       
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: true,
+          username: modalState.detectedUsername,
+          dsUserId: modalState.detectedSessionData?.dsUserId,
+          lastChecked: new Date()
+        },
         state: 'instagram_logged_in',
         isInstagramLoggedIn: true,
         isServerRegistered: true,
@@ -174,8 +308,19 @@ export const useInstagramWebView = () => {
         variant: "default"
       });
 
-      // 대시보드로 돌아가기
-      navigate('/dashboard');
+      // Navigate only if not in automation/webview contexts
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const inAutomation = window.location.pathname === '/webview/automation' || params.get('from') === 'automation';
+        const inWebView = window.location.pathname === '/webview' || params.get('minimal') === '1' || params.get('autoExecute') === '1';
+        if (inAutomation || inWebView) {
+          console.log('Manual username confirm in automation/webview context; staying on current page');
+        } else {
+          navigate('/dashboard');
+        }
+      } catch {
+        navigate('/dashboard');
+      }
 
     } catch (error) {
       console.error('Failed to save Instagram session:', error);
@@ -212,23 +357,55 @@ export const useInstagramWebView = () => {
 
   // 수동 사용자명 확인 핸들러
   const handleManualUsernameConfirm = useCallback(async (username: string) => {
-    if (!modalState.detectedSessionData) return;
+    console.log('=== handleManualUsernameConfirm called ===');
+    console.log('username:', username);
+    console.log('modalState.detectedSessionData:', modalState.detectedSessionData);
+    console.log('Full modalState:', modalState);
+    
+    // detectedSessionData가 없으면 webViewStatus에서 가져오기 시도
+    let sessionData = modalState.detectedSessionData;
+    if (!sessionData) {
+      console.log('No detectedSessionData in modalState, trying to get from webViewStatus or other sources');
+      // webViewStatus에서 기본 세션 데이터 구성
+      sessionData = {
+        username: username,
+        dsUserId: webViewStatus.dsUserId,
+        timestamp: new Date().toISOString()
+      };
+      console.log('Constructed session data from webViewStatus:', sessionData);
+    }
+    
+    if (!sessionData) {
+      console.log('No session data available, returning early');
+      return;
+    }
 
     try {
       const updatedSessionData = {
-        ...modalState.detectedSessionData,
+        ...sessionData,
         username: username
       };
 
+      console.log('Updated session data:', updatedSessionData);
+      console.log('Calling saveInstagramSession...');
       const response = await saveInstagramSession(updatedSessionData);
+      console.log('saveInstagramSession response:', response);
       
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: true,
+          username: username,
+          dsUserId: sessionData.dsUserId || webViewStatus.dsUserId,
+          lastChecked: new Date()
+        },
         state: 'instagram_logged_in',
         isInstagramLoggedIn: true,
         isServerRegistered: true,
         username: username,
-        dsUserId: modalState.detectedSessionData?.dsUserId,
+        dsUserId: sessionData.dsUserId || webViewStatus.dsUserId,
         lastChecked: new Date()
       }));
 
@@ -266,6 +443,14 @@ export const useInstagramWebView = () => {
 
     setWebViewStatus((prev: InstagramWebViewStatus) => ({
       ...prev,
+      data: {
+        ...prev.data,
+        isWebViewLoggedIn: false,
+        hasServerStorage: false,
+        username: undefined,
+        dsUserId: undefined,
+        lastChecked: new Date()
+      },
       state: 'instagram_logged_out_server_unregistered',
       isInstagramLoggedIn: false,
       isServerRegistered: false,
@@ -370,7 +555,38 @@ export const useInstagramWebView = () => {
   const handleAction = useCallback(async (action: InstagramWebViewAction) => {
     switch (action) {
       case 'connect_instagram':
-        // Proactively clear any residual Instagram data before starting a new login
+        // 먼저 기존 세션 복원 시도
+        try {
+          console.log('Attempting to restore existing Instagram session...');
+          const restored = await restoreInstagramSession();
+          if (restored) {
+            console.log('Instagram session restored successfully');
+            setWebViewStatus((prev: InstagramWebViewStatus) => ({
+              ...prev,
+              data: {
+                ...prev.data,
+                isWebViewLoggedIn: true,
+                hasServerStorage: true,
+                lastChecked: new Date()
+              },
+              state: 'instagram_logged_in',
+              isInstagramLoggedIn: true,
+              isServerRegistered: true,
+              lastChecked: new Date()
+            }));
+            toast({
+              title: "Instagram Session Restored",
+              description: "Your Instagram session has been restored successfully.",
+              variant: "default"
+            });
+            navigate('/dashboard');
+            return null;
+          }
+        } catch (error) {
+          console.log('Failed to restore session, proceeding with new login:', error);
+        }
+        
+        // 세션 복원 실패 시 새로운 로그인 진행
         try {
           // If running in Electron, clear known Instagram sessions (default + persisted partitions)
           // Passing undefined lets main clear default + known partitions even without a webview id
@@ -388,6 +604,11 @@ export const useInstagramWebView = () => {
           await disconnectAccount();
           setWebViewStatus((prev: InstagramWebViewStatus) => ({
             ...prev,
+            data: {
+              ...prev.data,
+              hasServerStorage: false,
+              lastChecked: new Date()
+            },
             state: 'instagram_logged_out_server_unregistered',
             isServerRegistered: false,
             lastChecked: new Date()
@@ -397,6 +618,8 @@ export const useInstagramWebView = () => {
             description: "Your Instagram account has been disconnected.",
             variant: "default"
           });
+          // After disconnect, navigate WebView to the Instagram login page
+          return 'https://www.instagram.com/accounts/login/';
         } catch (error) {
           toast({
             title: "Disconnect Failed",
@@ -411,13 +634,49 @@ export const useInstagramWebView = () => {
         return 'https://www.instagram.com/';
         
       case 'login_instagram':
-        // Instagram 로그인 페이지로 이동
+        // 먼저 기존 세션 복원 시도
+        try {
+          console.log('Attempting to restore existing Instagram session for login...');
+          const restored = await restoreInstagramSession();
+          if (restored) {
+            console.log('Instagram session restored successfully for login');
+            setWebViewStatus((prev: InstagramWebViewStatus) => ({
+              ...prev,
+              data: {
+                ...prev.data,
+                isWebViewLoggedIn: true,
+                hasServerStorage: true,
+                lastChecked: new Date()
+              },
+              state: 'instagram_logged_in',
+              isInstagramLoggedIn: true,
+              isServerRegistered: true,
+              lastChecked: new Date()
+            }));
+            toast({
+              title: "Instagram Session Restored",
+              description: "Your Instagram session has been restored successfully.",
+              variant: "default"
+            });
+            navigate('/dashboard');
+            return null;
+          }
+        } catch (error) {
+          console.log('Failed to restore session for login, proceeding with new login:', error);
+        }
+        
+        // 세션 복원 실패 시 새로운 로그인 진행
         return 'https://www.instagram.com/accounts/login/';
         
       case 'logout_instagram':
         // Instagram 로그아웃 (실제로는 Instagram에서 로그아웃 처리)
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: false,
+            lastChecked: new Date()
+          },
           state: 'instagram_logged_out_server_registered',
           isInstagramLoggedIn: false,
           lastChecked: new Date()
@@ -441,12 +700,17 @@ export const useInstagramWebView = () => {
       default:
         return null;
     }
-  }, [disconnectAccount, toast, handleConfirmConnection, handleManualUsername]);
+  }, [disconnectAccount, toast, handleConfirmConnection, handleManualUsername, restoreInstagramSession, navigate]);
 
   // 초기 상태 설정
   useEffect(() => {
     setWebViewStatus((prev: InstagramWebViewStatus) => ({
       ...prev,
+      data: {
+        ...prev.data,
+        hasServerStorage: isConnected,
+        lastChecked: new Date()
+      },
       isServerRegistered: isConnected,
       state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered'
     }));

@@ -24,18 +24,26 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { disconnectAccount, instagramAccount } = useInstagram();
+  const { disconnectAccount, instagramAccount, prepareWebViewForState } = useInstagram();
   
   // Check URL parameters for initial URL and auto-execution
   const params = new URLSearchParams(location.search);
   const urlParam = params.get('url');
+  const freshParam = params.get('fresh') === '1';
   const autoExecute = params.get('autoExecute') === '1';
   const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
   
-  // Use URL parameter if provided, otherwise default to login page
-  const [currentUrl, setCurrentUrl] = useState<string>(
-    urlParam ? decodeURIComponent(urlParam) : 'https://www.instagram.com/accounts/login/'
-  );
+  // Use URL parameter if provided, otherwise default based on connection status
+  const getInitialUrl = () => {
+    if (urlParam) {
+      return decodeURIComponent(urlParam);
+    }
+    // If user is connected to server, go to main Instagram page (cookies will be injected before DOM ready)
+    // If not connected, go to login page
+    return instagramAccount ? 'https://www.instagram.com/' : 'https://www.instagram.com/accounts/login/';
+  };
+  
+  const [currentUrl, setCurrentUrl] = useState<string>(getInitialUrl());
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
   const profileCollectionServiceRef = useRef<ProfileCollectionService | null>(null);
@@ -64,6 +72,18 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       }
     }
   }, [urlParam, currentUrl]);
+
+  // Update currentUrl when Instagram account status changes
+  useEffect(() => {
+    if (!urlParam) { // Only update if not overridden by URL parameter
+      const newUrl = getInitialUrl();
+      if (newUrl !== currentUrl) {
+        console.log('[WebView] Instagram account status changed, updating URL:', newUrl);
+        console.log('[WebView] Previous URL:', currentUrl);
+        setCurrentUrl(newUrl);
+      }
+    }
+  }, [instagramAccount, urlParam, currentUrl]);
 
   // Log when currentUrl changes
   useEffect(() => {
@@ -163,7 +183,9 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     setIsLoading(false);
     setIsWebViewReady(true);
     console.log('[WebView] Load completed, WebView is ready');
-  }, []);
+    
+    // Instagram detection will be handled directly by WebView component on dom-ready
+  }, [currentUrl]);
 
   // WebView 에러 핸들러
   const handleWebViewError = useCallback((error: any) => {
@@ -189,7 +211,40 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const forceExtension = (() => {
     try { return new URLSearchParams(window.location.search).get('forceExtension') === '1'; } catch { return false; }
   })();
-  const extensionActive = (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) || forceExtension;
+
+  // Enhanced extension activation logic for automation context
+  const shouldActivateExtension = () => {
+    // Force extension if explicitly requested
+    if (forceExtension) return true;
+
+    // Original condition: Instagram login detected AND server registered
+    if (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) return true;
+
+    // Automation fallback: If server registered AND we're in automation context AND have stored session
+    // This handles cases where Instagram login detection fails but cookies were injected
+    const isAutomationContext = window.location.pathname === '/webview/automation' || minimal;
+    const hasStoredSession = !!instagramAccount?.cookies?.sessionid;
+    const isServerRegistered = webViewStatus.isServerRegistered || !!instagramAccount;
+
+    if (isAutomationContext && isServerRegistered && hasStoredSession) {
+      console.log('🔧 Activating extension in automation context despite login detection failure');
+      console.log('Context:', { isAutomationContext, isServerRegistered, hasStoredSession });
+      return true;
+    }
+
+    return false;
+  };
+
+  const extensionActive = shouldActivateExtension();
+
+  console.log('[InstagramWebViewManager] Debug render state:', {
+    extensionActive,
+    webViewStatus: webViewStatus.state,
+    isInstagramLoggedIn: webViewStatus.isInstagramLoggedIn,
+    isServerRegistered: webViewStatus.isServerRegistered,
+    instagramAccount: !!instagramAccount,
+    modal: { showConfirmModal: modalState.showConfirmModal, showManualModal: modalState.showManualModal }
+  });
 
   // Block-only handler: physical mouse events are blocked from reaching the WebView
   const blockOnly = useCallback((e: React.SyntheticEvent) => {
@@ -356,8 +411,9 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         instagramAccount.username,
         userBenchmark,
         {
-          scrollDelay: 2000,
-          pageLoadDelay: 3000,
+          // Faster defaults; logic will poll for readiness instead of fixed waits
+          scrollDelay: 600,
+          pageLoadDelay: 1200,
           onProgress: (current: number, total: number, status: string) => {
             setAutomationProgress({ current, total });
             setAutomationStatus(status);
@@ -392,10 +448,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // Auto-execute automation after 5 seconds when autoExecute is true
   useEffect(() => {
     if (autoExecute && isWebViewReady && extensionActive && !isRunningAutomation) {
+      const startDelay = 1500 + Math.floor(Math.random() * 1200); // 1.5s - 2.7s
       const timer = setTimeout(() => {
-        console.log('[Auto-Execute] Starting automation after 5 seconds...');
+        console.log(`[Auto-Execute] Starting automation after ~${startDelay}ms...`);
         startAutomation();
-      }, 5000);
+      }, startDelay);
       
       return () => clearTimeout(timer);
     }
@@ -404,10 +461,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // Auto-execute following collection when autoCollectFollowing is true
   useEffect(() => {
     if (autoCollectFollowing && isWebViewReady && extensionActive && !isCollectingFollowing) {
+      const startDelay = 1500 + Math.floor(Math.random() * 1200);
       const timer = setTimeout(() => {
-        console.log('[Auto-Collect] Starting following collection after 5 seconds...');
+        console.log(`[Auto-Collect] Starting following collection after ~${startDelay}ms...`);
         startFollowingCollection();
-      }, 5000);
+      }, startDelay);
       
       return () => clearTimeout(timer);
     }
@@ -415,7 +473,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   // Instagram 로그인 감지 핸들러
   const handleInstagramLogin = useCallback((sessionData: any) => {
-    handleInstagramLoginDetected(sessionData);
+    handleInstagramLoginDetected(sessionData, window.location.pathname);
   }, [handleInstagramLoginDetected]);
 
   // 상태바 아이콘 렌더링
@@ -449,7 +507,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   };
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* Header, Status, and Actions hidden in minimal mode */}
       {!minimal && (
         <>
@@ -502,11 +560,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           <div className="flex items-center justify-between p-4 bg-black/10 border-b border-black/20">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => handleActionClick(uiConfig.primaryAction.action)}
-                variant={uiConfig.primaryAction.variant || 'default'}
+                onClick={() => uiConfig.primaryAction?.action && handleActionClick(uiConfig.primaryAction.action)}
+                variant={uiConfig.primaryAction?.variant || 'default'}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
               >
-                {uiConfig.primaryAction.label}
+                {uiConfig.primaryAction?.label}
               </Button>
               
               {uiConfig.secondaryAction && (
@@ -521,14 +579,14 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
             </div>
             
             <div className="text-xs text-white/60">
-              {webViewStatus.lastChecked.toLocaleTimeString()}
+              {webViewStatus.lastChecked?.toLocaleTimeString()}
             </div>
           </div>
         </>
       )}
 
       {/* WebView Container */}
-      <div className="flex-1 relative" id="ig-webview-container">
+      <div className="flex-1 relative min-h-0" id="ig-webview-container">
         <WebView
           ref={webviewApiRef}
           src={currentUrl}
@@ -538,8 +596,12 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           onLoginStatusCheck={handleInstagramStatusCheck}
           onUrlChange={handleUrlChange}
           instagramState={webViewStatus.state}
+          freshPartition={freshParam}
           enableExtension={extensionActive}
-          disablePointerEvents={extensionActive && blockNativeInput}
+          onPrepareWebView={prepareWebViewForState}
+          obscured={modalState.showConfirmModal || modalState.showManualModal}
+          // Do not block native pointer events until server registration is done
+          disablePointerEvents={extensionActive && blockNativeInput && webViewStatus.isServerRegistered}
           className="w-full h-full"
         />
 
@@ -587,26 +649,22 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         )}
       </div>
 
-      {/* Modals (hidden in minimal mode) */}
-      {!minimal && (
-        <>
-          <InstagramUsernameConfirmModal
-            open={modalState.showConfirmModal}
-            username={modalState.detectedUsername || ''}
-            sessionData={modalState.detectedSessionData}
-            onConfirm={handleConfirmConnection}
-            onCancel={handleManualUsername}
-          />
-          
-          <InstagramManualUsernameModal
-            open={modalState.showManualModal}
-            sessionData={modalState.detectedSessionData}
-            onConfirm={handleManualUsernameConfirm}
-            onSecondary={handleClearAndExit}
-            secondaryLabel="Disconnect"
-          />
-        </>
-      )}
+      {/* Modals (always rendered; minimal hides headers only) */}
+      <InstagramUsernameConfirmModal
+        open={modalState.showConfirmModal}
+        username={modalState.detectedUsername || ''}
+        sessionData={modalState.detectedSessionData}
+        onConfirm={handleConfirmConnection}
+        onCancel={handleManualUsername}
+      />
+      
+      <InstagramManualUsernameModal
+        open={modalState.showManualModal}
+        sessionData={modalState.detectedSessionData}
+        onConfirm={handleManualUsernameConfirm}
+        onSecondary={handleClearAndExit}
+        secondaryLabel="Disconnect"
+      />
     </div>
   );
 };

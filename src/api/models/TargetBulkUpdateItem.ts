@@ -2,8 +2,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export type InstagramConnectRequest = {
-    username: string;
-    cookies?: (Record<string, any> | null);
+import type { StageEnum } from './StageEnum';
+export type TargetBulkUpdateItem = {
+    ig_username: string;
+    stage: StageEnum;
 };
 

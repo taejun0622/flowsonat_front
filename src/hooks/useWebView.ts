@@ -14,7 +14,12 @@ export const useWebView = (): UseWebViewReturn => {
   });
 
   const openWebView = useCallback((url: string) => {
-    navigate(`/webview?url=${encodeURIComponent(url)}`);
+    const lower = (url || '').toLowerCase();
+    if (lower.includes('instagram.com/accounts/login')) {
+      navigate('/webview/login');
+    } else {
+      navigate(`/webview/automation?url=${encodeURIComponent(url)}`);
+    }
   }, [navigate]);
 
   const openInBrowser = useCallback((url: string) => {
