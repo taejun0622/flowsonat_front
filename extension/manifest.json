@@ -22,12 +22,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["cursor.svg", "cursor.png"],
-      "matches": ["https://www.instagram.com/*"]
-    }
-  ],
   "action": {
     "default_title": "FlowSonat Controller",
     "default_icon": {

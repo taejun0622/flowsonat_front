@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate, TargetBulkUpdate } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -197,6 +197,17 @@ export class AutomationService {
         // Wait for a common layout element on profile/suggested pages
         await this.waitForSelector('main, header', 1500);
       } catch {}
+      
+      // Check for page unavailable error after navigation
+      try {
+        const isPageUnavailable = await this.checkForPageUnavailableError();
+        if (isPageUnavailable) {
+          console.log(`[Automation] Page unavailable detected after navigation to ${profileUrl}`);
+          // Don't throw error, let the caller handle the page unavailable state
+        }
+      } catch (error) {
+        console.warn('[Automation] Error checking for page unavailable after navigation:', error);
+      }
 
       // Collect profile information and send to history API
       try {
@@ -336,6 +347,20 @@ export class AutomationService {
           // Small human-like settle before interacting
           await this.randomDelay(200, 600);
           
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username}, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            unfollowedCount++;
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
+          
           // Check if unfollow button exists and click it
           const unfollowed = await this.clickUnfollowButton();
           if (unfollowed) {
@@ -391,6 +416,13 @@ export class AutomationService {
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
           await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Benchmark profile ${benchmark.ig.username} is unavailable, skipping target collection`);
+            continue;
+          }
           
           // Check if follow button exists
           const canFollow = await this.checkIfCanFollow();
@@ -516,6 +548,19 @@ export class AutomationService {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
           await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username} during follow, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
           
           // Check if we can follow
           const canFollow = await this.checkIfCanFollow();
@@ -844,6 +889,32 @@ export class AutomationService {
     }
   }
 
+  private async getAllRequestedTargets(): Promise<TargetResponse[]> {
+    try {
+      // Get all targets with REQUESTED stage (no date filtering)
+      const allTargets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
+        this.benchmark.id,
+        StageEnum.REQUESTED
+      );
+      
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      let targetsArray: TargetResponse[] = [];
+      if (Array.isArray(allTargets)) {
+        targetsArray = allTargets;
+      } else if (allTargets && Array.isArray(allTargets.targets)) {
+        targetsArray = allTargets.targets;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', allTargets);
+        return [];
+      }
+      
+      return targetsArray;
+    } catch (error) {
+      console.error('[Automation] Get all requested targets error:', error);
+      return [];
+    }
+  }
+
   private async getPendingTargets(): Promise<TargetResponse[]> {
     try {
       const targets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
@@ -1049,49 +1120,68 @@ export class AutomationService {
   }
 
   /**
-   * Send followers to API using BulkFollowRequest1
-   * Multiple followers following one account (my account)
+   * Send followers to API using TargetBulkUpdate
+   * Update only REQUESTED stage followers to FOLLOW_BACK
    */
   private async sendFollowersToAPI(followers: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${followers.length} followers to API...`);
+      console.log(`[Automation] Filtering REQUESTED stage targets from ${followers.length} followers...`);
+      
+      // Get all REQUESTED stage targets (no date filtering)
+      const requestedTargets = await this.getAllRequestedTargets();
+      console.log(`[Automation] Found ${requestedTargets.length} REQUESTED stage targets`);
+      
+      // Filter followers that are in REQUESTED stage targets
+      const requestedUsernames = requestedTargets.map(target => target.ig.username);
+      const followersToUpdate = followers.filter(follower => 
+        requestedUsernames.includes(follower)
+      );
+      
+      console.log(`[Automation] Found ${followersToUpdate.length} followers that are REQUESTED stage targets`);
+      
+      if (followersToUpdate.length === 0) {
+        console.log(`[Automation] No REQUESTED stage followers found to update`);
+        return;
+      }
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 followers at a time
       const batches = [];
       
-      for (let i = 0; i < followers.length; i += batchSize) {
-        batches.push(followers.slice(i, i + batchSize));
+      for (let i = 0; i < followersToUpdate.length; i += batchSize) {
+        batches.push(followersToUpdate.slice(i, i + batchSize));
       }
       
       let totalSent = 0;
       for (const batch of batches) {
         try {
-          const bulkRequest: BulkFollowRequest1 = {
-            follower_usernames: batch,
-            following_username: this.instagramUsername
+          const bulkUpdateRequest: TargetBulkUpdate = {
+            updates: batch.map(username => ({
+              ig_username: username,
+              stage: StageEnum.FOLLOW_BACK
+            }))
           };
           
-          await InstagramService.updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
-            bulkRequest
+          await InstagramService.bulkUpdateTargetsApiV1InstagramTargetsBulkPut(
+            bulkUpdateRequest
           );
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} followers to API (${totalSent}/${followers.length})`);
+          console.log(`[Automation] Updated ${batch.length} REQUESTED followers to FOLLOW_BACK stage (${totalSent}/${followersToUpdate.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send followers batch:`, error);
+          console.error(`[Automation] Failed to update followers batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${followers.length} followers to API`);
+      console.log(`[Automation] Successfully updated ${totalSent}/${followersToUpdate.length} REQUESTED followers to FOLLOW_BACK stage`);
       
     } catch (error) {
-      console.error('[Automation] Error sending followers to API:', error);
+      console.error('[Automation] Error updating REQUESTED followers to FOLLOW_BACK stage:', error);
     }
   }
 
@@ -1101,7 +1191,7 @@ export class AutomationService {
    */
   private async sendFollowingToAPI(following: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${following.length} following to API...`);
+      console.log(`[Automation] Would send ${following.length} following to API (API call disabled)...`);
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 following at a time
@@ -1119,26 +1209,25 @@ export class AutomationService {
             following_usernames: batch
           };
           
-          await InstagramService.updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
-            bulkRequest
-          );
+          // API call removed - just log what would be sent
+          console.log(`[Automation] Would send batch of ${batch.length} following:`, bulkRequest);
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} following to API (${totalSent}/${following.length})`);
+          console.log(`[Automation] Would send ${batch.length} following to API (${totalSent}/${following.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send following batch:`, error);
+          console.error(`[Automation] Failed to process following batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${following.length} following to API`);
+      console.log(`[Automation] Would have sent ${totalSent}/${following.length} following to API`);
       
     } catch (error) {
-      console.error('[Automation] Error sending following to API:', error);
+      console.error('[Automation] Error processing following:', error);
     }
   }
 
@@ -1184,6 +1273,70 @@ export class AutomationService {
     const min = Math.floor(base * (1 - jitter));
     const max = Math.floor(base * (1 + jitter));
     return this.randomDelay(min, max);
+  }
+
+  /**
+   * Check if the current page shows "Sorry, this page isn't available" error
+   */
+  private async checkForPageUnavailableError(): Promise<boolean> {
+    try {
+      const result = await this.webviewApi.executeScript(`
+        (function() {
+          try {
+            // Look for the "Sorry, this page isn't available" error message
+            const errorTexts = [
+              "Sorry, this page isn't available",
+              "Sorry, this page isn't available.",
+              "Sorry, this page isn't available.",
+              "This page isn't available",
+              "Page not found",
+              "User not found"
+            ];
+            
+            // Check page title
+            const title = document.title || '';
+            if (errorTexts.some(text => title.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for error messages in the page content
+            const bodyText = document.body ? document.body.innerText || document.body.textContent || '' : '';
+            if (errorTexts.some(text => bodyText.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for specific error elements
+            const errorSelectors = [
+              'h2:contains("Sorry, this page isn\'t available")',
+              '[data-testid="error-page"]',
+              '.error-page',
+              'main h2',
+              'main h1'
+            ];
+            
+            for (const selector of errorSelectors) {
+              const elements = document.querySelectorAll(selector);
+              for (const element of elements) {
+                const text = element.innerText || element.textContent || '';
+                if (errorTexts.some(errorText => text.toLowerCase().includes(errorText.toLowerCase()))) {
+                  return true;
+                }
+              }
+            }
+            
+            return false;
+          } catch (e) {
+            console.error('Error checking for page unavailable:', e);
+            return false;
+          }
+        })();
+      `);
+      
+      return result === true;
+    } catch (error) {
+      console.error('[Automation] Error checking for page unavailable:', error);
+      return false;
+    }
   }
 
   /**
