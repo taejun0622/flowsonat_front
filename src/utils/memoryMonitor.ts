@@ -52,8 +52,26 @@ class MemoryMonitor {
    * 현재 메모리 사용량 정보를 가져옵니다
    */
   private getCurrentMemoryInfo(): MemoryStats {
-    const memory = process.memoryUsage();
+    const hasNodeProcess = typeof process !== 'undefined' && typeof (process as any).memoryUsage === 'function';
     const timestamp = Date.now();
+    
+    if (!hasNodeProcess) {
+      // Browser-safe fallback to avoid crashes in isolated renderer
+      const zero = { rss: 0, heapUsed: 0, heapTotal: 0, external: 0, arrayBuffers: 0 } as any;
+      return {
+        timestamp,
+        memory: zero,
+        formatted: {
+          rss: this.formatMemory(0),
+          heapUsed: this.formatMemory(0),
+          heapTotal: this.formatMemory(0),
+          external: this.formatMemory(0),
+          arrayBuffers: this.formatMemory(0),
+        },
+      };
+    }
+
+    const memory = (process as any).memoryUsage();
 
     return {
       timestamp,
@@ -131,6 +149,13 @@ class MemoryMonitor {
   startMonitoring(intervalMs: number = 30000): void {
     if (this.isMonitoring) {
       console.warn('Memory monitoring is already running');
+      return;
+    }
+    
+    const hasNodeProcess = typeof process !== 'undefined' && typeof (process as any).memoryUsage === 'function';
+    if (!hasNodeProcess) {
+      // Skip in pure browser/isolated renderer without Node process
+      console.log('ℹ️ Memory monitoring disabled (no Node process available)');
       return;
     }
 
@@ -248,9 +273,14 @@ class MemoryMonitor {
 export const memoryMonitor = MemoryMonitor.getInstance();
 
 // 개발 환경에서 자동으로 모니터링 시작
-if (process.env.NODE_ENV === 'development') {
-  // 30초마다 메모리 사용량 체크
-  memoryMonitor.startMonitoring(30000);
+try {
+  // Only auto-start in dev and when Node process is available
+  // eslint-disable-next-line no-undef
+  if (process?.env?.NODE_ENV === 'development') {
+    memoryMonitor.startMonitoring(30000);
+  }
+} catch {
+  // Ignore when process/env is unavailable
 }
 
 // 전역 객체에 추가 (디버깅용)

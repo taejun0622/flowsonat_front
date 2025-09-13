@@ -19,6 +19,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │
 process.env.APP_ROOT = path.join(__dirname, '..')
 
+// Mitigations for stability on recent macOS + Electron/V8 stacks
+// - Disable GPU to avoid potential driver/GPU-process crashes
+// - Run V8 in jitless mode to avoid rare JIT-related crashes
+//   (can be toggled off later if unnecessary)
+try {
+  if (process.platform === 'darwin') {
+    // Disable GPU only when explicitly requested to avoid blank webview issues on some macOS setups
+    if (process.env.ELECTRON_DISABLE_GPU === '1') {
+      app.disableHardwareAcceleration()
+      console.log('[Electron] Hardware acceleration disabled via ELECTRON_DISABLE_GPU=1')
+    } else {
+      console.log('[Electron] Hardware acceleration enabled (default)')
+    }
+    // IMPORTANT: Do not enable V8 jitless here — it disables WebAssembly in many
+    // Chromium/V8 builds and breaks sites like Instagram/Facebook login flows.
+    // If you ever need jitless for stability, guard it behind an env flag.
+    // Example:
+    // if (process.env.ELECTRON_JITLESS === '1') {
+    //   app.commandLine.appendSwitch('js-flags', '--jitless')
+    // }
+  }
+} catch (e) {
+  console.warn('Failed to apply V8/GPU mitigations', e)
+}
+
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
@@ -144,9 +169,15 @@ function createWindow() {
         webContents.on('crashed', () => {
           console.warn('WebView crashed, attempting to recover')
         })
-        
         webContents.on('unresponsive', () => {
           console.warn('WebView became unresponsive')
+        })
+        webContents.on('render-process-gone', (_e, details) => {
+          console.error('WebView render-process-gone:', details)
+          win?.webContents.send('ig:webview-gone', details)
+        })
+        webContents.on('child-process-gone', (_e, details) => {
+          console.error('WebView child-process-gone:', details)
         })
         
       } catch {/* no-op */}
@@ -324,6 +355,204 @@ ipcMain.handle('get-update-status', async () => {
     updateInfo,
     currentVersion: app.getVersion()
   };
+});
+
+// ========== Instagram/WebView session helpers ==========
+// Inject cookies into the persistent IG partition
+async function injectInstagramCookies(cookies: Record<string, any>): Promise<boolean> {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const cookieList = Object.entries(cookies || {});
+    if (!cookieList.length) {
+      console.log('No cookies to inject');
+      return false;
+    }
+
+    console.log(`Injecting ${cookieList.length} cookies:`, cookieList.map(([name]) => name));
+
+    // Use secure URL for cookie scope
+    const url = 'https://www.instagram.com';
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    // Load existing cookies to preserve httpOnly flags and avoid overwrite errors
+    const existingA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const existingB = await igSession.cookies.get({ domain: '.instagram.com' });
+    const existingByName: Record<string, Electron.Cookie> = {};
+    for (const c of [...existingA, ...existingB]) {
+      if (!c || !c.name) continue;
+      if (!(c.name in existingByName)) existingByName[c.name] = c;
+    }
+
+    const KNOWN_HTTP_ONLY = new Set(['sessionid', 'rur', 'datr', 'ig_did']);
+
+    for (const [name, value] of cookieList) {
+      try {
+        const existing = existingByName[name];
+        const desiredValue = String(value);
+        const isHttpOnly = existing?.httpOnly || KNOWN_HTTP_ONLY.has(name);
+
+        // Skip update if same value already set
+        if (existing && existing.value === desiredValue) {
+          console.log(`⏭️  Skipping cookie (unchanged): ${name}`);
+          successCount++;
+          continue;
+        }
+
+        const cookieDetails = {
+          url,
+          name,
+          value: desiredValue,
+          domain: '.instagram.com',
+          path: '/',
+          secure: true,
+          httpOnly: isHttpOnly,
+          sameSite: 'lax' as const,
+        };
+
+        await igSession.cookies.set(cookieDetails);
+        console.log(`✅ Cookie injected: ${name}`);
+        successCount++;
+      } catch (cookieError) {
+        console.error(`❌ Failed to inject cookie ${name}:`, cookieError);
+        failureCount++;
+      }
+    }
+    
+    console.log(`Cookie injection result: ${successCount} success, ${failureCount} failed`);
+    
+    // Verify injected cookies
+    const injectedCookies = await igSession.cookies.get({ url });
+    console.log(`Verification: ${injectedCookies.length} cookies now in session:`, 
+      injectedCookies.map(c => c.name));
+    
+    return successCount > 0;
+  } catch (e) {
+    console.error('injectInstagramCookies failed:', e);
+    return false;
+  }
+}
+
+// Clear cookies and storage for Instagram in IG partition
+async function clearInstagramDataForPartition(): Promise<boolean> {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    // Clear cookies for instagram domains
+    const all = await igSession.cookies.get({ domain: 'instagram.com' });
+    for (const c of all) {
+      try {
+        await igSession.cookies.remove('https://' + (c.domain?.startsWith('.') ? c.domain.substring(1) : c.domain), c.name);
+      } catch {}
+    }
+
+    // Clear storage data for Instagram origins
+    await igSession.clearStorageData({
+      origin: 'https://www.instagram.com',
+      storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage'],
+    });
+    await igSession.clearCache();
+    return true;
+  } catch (e) {
+    console.error('clearInstagramDataForPartition failed:', e);
+    return false;
+  }
+}
+
+// IPC: legacy and current channels used by renderer
+ipcMain.handle('inject-cookies-to-webview', async (_event, cookies) => {
+  return injectInstagramCookies(cookies || {});
+});
+
+ipcMain.handle('clear-webview-cookies', async () => {
+  return clearInstagramDataForPartition();
+});
+
+// Aliases used by preload/renderer
+ipcMain.handle('ig:inject-cookies', async (_event, cookies) => {
+  return injectInstagramCookies(cookies || {});
+});
+
+ipcMain.handle('ig:clear-instagram-data', async (_event, _webContentsId?: number) => {
+  // For now, clear the known IG partition regardless of id
+  return clearInstagramDataForPartition();
+});
+
+// Get cookies for instagram.com from IG partition
+ipcMain.handle('ig:get-instagram-cookies', async () => {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const listA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const listB = await igSession.cookies.get({ domain: '.instagram.com' });
+    // de-duplicate by name
+    const all = [...listA, ...listB];
+    const byName: Record<string, string> = {};
+    for (const c of all) {
+      if (c && c.name) byName[c.name] = c.value ?? '';
+    }
+    return { cookies: byName, raw: all };
+  } catch (e) {
+    console.error('get-instagram-cookies failed:', e);
+    return { cookies: {}, raw: [] };
+  }
+});
+
+// Get current user info via IG partition cookies
+ipcMain.handle('ig:get-current-user', async () => {
+  try {
+    const igSession = session.fromPartition('persist:ig');
+    const listA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const listB = await igSession.cookies.get({ domain: '.instagram.com' });
+    const all = [...listA, ...listB];
+    const cookieMap: Record<string, string> = {};
+    const cookiePairs: string[] = [];
+    for (const c of all) {
+      if (c && c.name) {
+        cookieMap[c.name] = c.value ?? '';
+        cookiePairs.push(`${c.name}=${c.value ?? ''}`);
+      }
+    }
+    const cookieHeader = cookiePairs.join('; ');
+
+    const https = require('https');
+    const options = {
+      method: 'GET',
+      hostname: 'www.instagram.com',
+      path: '/api/v1/accounts/current_user/?edit=true',
+      headers: {
+        'Cookie': cookieHeader,
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://www.instagram.com/',
+      }
+    };
+
+    const result = await new Promise<{ status: number; body: any }>((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk: any) => { data += chunk; });
+        res.on('end', () => {
+          let parsed: any = null;
+          try { parsed = JSON.parse(data); } catch { parsed = null; }
+          resolve({ status: res.statusCode || 0, body: parsed ?? data });
+        });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    if (result.status === 200 && result.body) {
+      const body = result.body as any;
+      const username = (body?.user?.username) || body?.username || null;
+      const dsUserId = String((body?.user?.pk) || body?.user?.id || body?.user_id || cookieMap['ds_user_id'] || '');
+      return { ok: true, username, dsUserId, cookies: cookieMap };
+    }
+
+    return { ok: false, status: result.status };
+  } catch (e) {
+    console.error('ig:get-current-user failed:', e);
+    return { ok: false, error: String(e) };
+  }
 });
 
 // GA4 Analytics handlers
@@ -644,58 +873,225 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  /** Clear Instagram domain-specific data */
-  async function clearInstagramData(partition = 'persist:ig') {
-    const sess = session.fromPartition(partition)
-
-    // 1) Delete origin-based storage/cache
-    await sess.clearStorageData({
-      origin: 'https://www.instagram.com',
-      storages: [
-        'cookies',
-        'localstorage',
-        'indexdb',
-        'serviceworkers',
-        'cachestorage',
-        'websql',
-        'filesystem',
-      ],
-      quotas: ['temporary'],
-    })
-
-    // 2) Clear all cookies
-    try {
-      const cookies = await sess.cookies.get({})
-      for (const cookie of cookies) {
-        const cookieUrl = `https://${cookie.domain}${cookie.path}`
-        await sess.cookies.remove(cookieUrl, cookie.name)
-      }
-      console.log('Cleared all cookies')
-    } catch (error) {
-      console.error('Failed to clear cookies:', error)
-    }
-
-    // 3) Clear auth cache (HTTP auth)
-    await sess.clearAuthCache()
-
-    // 4) Force changes to be written to disk
-    await sess.cookies.flushStore()
-    await sess.clearCache()
-  }
-
-  /** Renderer request: Clear Instagram session */
-  ipcMain.handle('ig:clear-session', async () => {
-    await clearInstagramData('persist:ig')
-    return true
+  // Log main window render process issues
+  win?.webContents.on('render-process-gone', (_e, details) => {
+    console.error('Renderer render-process-gone:', details)
+  })
+  win?.webContents.on('child-process-gone', (_e, details) => {
+    console.error('Renderer child-process-gone:', details)
   })
 
-  /** Renderer request: Clear Instagram session and reload */
-  ipcMain.handle('ig:disconnect-and-reload', async () => {
-    await clearInstagramData('persist:ig')
-    if (win) {
-      win.webContents.send('ig:reload-webview')
+  /** Clear Instagram domain-specific data - COMPLETE NUCLEAR OPTION */
+  async function clearInstagramData(partition = 'persist:ig') {
+    console.log(`🧹 Starting complete Instagram data cleanup for partition: ${partition}`)
+    const sess = session.fromPartition(partition)
+
+    try {
+      // Helper to normalize cookie removal URL
+      const buildCookieRemovalUrl = (cookie: Electron.Cookie) => {
+        const secure = cookie.secure ? 'https://' : 'http://'
+        const domain = (cookie.domain || '').replace(/^\./, '') || 'instagram.com'
+        const path = cookie.path || '/'
+        return `${secure}${domain}${path}`
+      }
+
+      const igOrigins = [
+        'https://www.instagram.com',
+        'https://instagram.com',
+        'https://i.instagram.com',
+        'https://static.cdninstagram.com',
+        'https://edge-chat.instagram.com',
+      ]
+
+      // 1) Delete origin-based storage/cache (Instagram specific)
+      console.log('🗑️ Clearing Instagram-specific storage data...')
+      for (const origin of igOrigins) {
+        try {
+          await sess.clearStorageData({
+            origin,
+            storages: [
+              'cookies',
+              'localstorage',
+              'indexdb',
+              'serviceworkers',
+              'cachestorage',
+              'websql',
+              'filesystem',
+            ],
+            quotas: ['temporary', 'persistent'],
+          })
+          console.log(`  ✅ Cleared storage for ${origin}`)
+        } catch (e) {
+          console.warn(`  ⚠️ Failed clearing storage for ${origin}:`, e)
+        }
+      }
+
+      // 2) Clear ALL cookies (not just Instagram)
+      console.log('🍪 Clearing ALL cookies...')
+      try {
+        const cookies = await sess.cookies.get({})
+        console.log(`Found ${cookies.length} cookies to clear`)
+        
+        for (const cookie of cookies) {
+          try {
+            const url = buildCookieRemovalUrl(cookie)
+            await sess.cookies.remove(url, cookie.name)
+            console.log(`Removed cookie: ${cookie.name} (${url})`)
+          } catch (cookieError) {
+            console.warn(`Failed to remove cookie ${cookie.name}:`, cookieError)
+          }
+        }
+        console.log('✅ All cookies cleared')
+      } catch (error) {
+        console.error('❌ Failed to clear cookies:', error)
+      }
+
+      // 3) Clear auth cache (HTTP auth)
+      console.log('🔐 Clearing auth cache...')
+      await sess.clearAuthCache()
+
+      // 4) Clear ALL storage data (nuclear option)
+      console.log('💥 Clearing ALL storage data (nuclear option)...')
+      await sess.clearStorageData({
+        storages: [
+          'cookies',
+          'localstorage',
+          'indexdb',
+          'serviceworkers',
+          'cachestorage',
+          'websql',
+          'filesystem',
+        ],
+        quotas: ['temporary', 'persistent'],
+      })
+
+      // 5) Clear cache
+      console.log('🗂️ Clearing cache...')
+      await sess.clearCache()
+
+      // 6) Force changes to be written to disk
+      console.log('💾 Flushing changes to disk...')
+      await sess.cookies.flushStore()
+
+      // 6.5) Try clearing host resolver cache (just in case)
+      try { await (sess as any).clearHostResolverCache?.() } catch (e) { console.warn('clearHostResolverCache failed', e) }
+
+      // 7) Clear all partitions (if partition is default)
+      if (partition === 'persist:ig') {
+        console.log('🌐 Clearing all Instagram-related partitions...')
+        try {
+          // Clear default partition too
+          const defaultSess = session.defaultSession
+          for (const origin of igOrigins) {
+            try {
+              await defaultSess.clearStorageData({
+                origin,
+                storages: [
+                  'cookies',
+                  'localstorage',
+                  'indexdb',
+                  'serviceworkers',
+                  'cachestorage',
+                  'websql',
+                  'filesystem',
+                ],
+                quotas: ['temporary', 'persistent'],
+              })
+              console.log(`  ✅ Cleared default storage for ${origin}`)
+            } catch (e) {
+              console.warn(`  ⚠️ Failed default storage clear for ${origin}:`, e)
+            }
+          }
+          await defaultSess.clearCache()
+          await defaultSess.clearAuthCache()
+          console.log('✅ Default partition cleared')
+        } catch (defaultError) {
+          console.warn('⚠️ Failed to clear default partition:', defaultError)
+        }
+      }
+
+      console.log('🎉 Complete Instagram data cleanup finished!')
+    } catch (error) {
+      console.error('❌ Error during Instagram data cleanup:', error)
     }
-    return true
+  }
+
+
+  
+
+  
+
+  
+
+
+  /** Renderer request: Clear WebView cookies */
+  ipcMain.handle('clear-webview-cookies', async () => {
+    try {
+      console.log('🧹 Clearing WebView cookies...')
+      
+      // Instagram 세션의 모든 쿠키 삭제
+      const igSession = session.fromPartition('persist:ig')
+      await igSession.clearStorageData({
+        storages: ['cookies', 'localStorage', 'sessionStorage', 'indexeddb', 'websql']
+      })
+      
+      console.log('✅ WebView cookies cleared successfully')
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Failed to clear WebView cookies:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  /** Renderer request: Inject cookies to Instagram WebView (unified) */
+  ipcMain.handle('ig:inject-cookies', async (_event, cookies: Record<string, any>) => {
+    try {
+      return await injectInstagramCookies(cookies || {});
+    } catch (e) {
+      console.error('Failed to inject cookies (unified handler):', e);
+      return false;
+    }
+  })
+
+  /** Renderer request: Clear Instagram data for specific web contents */
+  ipcMain.handle('ig:clear-instagram-data', async (event, webContentsId?: number) => {
+    try {
+      console.log('Clearing Instagram data for web contents:', webContentsId)
+      
+      // 기본 Instagram 파티션 정리
+      await clearInstagramData('persist:ig')
+      
+      // 특정 WebContents ID가 제공된 경우 해당 WebContents의 세션도 정리
+      if (webContentsId) {
+        const webContents = win?.webContents
+        if (webContents && webContents.id === webContentsId) {
+          // WebView 내부 데이터 정리
+          await webContents.executeJavaScript(`
+            // 모든 WebView 요소 찾기
+            const webviews = document.querySelectorAll('webview');
+            webviews.forEach(webview => {
+              try {
+                webview.executeJavaScript(\`
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                  });
+                \`);
+              } catch (e) {
+                console.warn('Failed to clear WebView data:', e);
+              }
+            });
+          `)
+        }
+      }
+      
+      console.log('Instagram data cleared successfully')
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to clear Instagram data:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
   })
 
   // Check for updates on app start (only when not in development mode)

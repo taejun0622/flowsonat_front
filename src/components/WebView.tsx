@@ -43,6 +43,12 @@ interface WebViewProps {
   instagramState?: string; // Instagram 상태 추가
   enableExtension?: boolean; // 확장프로그램 활성화 여부
   disablePointerEvents?: boolean; // 사용자 물리적 입력 차단
+  onPrepareWebView?: (serverRegistered: boolean) => Promise<boolean>; // WebView 준비 콜백
+  // Optional: when true, a parent intends to mount WebView on a fresh partition.
+  // Current implementation ignores it to keep changes minimal for stability.
+  freshPartition?: boolean;
+  // When true, temporarily hide the guest view (webview) for overlay/modals to show above.
+  obscured?: boolean;
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -55,30 +61,75 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   className = "",
   instagramState,
   enableExtension = false,
-  disablePointerEvents = false
+  disablePointerEvents = false,
+  onPrepareWebView,
+  obscured = false
 }, ref) => {
   const webviewRef = useRef<any>(null);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  // If server is registered, defer navigation until cookies are injected
+  const serverRegistered = !!instagramState && (
+    instagramState === 'instagram_logged_out_server_registered' ||
+    instagramState === 'instagram_logged_in_server_registered'
+  );
+  const shouldDeferInitialLoad = Boolean(src?.includes('instagram.com') && serverRegistered && onPrepareWebView);
+
+  // Start with about:blank when we need to inject cookies first
+  const [currentSrc, setCurrentSrc] = useState(shouldDeferInitialLoad ? 'about:blank' : src);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
   const [forceReload, setForceReload] = useState(0); // 강제 리렌더링을 위한 상태
   const [extensionActive, setExtensionActive] = useState(false);
   const [isDomReady, setIsDomReady] = useState(false);
+  const isDomReadyRef = useRef(false);
+  const domReadyResolversRef = useRef<((ready: boolean) => void)[]>([]);
+  const lastDomWarnAtRef = useRef<number>(0);
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const injectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const injectionAttemptsRef = useRef(0);
+  const destroyedRef = useRef(false);
+  const preparingRef = useRef(false);
+  const preparedOnceRef = useRef(false);
+  const loginRedirectedRef = useRef(false);
 
   // Helper function to safely execute JavaScript in WebView
-  const safeExecuteJavaScript = async (script: string, retries = 3): Promise<any> => {
-    const webview = webviewRef.current;
-    if (!webview || !isDomReady) {
+  const safeExecuteJavaScript = async (script: string, retries = 3, forceExecute = false): Promise<any> => {
+    const webview = webviewRef.current as any;
+    // Ensure DOM-ready and the <webview> is still attached to DOM
+    // For forced execution (automation), be more permissive
+    if (!webview) {
       console.warn('WebView not ready for JavaScript execution');
       return null;
     }
 
+    if (!forceExecute && !(webview.isConnected ?? document.body.contains(webview))) {
+      console.warn('WebView not ready for JavaScript execution');
+      return null;
+    }
+    
+    // Check DOM ready only if not forcing execution
+    if (!forceExecute && !isDomReadyRef.current) {
+      console.warn('WebView DOM not ready for JavaScript execution');
+      return null;
+    }
+
+    // Additional safety check: verify webview is still functional
+    // Only block execution for blank page if not forcing execution
+    if (!forceExecute && typeof webview.getURL === 'function') {
+      const currentUrl = webview.getURL();
+      if (!currentUrl || currentUrl === 'about:blank') {
+        console.warn('WebView not fully loaded (blank page), skipping script execution');
+        return null;
+      }
+    }
+
     for (let i = 0; i < retries; i++) {
       try {
-        // Check if WebView is properly attached and ready
         if (webview.executeJavaScript && typeof webview.executeJavaScript === 'function') {
+          // Avoid running while main frame is loading
+          if (typeof webview.isLoadingMainFrame === 'function' && webview.isLoadingMainFrame()) {
+            await new Promise((r) => setTimeout(r, 250));
+          }
           return await webview.executeJavaScript(script);
         } else {
           throw new Error('executeJavaScript method not available');
@@ -89,27 +140,275 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           console.error('All JavaScript execution attempts failed');
           return null;
         }
-        // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
       }
     }
     return null;
   };
 
+  // Cookie-based login status check via Electron session (persist:ig)
+  const checkLoginViaCookies = React.useCallback(async () => {
+    try {
+      const webview = webviewRef.current as any;
+      const url = (webview && typeof webview.getURL === 'function') ? webview.getURL() : currentSrc;
+      const isInstagramHost = typeof url === 'string' && url.includes('instagram.com');
+      if (!isInstagramHost) {
+        onLoginStatusCheck?.(false);
+        return false;
+      }
+      const api: any = (window as any).electronAPI;
+      if (!api || typeof api.getInstagramCookies !== 'function') {
+        return false;
+      }
+      const result = await api.getInstagramCookies();
+      const cookies: Record<string, string> = result?.cookies || {};
+      const required = ['csrftoken', 'ds_user_id', 'ig_did', 'ig_nrcb', 'mid', 'rur', 'sessionid'];
+      const missing = required.filter((k) => !cookies[k]);
+      const isLoggedIn = missing.length === 0;
+      console.log('[CookieCheck] URL host ok:', isInstagramHost, 'missing:', missing, 'isLoggedIn:', isLoggedIn);
+      onLoginStatusCheck?.(isLoggedIn);
+      // If not logged-in but server is registered, proactively navigate to login once
+      const serverReg = instagramState === 'instagram_logged_out_server_registered' || instagramState === 'instagram_logged_in_server_registered';
+      if (!isLoggedIn && serverReg && !loginRedirectedRef.current && typeof setCurrentSrc === 'function') {
+        console.log('[CookieCheck] Not logged in with server-registered; redirecting to Instagram login page');
+        loginRedirectedRef.current = true;
+        setCurrentSrc('https://www.instagram.com/accounts/login/');
+        setIsDomReady(false);
+        isDomReadyRef.current = false;
+      }
+      // If logged in by cookies, try to fetch current user via main (no DOM required)
+      if (isLoggedIn) {
+        try {
+          const api: any = (window as any).electronAPI;
+          if (api && typeof api.getInstagramCurrentUser === 'function') {
+            const resp = await api.getInstagramCurrentUser();
+            if (resp?.ok) {
+              const sessionData = {
+                isLoggedIn: true,
+                username: resp.username || 'instagram_user',
+                dsUserId: resp.dsUserId,
+                sessionId: null,
+                cookies,
+                rawCookies: '',
+                detectionMethod: 'cookies',
+                timestamp: new Date().toISOString(),
+                url
+              };
+              onInstagramLogin?.(sessionData);
+              return true;
+            }
+          }
+        } catch (error) {
+          console.log('getInstagramCurrentUser failed:', error);
+        }
+        
+        // Fallback: run detailed detection after DOM is ready
+        console.log('Electron API failed, triggering detailed detection...');
+        console.log('isDomReadyRef.current:', isDomReadyRef.current);
+        
+        // Wait for DOM to be ready if not already
+        const runDetailedDetection = (forceExecute = false) => {
+          console.log('Running detailed detection script...', forceExecute ? '(forced)' : '');
+          setTimeout(() => {
+            safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript(), 3, forceExecute)
+              .then((result: string) => {
+                console.log('Detailed detection script result:', result);
+                if (!result) return;
+                try {
+                  const parsed = JSON.parse(result);
+                  if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                    console.log('Instagram login detected via detailed script:', parsed.data);
+                    onInstagramLogin?.(parsed.data);
+                  }
+                } catch (e) {
+                  console.warn('Could not parse detailed login check result:', e);
+                }
+              })
+              .catch((error) => {
+                console.warn('Detailed login detection failed:', error);
+              });
+          }, 500);
+        };
+
+        // Try to run detailed detection immediately, regardless of DOM ready state
+        console.log('Attempting to run detailed detection...');
+        runDetailedDetection(true);
+        
+        // Also try again after a delay in case DOM becomes ready
+        setTimeout(() => {
+          if (isDomReadyRef.current) {
+            console.log('DOM became ready, running detailed detection again...');
+            runDetailedDetection();
+          }
+        }, 2000);
+      }
+      return isLoggedIn;
+    } catch {
+      return false;
+    }
+  }, [currentSrc, onLoginStatusCheck, onInstagramLogin, instagramState]);
+
   useEffect(() => {
+    destroyedRef.current = false;
     console.log('[WebView] Source URL changed:', src);
     console.log('[WebView] Previous source:', currentSrc);
-    
-    // Only update if the URL is actually different to avoid unnecessary reloads
-    if (src !== currentSrc) {
-      console.log('[WebView] URL is different, updating currentSrc');
-      setCurrentSrc(src);
-      // New navigation; wait for next dom-ready
-      setIsDomReady(false);
-    } else {
-      console.log('[WebView] URL is the same, skipping update to preserve session');
+
+    // If we should defer (server-registered), ensure cookies are injected BEFORE setting real URL
+    const maybePrepareAndNavigate = async () => {
+      if (!src?.includes('instagram.com') || !onPrepareWebView) {
+        // No special handling needed; update when different
+        if (src !== currentSrc) {
+          console.log('[WebView] URL is different, updating currentSrc');
+          setCurrentSrc(src);
+          setIsDomReady(false);
+          isDomReadyRef.current = false;
+        } else {
+          console.log('[WebView] URL is the same, skipping update to preserve session');
+        }
+        return;
+      }
+
+      if (serverRegistered) {
+        // Prevent duplicate prepare in StrictMode/dev
+        if (preparedOnceRef.current || preparingRef.current) {
+          console.log('[WebView] Prepare already handled, updating src if needed');
+          if (src !== currentSrc) {
+            setCurrentSrc(src);
+            setIsDomReady(false);
+            isDomReadyRef.current = false;
+          }
+          return;
+        }
+        try {
+          preparingRef.current = true;
+          console.log('[WebView] ⏸️ Deferring navigation until cookies injected');
+          if (currentSrc !== 'about:blank') setCurrentSrc('about:blank');
+          // Inject cookies first
+          await onPrepareWebView(true);
+          preparedOnceRef.current = true;
+          console.log('[WebView] ✅ Cookies injected, proceeding to navigate');
+          setCurrentSrc(src);
+          setIsDomReady(false);
+          isDomReadyRef.current = false;
+        } catch (e) {
+          console.error('[WebView] ❌ Failed to prepare before navigation:', e);
+          // Fallback to navigating anyway
+          setCurrentSrc(src);
+        } finally {
+          preparingRef.current = false;
+        }
+        return;
+      }
+
+      // Not server registered; normal update
+      if (src !== currentSrc) {
+        console.log('[WebView] URL is different, updating currentSrc');
+        setCurrentSrc(src);
+        setIsDomReady(false);
+        isDomReadyRef.current = false;
+      } else {
+        console.log('[WebView] URL is the same, skipping update to preserve session');
+      }
+    };
+
+    maybePrepareAndNavigate();
+  }, [src, currentSrc, serverRegistered, onPrepareWebView]);
+
+  // Instagram 상태에 따른 쿠키 처리 (WebView 로드 전)
+  useEffect(() => {
+    if (!src.includes('instagram.com') || !onPrepareWebView || !instagramState) {
+      return;
     }
-  }, [src, currentSrc]);
+
+    // Early cookie injection immediately when Instagram URL is set
+    const injectCookiesImmediately = async () => {
+      try {
+        console.log('[WebView] 🚀 Immediate cookie injection for URL:', src);
+        console.log('[WebView] Instagram state:', instagramState);
+        // If we already handled deferred prepare, skip this path to avoid duplication
+        if (preparedOnceRef.current || preparingRef.current) {
+          console.log('[WebView] Skipping immediate injection — already prepared via deferred path');
+          return true;
+        }
+        
+        // Determine server registration status
+        let isServerRegistered = false;
+        if (instagramState === 'instagram_logged_in_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_logged_out_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_login_detected') {
+          console.log('[WebView] Skipping immediate cookie injection for login_detected');
+          return;
+        }
+        
+        if (isServerRegistered) {
+          console.log('[WebView] 🍪 Injecting server cookies immediately before page loads');
+          await onPrepareWebView(isServerRegistered);
+          console.log('[WebView] ✅ Immediate cookie injection completed');
+          preparedOnceRef.current = true;
+          return true; // Signal that cookies were injected
+        }
+        return false;
+      } catch (error) {
+        console.error('[WebView] ❌ Failed immediate cookie injection:', error);
+        return false;
+      }
+    };
+
+    // First, try to inject cookies immediately
+    injectCookiesImmediately().then((injected) => {
+      if (injected) {
+        console.log('[WebView] Cookies injected immediately, skipping later preparation');
+        return;
+      }
+      
+      // If not injected immediately, proceed with normal preparation
+      const prepareWebView = async () => {
+      try {
+        console.log('[WebView] Preparing WebView for Instagram state:', instagramState);
+
+        // 서버 등록 상태 확인 - 더 정확한 로직
+        let isServerRegistered = false;
+
+        if (instagramState === 'instagram_logged_in_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_logged_out_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_login_detected') {
+          // IMPORTANT: When login is detected via cookies/URL, do NOT clear cookies.
+          // We skip preparation entirely to preserve the just-established session.
+          console.log('[WebView] Skipping WebView preparation to preserve cookies on login_detected');
+          return;
+        } else {
+          // 기본적으로 미등록 상태로 처리
+          isServerRegistered = false;
+        }
+
+        // Skip preparation if cookies were already injected in deferred or immediate path
+        if (isServerRegistered || preparedOnceRef.current || preparingRef.current) {
+          console.log('[WebView] Skipping late WebView preparation - cookies already injected early');
+          return;
+        }
+        
+        console.log('[WebView] Server registration status:', isServerRegistered);
+        
+        // 상태에 따른 쿠키 처리
+        const prepared = await onPrepareWebView(isServerRegistered);
+        
+        if (prepared) {
+          console.log('[WebView] ✅ WebView prepared successfully for state:', instagramState);
+        } else {
+          console.warn('[WebView] ⚠️ WebView preparation failed for state:', instagramState);
+        }
+      } catch (error) {
+        console.error('[WebView] ❌ Failed to prepare WebView:', error);
+      }
+    };
+
+      prepareWebView();
+    });
+  }, [src, instagramState, onPrepareWebView]);
 
   // Instagram disconnect 후 강제 리렌더링 이벤트 감지
   useEffect(() => {
@@ -118,12 +417,39 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       setForceReload(prev => prev + 1);
     };
 
+    // Handle full cookies received from Electron API
+    const handleFullCookiesReceived = (event: CustomEvent) => {
+      console.log('[WebView] 📥 Full cookies received via Electron API');
+      const { cookies, originalSessionData } = event.detail;
+      
+      // Create updated session data with full cookie set
+      const updatedSessionData = {
+        ...originalSessionData,
+        cookies: cookies,
+        detectionMethod: originalSessionData.detectionMethod + '_with_electron_cookies'
+      };
+      
+      console.log('[WebView] 🔄 Updated session data with full cookies:', {
+        cookieCount: Object.keys(cookies).length,
+        cookieNames: Object.keys(cookies),
+        detectionMethod: updatedSessionData.detectionMethod
+      });
+      
+      // Trigger Instagram login callback with updated data
+      if (onInstagramLogin) {
+        console.log('[WebView] 🚀 Triggering login callback with full cookie set');
+        onInstagramLogin(updatedSessionData);
+      }
+    };
+
     window.addEventListener('instagram-webview-force-reload', handleForceReload);
+    window.addEventListener('instagram-full-cookies-received', handleFullCookiesReceived as EventListener);
     
     return () => {
       window.removeEventListener('instagram-webview-force-reload', handleForceReload);
+      window.removeEventListener('instagram-full-cookies-received', handleFullCookiesReceived as EventListener);
     };
-  }, []);
+  }, [onInstagramLogin]);
 
   // 확장프로그램 활성화 상태 변경 감지 (Manager decides; trust enableExtension)
   useEffect(() => {
@@ -147,7 +473,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   useEffect(() => {
     console.log('🔄 Extension 상태 변경 감지:', { extensionActive });
     
-    if (!isDomReady) {
+    if (!isDomReady || !isDomReadyRef.current) {
       console.log('⚠️ WebView DOM not ready');
       return;
     }
@@ -174,7 +500,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_ACTIVATE'
           }, '*');
-        `);
+        `, 3, true);
         setExtensionActive(true);
       }
     },
@@ -184,7 +510,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_DEACTIVATE'
           }, '*');
-        `);
+        `, 3, true);
         setExtensionActive(false);
       }
     },
@@ -200,7 +526,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');
             window.postMessage({ type: 'FLOWSONAT_MOVE_CURSOR', data: { x: ${x}, y: ${y} } }, '*');
           }
-          return true; } catch(e){ return false; } })();`);
+          return true; } catch(e){ return false; } })();`, 3, true);
       }
     },
     click: async (x: number, y: number, button: 'left' | 'right' = 'left') => {
@@ -211,7 +537,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_CLICK',
             data: { x: ${x}, y: ${y}, button: '${button}' }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     doubleClick: async (x: number, y: number) => {
@@ -222,7 +548,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DOUBLE_CLICK',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     startDrag: async (x: number, y: number) => {
@@ -232,7 +558,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DRAG_START',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     dragMove: async (x: number, y: number) => {
@@ -242,7 +568,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DRAG_MOVE',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     endDrag: async () => {
@@ -251,7 +577,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_DRAG_END'
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     scroll: async (x: number, y: number, deltaX: number, deltaY: number) => {
@@ -290,7 +616,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_SCROLLABLE_AREAS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_SCROLLABLE_AREAS result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -313,7 +639,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_CLICKABLE_ELEMENTS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_CLICKABLE_ELEMENTS result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -336,7 +662,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_ELEMENT_BY_TEXT', { text });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_TEXT result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -359,7 +685,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_ELEMENT_BY_SELECTOR', { selector });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_SELECTOR result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -420,8 +746,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] SCROLL_FOREMOST', { deltaY });
-        await safeExecuteJavaScript(`try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}`);
-        const res = await safeExecuteJavaScript(js);
+        await safeExecuteJavaScript(`try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}`, 3, true);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -448,7 +774,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return 'null'; }
         })();`;
         console.log('[WebView] GET_ELEMENT_INFO', { x, y });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] GET_ELEMENT_INFO result', parsed); return parsed; } catch { return null; }
         }
@@ -469,7 +795,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           }
         })();`;
         console.log('[WebView] TAKE_SCREENSHOT');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] TAKE_SCREENSHOT result', parsed); return parsed; } catch { return null; }
         }
@@ -493,7 +819,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             return false;
           } catch (e) { return false; }
         })();`;
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -519,7 +845,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] TYPE_TEXT');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -538,7 +864,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] PRESS_ENTER');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -556,7 +882,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] PRESS_ESCAPE');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -574,7 +900,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWERS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -592,7 +918,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWING');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -608,7 +934,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOW_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -624,7 +950,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWING_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -640,7 +966,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_REQUESTED_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -661,15 +987,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         })();`;
         
         console.log('[WebView] CLICK_FOLLOWING_OR_REQUESTED_BUTTON');
-        const followingClicked = await safeExecuteJavaScript(followingOrRequestedJs);
+        const followingClicked = await safeExecuteJavaScript(followingOrRequestedJs, 3, true);
         
         if (!followingClicked) {
           console.log('[WebView] No Following/Requested button found');
           return false;
         }
         
-        // Step 2: Wait for confirmation modal to appear
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Step 2: Wait briefly for confirmation modal to appear (reduced)
+        await new Promise(resolve => setTimeout(resolve, 700));
         
         // Step 3: Now click the Unfollow button in the modal
         const unfollowJs = `(() => {
@@ -689,19 +1015,28 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         })();`;
         
         console.log('[WebView] CLICK_UNFOLLOW_BUTTON_IN_MODAL');
-        const res = await safeExecuteJavaScript(unfollowJs);
+        const res = await safeExecuteJavaScript(unfollowJs, 3, true);
         return !!res;
       }
       return false;
     },
     executeScript: async (script: string) => {
-      // Wait a bit for DOM to be ready if not already
-      if (!isDomReady) {
-        console.log('[WebView] DOM not ready, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prefer waiting on dom-ready event; fall back to short forced run if needed
+      if (!isDomReadyRef.current) {
+        const waiter = new Promise<boolean>((resolve) => { domReadyResolversRef.current.push(resolve); });
+        const ready = await Promise.race([
+          waiter,
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 6000))
+        ]);
+        if (!ready && !isDomReadyRef.current) {
+          const now = Date.now();
+          if (now - (lastDomWarnAtRef.current || 0) > 3000) {
+            console.warn('[WebView] DOM not ready after waiting, attempting execution anyway');
+            lastDomWarnAtRef.current = now;
+          }
+        }
       }
-      
-      return await safeExecuteJavaScript(script);
+      return await safeExecuteJavaScript(script, 3, true);
     }
   }));
 
@@ -709,9 +1044,14 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   useEffect(() => {
     if (!webviewRef.current || !src.includes('instagram.com')) return;
     
-    // instagram_logged_out_server_unregistered 상태에서만 주기적 체크 실행
-    if (instagramState !== 'instagram_logged_out_server_unregistered') {
-      console.log('Periodic check skipped - not in unregistered state:', instagramState);
+    // 주기적 체크가 필요한 상태들
+    const needsPeriodicCheck = [
+      'instagram_logged_out_server_unregistered',
+      'instagram_login_detected'
+    ];
+    
+    if (!instagramState || !needsPeriodicCheck.includes(instagramState)) {
+      console.log('Periodic check skipped - not in unregistered or login_detected state:', instagramState);
       return;
     }
 
@@ -726,7 +1066,13 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       
       setLastCheckTime(now);
       
-      safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript()).then((result: string) => {
+      // First, fast cookie-based detection via Electron (HttpOnly-safe)
+      checkLoginViaCookies();
+      // Then, run the in-page script as a secondary signal (only when DOM is ready)
+      if (!isDomReadyRef.current) {
+        return;
+      }
+      safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript(), 3, true).then((result: string) => {
         if (!result || isCleanedUp) return;
         
         try {
@@ -759,7 +1105,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         intervalId = null;
       }
     };
-  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState]);
+  }, [src, lastCheckTime, onInstagramLogin, onLoginStatusCheck, instagramState, checkLoginViaCookies]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -780,7 +1126,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     // 메모리 정리 함수
     const cleanupMemory = () => {
       try {
-        if (webview && webview.executeJavaScript) {
+        // Only attempt cleanup when DOM-ready and still attached
+        if (isDomReadyRef.current && webview && (webview.isConnected ?? document.body.contains(webview)) && webview.executeJavaScript) {
           webview.executeJavaScript(`
             // 메모리 정리 스크립트
             if (window.gc) {
@@ -813,8 +1160,45 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     };
 
   const handleDomReady = () => {
+      console.log('[WebView] DOM Ready event triggered!');
       setIsLoading(false);
       setIsDomReady(true);
+      isDomReadyRef.current = true;
+      if (domReadyResolversRef.current.length) {
+        domReadyResolversRef.current.forEach((resolve) => { try { resolve(true); } catch {} });
+        domReadyResolversRef.current = [];
+      }
+      
+      console.log('[WebView] DOM Ready - WebView is now ready for script execution');
+      console.log('[WebView] isDomReadyRef.current set to:', isDomReadyRef.current);
+      
+      // If this is Instagram, trigger login detection and process the result
+      if (src.includes('instagram.com')) {
+        setTimeout(() => {
+          console.log('[WebView] DOM ready - triggering Instagram detection');
+          console.log('[WebView] isDomReadyRef.current:', isDomReadyRef.current);
+          // Quick cookie-based check first
+          checkLoginViaCookies();
+          // Also run detailed detection script
+          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript(), 3, true)
+            .then((result: string) => {
+              console.log('[WebView] Detailed detection script result:', result);
+              if (!result) return;
+              try {
+                const parsed = JSON.parse(result);
+                if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                  console.log('Instagram login detected via executeScript:', parsed.data);
+                  onInstagramLogin?.(parsed.data);
+                }
+              } catch (e) {
+                console.warn('Could not parse detailed login check result:', e);
+              }
+            })
+            .catch((error) => {
+              console.warn('Instagram detection on DOM ready failed:', error);
+            });
+        }, 1000);
+      }
       
       // 주기적 메모리 정리 시작 (5분마다)
       if (memoryCleanupIntervalRef.current) {
@@ -822,7 +1206,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
       
       memoryCleanupIntervalRef.current = setInterval(() => {
-        if (webviewRef.current && isDomReady) {
+        if (webviewRef.current && isDomReadyRef.current) {
           cleanupMemory();
         }
       }, 5 * 60 * 1000); // 5분마다
@@ -830,22 +1214,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       // Instagram 페이지인지 확인
       const isInstagram = src.includes('instagram.com');
       
-      if (isInstagram && (onInstagramLogin || onLoginStatusCheck)) {
-        // Instagram은 동적으로 콘텐츠를 로드하므로 지연 후 실행
-        setTimeout(() => {
-          // Ensure WebView is ready before executing JavaScript
-          if (webview && webview.executeJavaScript) {
-            try {
-              webview.executeJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript());
-            } catch (error) {
-              console.warn('Failed to execute Instagram login check script:', error);
-            }
-          }
-        }, 2000); // 2초 지연
+      if (isInstagram && onLoginStatusCheck) {
+        // URL-based check is handled by did-navigate listener
       }
       
       // Instagram 로그인 페이지에서 강제 리렌더링 트리거
-      if (isInstagram && src.includes('/accounts/login/')) {
+      if (isInstagram && src.includes('/accounts/login/') && !extensionActive) {
         setTimeout(() => {
           setForceReload(prev => prev + 1);
         }, 1000);
@@ -866,6 +1240,18 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         const injectExtension = async () => {
           try {
             console.log('📥 Extension 컨텐츠 스크립트 주입 중...');
+            // Guard: ensure webview is still attached and dom-ready
+            const webview = webviewRef.current as any;
+            const attached = !!webview && (webview.isConnected ?? document.body.contains(webview));
+            if (!attached || !isDomReadyRef.current || !extensionActive) {
+              if (injectionAttemptsRef.current < 20) {
+                injectionAttemptsRef.current += 1;
+                injectionTimerRef.current = setTimeout(injectExtension, 1000);
+              } else {
+                console.warn('Stopping extension injection retries: conditions not met');
+              }
+              return;
+            }
             
             const injectionScript = `
               // 확장프로그램 컨텐츠 스크립트 주입
@@ -882,10 +1268,13 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
               } catch (e) {}
             `;
             
-            const result = await safeExecuteJavaScript(injectionScript);
+            const result = await safeExecuteJavaScript(injectionScript, 3, true);
             if (result === null) {
               console.warn('Extension injection failed, retrying in 1000ms...');
-              setTimeout(injectExtension, 1000);
+              if (injectionAttemptsRef.current < 20) {
+                injectionAttemptsRef.current += 1;
+                injectionTimerRef.current = setTimeout(injectExtension, 1000);
+              }
               return;
             }
             
@@ -898,33 +1287,37 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
                 // Ignore errors when posting message
               }
               
-              await safeExecuteJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`);
+              await safeExecuteJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`, 3, true);
               console.log('✅ Extension 컨트롤러 활성화 완료');
             }, 200);
           } catch (error) {
             console.warn('Extension injection failed:', error);
             // 재시도
-            setTimeout(injectExtension, 1000);
+            if (injectionAttemptsRef.current < 20) {
+              injectionAttemptsRef.current += 1;
+              injectionTimerRef.current = setTimeout(injectExtension, 1000);
+            }
           }
         };
         
         // 1초 후에 주입 시작
-        setTimeout(injectExtension, 1000);
+        injectionAttemptsRef.current = 0;
+        if (injectionTimerRef.current) clearTimeout(injectionTimerRef.current);
+        injectionTimerRef.current = setTimeout(injectExtension, 1000);
       } else {
         console.log('❌ Extension 컨텐츠 스크립트 주입 조건 불만족');
+        // If extension deactivated, cancel pending timers
+        if (injectionTimerRef.current) {
+          clearTimeout(injectionTimerRef.current);
+          injectionTimerRef.current = null;
+        }
+        injectionAttemptsRef.current = 0;
       }
     };
 
     const handleMessage = (event: any) => {
+      // This listener is now only for extension-related messages, not login detection.
       console.log('WebView message received:', event);
-      
-      if (event.data && event.data.type === 'INSTAGRAM_LOGIN_SUCCESS') {
-        console.log('Instagram login detected:', event.data.data);
-        onInstagramLogin?.(event.data.data);
-      } else if (event.data && event.data.type === 'INSTAGRAM_LOGIN_STATUS_CHECK') {
-        console.log('Instagram login status check:', event.data.data);
-        onLoginStatusCheck?.(event.data.data.isLoggedIn);
-      }
     };
 
     // URL-based login detection as requested: if it redirects away from /accounts/login -> logged in
@@ -932,12 +1325,41 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       try {
         const url: string = e?.url || webview.getURL?.() || '';
         const isInstagramHost = url.includes('instagram.com');
-        const onLoginPage = /instagram\.com\/accounts\/login/.test(url);
+
         if (isInstagramHost) {
-          const inferredLoggedIn = !onLoginPage;
-          console.log('🔎 URL-based status:', { url, inferredLoggedIn });
+          const onLoginPage = /instagram\.com\/accounts\/login/.test(url);
+          const onSignupPage = /instagram\.com\/accounts\/emailsignup/.test(url);
+          const onPasswordResetPage = /instagram\.com\/accounts\/password\/reset/.test(url);
+          const isLoggedOutPage = onLoginPage || onSignupPage || onPasswordResetPage;
+
+          const inferredLoggedIn = !isLoggedOutPage;
+
+          console.log('🔎 URL-based status:', { url, inferredLoggedIn, isLoggedOutPage });
           onLoginStatusCheck?.(inferredLoggedIn);
-          
+
+          // If URL-based detection suggests login but we need session data, trigger detailed detection
+          if (inferredLoggedIn && isDomReadyRef.current) {
+            console.log('🔍 URL suggests login, triggering detailed detection...');
+            setTimeout(() => {
+              safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+                .then((result: string) => {
+                  if (!result) return;
+                  try {
+                    const parsed = JSON.parse(result);
+                    if (parsed.type === 'INSTAGRAM_LOGIN_SUCCESS') {
+                      console.log('Instagram login confirmed via detailed detection:', parsed.data);
+                      onInstagramLogin?.(parsed.data);
+                    }
+                  } catch (e) {
+                    console.warn('Could not parse detailed login check result:', e);
+                  }
+                })
+                .catch((error) => {
+                  console.warn('Detailed login detection failed:', error);
+                });
+            }, 2000); // Wait 2 seconds for page to fully load
+          }
+
           // Notify parent component of URL change
           onUrlChange?.(url);
         }
@@ -946,14 +1368,59 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     };
 
+    // Handle navigation start - inject cookies before content loads
+    const handleDidNavigateStart = async (event: any) => {
+      try {
+        const url = event.url || currentSrc;
+        console.log('[WebView] Navigation started - injecting cookies early for URL:', url);
+        
+        // Only inject cookies for Instagram pages
+        if (typeof url === 'string' && url.includes('instagram.com')) {
+          // Call prepareWebView to inject cookies before page content loads
+          const prepareWebView = async () => {
+            try {
+              console.log('[WebView] Early cookie injection for Instagram state:', instagramState);
+              
+              // Determine server registration status
+              let isServerRegistered = false;
+              if (instagramState === 'instagram_logged_in_server_registered') {
+                isServerRegistered = true;
+              } else if (instagramState === 'instagram_logged_out_server_registered') {
+                isServerRegistered = true;
+              } else if (instagramState === 'instagram_login_detected') {
+                // Skip preparation to preserve cookies on login_detected
+                console.log('[WebView] Skipping early cookie injection for login_detected');
+                return;
+              }
+              
+              if (isServerRegistered && onPrepareWebView) {
+                console.log('[WebView] Injecting server cookies early');
+                await onPrepareWebView(isServerRegistered);
+                console.log('[WebView] ✅ Early cookie injection completed');
+              }
+            } catch (error) {
+              console.error('[WebView] ❌ Failed to inject cookies early:', error);
+            }
+          };
+
+          await prepareWebView();
+        }
+      } catch (error) {
+        console.error('[WebView] Error in navigation handler:', error);
+      }
+    };
+
+    webview.addEventListener('will-navigate', handleDidNavigateStart as any);
     webview.addEventListener('did-finish-load', handleLoad);
     webview.addEventListener('did-fail-load', handleError);
     webview.addEventListener('dom-ready', handleDomReady);
     webview.addEventListener('did-navigate', handleDidNavigate as any);
     webview.addEventListener('did-navigate-in-page', handleDidNavigate as any);
     window.addEventListener('message', handleMessage);
+    
 
     return () => {
+      webview.removeEventListener('will-navigate', handleDidNavigateStart as any);
       webview.removeEventListener('did-finish-load', handleLoad);
       webview.removeEventListener('did-fail-load', handleError);
       webview.removeEventListener('dom-ready', handleDomReady);
@@ -967,8 +1434,24 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         memoryCleanupIntervalRef.current = null;
       }
       
-      // 메모리 정리 실행
-      cleanupMemory();
+      // Cancel any pending extension injection timers
+      if (injectionTimerRef.current) {
+        clearTimeout(injectionTimerRef.current);
+        injectionTimerRef.current = null;
+      }
+      injectionAttemptsRef.current = 0;
+      destroyedRef.current = true;
+
+      // 메모리 정리 실행 (안전할 때만)
+      if (webviewRef.current && isDomReadyRef.current && (webviewRef.current.isConnected ?? document.body.contains(webviewRef.current))) {
+        cleanupMemory();
+      }
+      isDomReadyRef.current = false;
+      // Resolve any pending waiters as not ready to prevent hangs
+      if (domReadyResolversRef.current.length) {
+        domReadyResolversRef.current.forEach((resolve) => { try { resolve(false); } catch {} });
+        domReadyResolversRef.current = [];
+      }
     };
   }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
 
@@ -1013,9 +1496,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         className="w-full h-full"
         partition="persist:ig"
         webpreferences="contextIsolation=yes, nodeIntegration=no"
-        allowpopups={true}
-        security="true"
-        style={{ pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const }}
+        style={{ 
+          pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const,
+          // Hide the webview when obscured so portal-based modals render above it reliably.
+          visibility: obscured ? 'hidden' as const : 'visible' as const
+        }}
         key={`webview-${forceReload}`} // 강제 리렌더링을 위한 key
       />
     </div>

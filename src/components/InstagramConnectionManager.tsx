@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Loader2, Instagram } from 'lucide-react';
+import { Loader2, Instagram, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInstagram } from '@/contexts/InstagramContext';
 
@@ -20,16 +20,36 @@ export const InstagramConnectionManager = ({
     checkConnection, 
     connectAccount, 
     disconnectAccount,
-    saveInstagramSession
+    saveInstagramSession,
+    restoreInstagramSession
   } = useInstagram();
 
   React.useEffect(() => {
     onConnectionChange?.(isConnected);
   }, [isConnected, onConnectionChange]);
 
+  const [isRestoring, setIsRestoring] = React.useState(false);
+
   const handleConnectClick = () => {
     // Instagram connection is now handled through the API only
     console.log('Instagram connection requested');
+  };
+
+  const handleRestoreSession = async () => {
+    try {
+      setIsRestoring(true);
+      console.log('Attempting to restore Instagram session...');
+      const restored = await restoreInstagramSession();
+      if (restored) {
+        console.log('Instagram session restored successfully');
+      } else {
+        console.log('No session to restore or restoration failed');
+      }
+    } catch (error) {
+      console.error('Failed to restore Instagram session:', error);
+    } finally {
+      setIsRestoring(false);
+    }
   };
 
   if (!user) {
@@ -80,13 +100,33 @@ export const InstagramConnectionManager = ({
               <p className="text-gray-600">
                 Connect your Instagram account to enable automation features.
               </p>
-              <Button
-                onClick={handleConnectClick}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              >
-                <Instagram className="h-4 w-4 mr-2" />
-                Connect Instagram
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleConnectClick}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                >
+                  <Instagram className="h-4 w-4 mr-2" />
+                  Connect Instagram
+                </Button>
+                <Button
+                  onClick={handleRestoreSession}
+                  disabled={isRestoring}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isRestoring ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Restoring Session...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Restore Session
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

@@ -25,8 +25,7 @@ declare namespace NodeJS {
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   IG: {
-    clearSession: () => Promise<boolean>
-    disconnectAndReload: () => Promise<boolean>
+    injectCookies: (cookies: Record<string, any>) => Promise<boolean>
     onReloadRequest: (cb: () => void) => void
   }
   analytics: {

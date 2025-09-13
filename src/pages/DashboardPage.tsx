@@ -62,8 +62,16 @@ export const DashboardPage = () => {
 
     // 로그아웃 상태면 바로 Instagram WebView로 이동
     if (!isConnected) {
-      console.log('Instagram not connected, navigating to WebView...');
-      navigate('/webview');
+      console.log('Instagram not connected, navigating to Login WebView...');
+      // If a fresh partition was requested (disconnect), append fresh=1
+      let fresh = false;
+      try { fresh = sessionStorage.getItem('ig_force_fresh_partition') === '1'; } catch {}
+      if (fresh) {
+        try { sessionStorage.removeItem('ig_force_fresh_partition'); } catch {}
+        navigate('/webview/login?fresh=1');
+      } else {
+        navigate('/webview/login');
+      }
     }
   }, [isConnected, hasCheckedConnection, isCheckingConnection, navigate]);
 
@@ -75,8 +83,8 @@ export const DashboardPage = () => {
   }, [isConnected, hasCheckedConnection]);
 
   const handleStartAutomation = () => {
-    // Open full-screen WebView manager in minimal mode with auto-execution
-    navigate('/webview?minimal=1&autoExecute=1');
+    // Open full-screen Automation WebView in minimal mode with auto-execution
+    navigate('/webview/automation?minimal=1&autoExecute=1');
   };
 
   const handleRefresh = () => {

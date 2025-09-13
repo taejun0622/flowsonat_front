@@ -55,8 +55,9 @@ export class AutomationService {
     this.benchmark = benchmark;
     this.profileCollectionService = new ProfileCollectionService(webviewApi);
     this.options = {
-      scrollDelay: options.scrollDelay || 1000,
-      pageLoadDelay: options.pageLoadDelay || 3000,
+      // Faster defaults; higher reliability via polling instead of long sleeps
+      scrollDelay: options.scrollDelay ?? 600,
+      pageLoadDelay: options.pageLoadDelay ?? 1200,
       onProgress: options.onProgress,
       onAction: options.onAction
     };
@@ -187,8 +188,15 @@ export class AutomationService {
         `);
       }
 
-      // Wait for page to load
-      await this.delay(this.options.pageLoadDelay);
+      // Wait for URL to update and for main elements to render (fast polling)
+      try {
+        const fragment = '${profileUrl}'.replace('https://www.instagram.com/', '');
+        await this.waitForUrlContains(fragment, Math.max(1200, this.options.pageLoadDelay));
+      } catch {}
+      try {
+        // Wait for a common layout element on profile/suggested pages
+        await this.waitForSelector('main, header', 1500);
+      } catch {}
 
       // Collect profile information and send to history API
       try {
@@ -298,7 +306,6 @@ export class AutomationService {
       // Navigate to profile
       const profileUrl = `https://www.instagram.com/${this.instagramUsername}`;
       await this.navigateToProfile(profileUrl);
-      await this.delay(this.options.pageLoadDelay);
       
       // Collect followers
       const followersCollected = await this.collectFollowers();
@@ -326,7 +333,8 @@ export class AutomationService {
         try {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          // Small human-like settle before interacting
+          await this.randomDelay(200, 600);
           
           // Check if unfollow button exists and click it
           const unfollowed = await this.clickUnfollowButton();
@@ -339,7 +347,7 @@ export class AutomationService {
             this.options.onAction?.('unfollow', target.ig.username, true);
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Unfollow error for ${target.ig.username}:`, error);
         }
@@ -382,7 +390,7 @@ export class AutomationService {
           
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          await this.randomDelay(250, 650);
           
           // Check if follow button exists
           const canFollow = await this.checkIfCanFollow();
@@ -450,8 +458,8 @@ export class AutomationService {
                       return { targetsCollected };
                     }
                     
-                    // Small delay between batches
-                    await this.delay(100);
+                    // Human-like small delay between batches
+                    await this.randomDelay(80, 220);
                   } catch (batchError) {
                     console.error(`[Automation] Batch creation failed, falling back to individual creation for batch:`, batchError);
                     
@@ -481,7 +489,7 @@ export class AutomationService {
             }
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Target collection error for ${benchmark.ig.username}:`, error);
         }
@@ -507,7 +515,7 @@ export class AutomationService {
         try {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
-          await this.delay(this.options.pageLoadDelay);
+          await this.randomDelay(250, 650);
           
           // Check if we can follow
           const canFollow = await this.checkIfCanFollow();
@@ -529,7 +537,7 @@ export class AutomationService {
             this.options.onAction?.('already_following', target.ig.username, true);
           }
           
-          await this.delay(this.options.scrollDelay);
+          await this.delayAround(this.options.scrollDelay, 0.5);
         } catch (error) {
           console.error(`[Automation] Follow error for ${target.ig.username}:`, error);
         }
@@ -550,7 +558,6 @@ export class AutomationService {
       // Navigate to Instagram Suggested page
       const suggestedUrl = 'https://www.instagram.com/explore/people/suggested/';
       await this.navigateToProfile(suggestedUrl);
-      await this.delay(this.options.pageLoadDelay);
       
       // Extract usernames from the Suggested page
       const usernames = await this.extractUsernamesFromSuggestedPage();
@@ -569,8 +576,8 @@ export class AutomationService {
           suggestionsCollected++;
           this.options.onAction?.('suggestion_created', username, true);
           
-          // Small delay between API calls
-          await this.delay(100);
+          // Human-like small delay between API calls
+          await this.randomDelay(80, 220);
         } catch (error) {
           console.error(`[Automation] Failed to create suggestion for ${username}:`, error);
           this.options.onAction?.('suggestion_failed', username, false);
@@ -597,8 +604,8 @@ export class AutomationService {
         throw new Error('Failed to open followers modal');
       }
       
-      console.log('[Automation] Waiting for followers modal to load...');
-      await this.delay(3000);
+      console.log('[Automation] Waiting for followers modal to load (selector)...');
+      await this.waitForSelector('[role="dialog"], [aria-modal="true"]', 2000);
       
       // Collect usernames from modal with scrolling
       const followers = await this.collectUsernamesFromModalWithScroll();
@@ -628,8 +635,8 @@ export class AutomationService {
         throw new Error('Failed to open following modal');
       }
       
-      console.log('[Automation] Waiting for following modal to load...');
-      await this.delay(3000);
+      console.log('[Automation] Waiting for following modal to load (selector)...');
+      await this.waitForSelector('[role="dialog"], [aria-modal="true"]', 2000);
       
       // Collect usernames from modal with scrolling
       const following = await this.collectUsernamesFromModalWithScroll();
@@ -660,7 +667,8 @@ export class AutomationService {
       console.log(`[Automation] Current usernames: ${usernames.length}`);
 
       try {
-        await this.delay(1000);
+        // Short settle time before reading
+        await this.delay(300);
 
         // Extract usernames from current view
         const snapshotUsernames = await this.extractUsernamesFromModal();
@@ -688,18 +696,34 @@ export class AutomationService {
           this.options.onProgress?.(usernames.length, usernames.length, `Collected ${usernames.length} usernames...`);
         }
 
-        // Scroll down to load more
+        // Scroll down to load more with human-like variance
         console.log('[Automation] Scrolling down...');
         this.options.onProgress?.(usernames.length, usernames.length, 'Scrolling to load more...');
-        const scrolled = await this.webviewApi.scrollForemost(1000);
+        const delta = 800 + Math.floor(Math.random() * 601); // 800-1400
+        const scrolled = await this.webviewApi.scrollForemost(delta);
         if (!scrolled) {
           console.log('[Automation] Cannot scroll further');
           break;
         }
 
-        // Wait for new content to load
-        console.log('[Automation] Waiting for new content to load...');
-        await this.delay(this.options.scrollDelay + 1000);
+        // Wait for new content to load by polling anchor count change
+        console.log('[Automation] Waiting for new content to load (polling)...');
+        const start = Date.now();
+        const maxWait = Math.max(1500, this.options.scrollDelay);
+        let changed = false;
+        let lastCount = snapshotUsernames.length;
+        while (Date.now() - start < maxWait) {
+          const countStr = await this.webviewApi.executeScript(`(() => { try {
+            var d = document.querySelector('[role="dialog"], [aria-modal="true"]') || document;
+            return String(d.querySelectorAll('a').length || 0);
+          } catch (e) { return '0'; } })();`);
+          const count = parseInt(countStr || '0', 10);
+          if (count > lastCount) { changed = true; break; }
+          await this.delay(120);
+        }
+        if (!changed) {
+          console.log('[Automation] No new anchors detected after scroll');
+        }
       } catch (error) {
         console.error('[Automation] Error during collection:', error);
         unchangedScrolls++;
@@ -898,8 +922,8 @@ export class AutomationService {
         return false;
       }
       
-      // Step 2: Wait for confirmation modal to appear
-      await this.delay(1500);
+      // Step 2: Wait for confirmation modal to appear (selector-based, faster)
+      await this.waitForSelector('[role="dialog"] button, [aria-modal="true"] button', 1200);
       
       // Step 3: Look for and click the Unfollow button in the modal
       const result = await this.webviewApi.executeScript(`
@@ -1007,7 +1031,8 @@ export class AutomationService {
         return [];
       }
       
-      await this.delay(3000);
+      await this.waitForSelector('[role\="dialog\"], [aria-modal\="true\"]', 2000);
+      await this.randomDelay(150, 400);
       
       // Collect usernames with scrolling
       const followers = await this.collectUsernamesFromModalWithScroll();
@@ -1054,8 +1079,8 @@ export class AutomationService {
           totalSent += batch.length;
           console.log(`[Automation] Sent ${batch.length} followers to API (${totalSent}/${followers.length})`);
           
-          // Small delay between batches
-          await this.delay(200);
+          // Human-like small delay between batches
+          await this.randomDelay(160, 320);
           
         } catch (error) {
           console.error(`[Automation] Failed to send followers batch:`, error);
@@ -1101,8 +1126,8 @@ export class AutomationService {
           totalSent += batch.length;
           console.log(`[Automation] Sent ${batch.length} following to API (${totalSent}/${following.length})`);
           
-          // Small delay between batches
-          await this.delay(200);
+          // Human-like small delay between batches
+          await this.randomDelay(160, 320);
           
         } catch (error) {
           console.error(`[Automation] Failed to send following batch:`, error);
@@ -1119,6 +1144,46 @@ export class AutomationService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Fast polling helpers to reduce fixed waiting
+  private async waitForSelector(selector: string, timeout = 2000, interval = 100): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const ok = await this.webviewApi.executeScript(`(() => { try { return !!document.querySelector(${JSON.stringify(selector)}); } catch (e) { return false; } })();`);
+      if (ok) return true;
+      await this.delay(interval);
+    }
+    return false;
+  }
+
+  private async waitForUrlContains(fragment: string, timeout = 2000, interval = 100): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const href = await this.webviewApi.executeScript(`(() => { try { return window.location && window.location.href || ''; } catch (e) { return ''; } })();`);
+      if (typeof href === 'string' && href.indexOf(fragment) !== -1) return true;
+      await this.delay(interval);
+    }
+    return false;
+  }
+
+  // Human-like timing helpers
+  private randInt(min: number, max: number): number {
+    if (max < min) [min, max] = [max, min];
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  private async randomDelay(minMs: number, maxMs: number): Promise<void> {
+    const ms = this.randInt(Math.max(0, Math.floor(minMs)), Math.max(0, Math.floor(maxMs)));
+    return this.delay(ms);
+  }
+
+  private async delayAround(baseMs: number, jitterRatio = 0.5): Promise<void> {
+    const base = Math.max(0, Math.floor(baseMs || 0));
+    const jitter = Math.max(0, Math.min(0.95, jitterRatio));
+    const min = Math.floor(base * (1 - jitter));
+    const max = Math.floor(base * (1 + jitter));
+    return this.randomDelay(min, max);
   }
 
   /**

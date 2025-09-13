@@ -3,6 +3,9 @@ import { InstagramService } from '@/api/services/InstagramService';
 import { InstagramConnectResponse } from '@/api';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { parseCookies } from '@/utils/instagramUtils';
+import { InstagramDisconnectService } from '@/services/InstagramDisconnectService';
+import { NavigateFunction } from 'react-router-dom';
 
 interface InstagramContextType {
   instagramAccount: InstagramConnectResponse | null;
@@ -13,6 +16,12 @@ interface InstagramContextType {
   disconnectAccount: () => Promise<void>;
   refreshConnection: () => Promise<void>;
   saveInstagramSession: (sessionData: any) => Promise<InstagramConnectResponse>;
+  injectCookiesToWebView: (cookies: Record<string, any>) => Promise<boolean>;
+  restoreInstagramSession: () => Promise<boolean>;
+  clearWebViewCookies: () => Promise<boolean>;
+  prepareWebViewForState: (serverRegistered: boolean) => Promise<boolean>;
+  debugCurrentCookies: () => Promise<void>;
+  setNavigate: (navigate: NavigateFunction) => void;
 }
 
 const InstagramContext = React.createContext<InstagramContextType | undefined>(undefined);
@@ -32,8 +41,13 @@ interface InstagramProviderProps {
 export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   const [instagramAccount, setInstagramAccount] = React.useState<InstagramConnectResponse | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const navigateRef = React.useRef<NavigateFunction | null>(null);
   const { user, token } = useAuth();
   const { toast } = useToast();
+
+  const setNavigate = (navigate: NavigateFunction) => {
+    navigateRef.current = navigate;
+  };
 
   const checkConnection = React.useCallback(async () => {
     if (!token || !user) {
@@ -46,15 +60,18 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       const account = await InstagramService.getMyInstagramAccountApiV1InstagramMeGet();
       setInstagramAccount(account);
     } catch (error: any) {
-      // 404 에러는 연결된 계정이 없다는 의미이므로 조용히 처리
+      // 404 means no connected account
       if (error.status === 404) {
-        console.log('Instagram not connected (404)');
+        console.log('Instagram not connected (404), navigating to connection flow.');
         setInstagramAccount(null);
+        if (navigateRef.current) {
+          navigateRef.current('/instagram-connection-flow');
+        }
       } else {
         console.error('Failed to check Instagram connection:', error);
         setInstagramAccount(null);
         
-        // API 엔드포인트가 아직 구현되지 않았을 수도 있음
+        // Only show error for non-500 status (server implementation issues)
         if (error.status !== 500) {
           toast({
             title: "Connection check failed",
@@ -69,395 +86,37 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
   }, [token, user, toast]);
 
   const connectAccount = () => {
-    // Instagram 로그인은 InstagramConnectionManager에서 처리
+    // Instagram connection is handled by InstagramConnectionManager
     console.log('Instagram connection requested');
   };
 
-  const saveInstagramSession = async (sessionData: any) => {
-    try {
-      console.log('Saving Instagram session data:', sessionData);
-      
-      // 세션 데이터에서 username 추출
-      const username = sessionData?.username;
-      
-      if (!username) {
-        throw new Error('Username not found in session data');
-      }
-      
-      // Instagram 세션 정보를 서버에 저장
-      const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost({
-        username: String(username)
-      });
-      
-      setInstagramAccount(response);
-      
-      // 추가 세션 정보를 로컬에 저장 (선택사항)
-      const extendedSessionData = {
-        ...sessionData,
-        connectedAt: new Date().toISOString(),
-        accountId: response.id
-      };
-      
-      // 로컬 스토리지에 세션 정보 저장 (개발용)
-      if (process.env.NODE_ENV === 'development') {
-        localStorage.setItem('instagram_session_data', JSON.stringify(extendedSessionData));
-      }
-      
-      toast({
-        title: "Instagram connected",
-        description: `Successfully connected to Instagram account @${username}.`,
-      });
-      
-      return response;
-    } catch (error: any) {
-      console.error('Failed to save Instagram session:', error);
-      toast({
-        title: "Connection failed",
-        description: error.message || "Failed to save Instagram session.",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
-
   const disconnectAccount = async () => {
-    console.log('🔍 disconnectAccount 함수 시작');
-    console.log('🔍 token 존재 여부:', !!token);
+    console.log('🔍 Instagram disconnect started');
     
     if (!token) {
-      console.log('❌ token이 없어서 함수 종료');
+      console.log('❌ No token available, aborting disconnect');
       return;
     }
 
     try {
-      console.log('🔄 로딩 상태 설정');
       setIsLoading(true);
       
-      // 1. 서버에서 Instagram 계정 연결 해제 (선택적)
-      console.log('🌐 서버 API 호출 시작');
-      try {
-        await InstagramService.disconnectInstagramAccountApiV1InstagramMeDelete();
-        console.log('✅ 서버 API 호출 완료');
-      } catch (apiError) {
-        console.warn('⚠️ 서버 API 호출 실패 (계속 진행):', apiError);
-        // API 실패는 무시하고 계속 진행
-      }
-      setInstagramAccount(null);
-      console.log('✅ Instagram 계정 상태 초기화');
-
-      // 2. 로컬 스토리지에서 모든 Instagram 관련 데이터 정리
-      console.log('🗂️ 로컬 스토리지 정리 시작');
-      
-      // 먼저 모든 localStorage 키를 확인
-      console.log('📋 현재 localStorage 전체 내용:');
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          console.log(`  - ${key}: ${localStorage.getItem(key)?.substring(0, 50)}...`);
-        }
-      }
-      console.log(`📊 localStorage 총 ${localStorage.length}개 항목`);
-      
-      // sessionStorage도 확인
-      console.log('📋 현재 sessionStorage 전체 내용:');
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key) {
-          console.log(`  - ${key}: ${sessionStorage.getItem(key)?.substring(0, 50)}...`);
-        }
-      }
-      console.log(`📊 sessionStorage 총 ${sessionStorage.length}개 항목`);
-      
-      try {
-        // 개발 환경 세션 데이터
-        console.log('🗂️ instagram_session_data 삭제 시도');
-        localStorage.removeItem('instagram_session_data');
-        console.log('✅ instagram_session_data 삭제 완료');
-        
-        // Instagram 관련 모든 로컬 스토리지 키 정리
-        console.log('🔍 localStorage 키 검색 시작');
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (
-            key.toLowerCase().includes('instagram') ||
-            key.toLowerCase().includes('ig_') ||
-            key.toLowerCase().includes('ds_') ||
-            key.toLowerCase().includes('session') ||
-            key.toLowerCase().includes('auth')
-          )) {
-            keysToRemove.push(key);
-            console.log(`🔍 발견된 키: ${key}`);
-          }
-        }
-        console.log(`📊 총 ${keysToRemove.length}개의 키 발견`);
-        
-        keysToRemove.forEach(key => {
-          try {
-            localStorage.removeItem(key);
-            console.log(`Removed localStorage key: ${key}`);
-          } catch (e) {
-            console.warn(`Failed to remove localStorage key ${key}:`, e);
-          }
-        });
-
-        // SessionStorage도 정리
-        const sessionKeysToRemove: string[] = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const key = sessionStorage.key(i);
-          if (key && (
-            key.toLowerCase().includes('instagram') ||
-            key.toLowerCase().includes('ig_') ||
-            key.toLowerCase().includes('ds_') ||
-            key.toLowerCase().includes('session') ||
-            key.toLowerCase().includes('auth')
-          )) {
-            sessionKeysToRemove.push(key);
-          }
-        }
-        
-        sessionKeysToRemove.forEach(key => {
-          try {
-            sessionStorage.removeItem(key);
-            console.log(`Removed sessionStorage key: ${key}`);
-          } catch (e) {
-            console.warn(`Failed to remove sessionStorage key ${key}:`, e);
-          }
-        });
-
-        console.log('All local Instagram data cleared');
-      } catch (e) {
-        console.warn('Failed to clear some local data:', e);
-      }
-
-            // 3. WebView 완전 파괴 및 재생성 (무식한 방법)
-      console.log('💥 WebView 완전 파괴 시작');
-      try {
-        // 방법 1: Electron API 사용
-        if (window.IG && typeof window.IG.disconnectAndReload === 'function') {
-          console.log('🔧 Electron IG API 사용하여 WebView 정리');
-          await window.IG.disconnectAndReload();
-          console.log('✅ Electron WebView 세션 정리 완료');
-        } else {
-          console.log('⚠️ Electron IG API 사용 불가');
-        }
-        
-        // 방법 1.5: Electron 세션 직접 정리
-        try {
-          if (window.ipcRenderer) {
-            console.log('🔧 Electron 세션 직접 정리 시도');
-            await window.ipcRenderer.invoke('ig:clear-session');
-            console.log('✅ Electron 세션 직접 정리 완료');
-          }
-        } catch (e) {
-          console.warn('⚠️ Electron 세션 직접 정리 실패:', e);
-        }
-        
-        // 방법 2: WebView 완전 파괴 (무식한 방법)
-        try {
-          // 모든 WebView 요소 찾기
-          const webviews = document.querySelectorAll('webview');
-          console.log(`🔍 발견된 WebView 개수: ${webviews.length}`);
-          
-          webviews.forEach((webviewElement, index) => {
-            const webview = webviewElement as any;
-            try {
-              console.log(`💥 WebView ${index + 1} 완전 파괴 중...`);
-              
-              // 1. WebView 내부 데이터 완전 정리
-              const nukeScript = `
-                (function() {
-                  try {
-                    console.log('💥 WebView 내부 핵폭탄 시작');
-                    
-                    // 모든 스토리지 완전 삭제
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    
-                    // 모든 쿠키 삭제
-                    document.cookie.split(";").forEach(function(c) { 
-                      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                    });
-                    
-                    // IndexedDB 완전 삭제
-                    if ('indexedDB' in window) {
-                      indexedDB.databases().then(databases => {
-                        databases.forEach(db => {
-                          if (db.name) indexedDB.deleteDatabase(db.name);
-                        });
-                      });
-                    }
-                    
-                    // Cache 완전 삭제
-                    if ('caches' in window) {
-                      caches.keys().then(cacheNames => {
-                        cacheNames.forEach(cacheName => caches.delete(cacheName));
-                      });
-                    }
-                    
-                    // Service Workers 완전 삭제
-                    if ('serviceWorker' in navigator) {
-                      navigator.serviceWorker.getRegistrations().then(registrations => {
-                        registrations.forEach(registration => registration.unregister());
-                      });
-                    }
-                    
-                    console.log('💥 WebView 내부 핵폭탄 완료');
-                    return 'NUKED';
-                  } catch (e) {
-                    return 'NUKED_WITH_ERROR: ' + e.message;
-                  }
-                })();
-              `;
-              
-              // 스크립트 실행
-              if (webview.executeJavaScript) {
-                webview.executeJavaScript(nukeScript).then((result: any) => {
-                  console.log(`💥 WebView ${index + 1} 내부 핵폭탄 결과:`, result);
-                });
-              }
-              
-              // 2. WebView 완전 파괴
-              setTimeout(() => {
-                try {
-                  // WebView를 DOM에서 완전히 제거
-                  if (webviewElement.parentNode) {
-                    webviewElement.parentNode.removeChild(webviewElement);
-                    console.log(`💥 WebView ${index + 1} DOM에서 완전 제거`);
-                  }
-                  
-                                     // 새로운 WebView 생성 (완전히 새로운 파티션으로)
-                   setTimeout(() => {
-                     try {
-                       const newWebView = document.createElement('webview') as any;
-                       
-                       // 완전히 새로운 파티션으로 생성 (세션 격리)
-                       const timestamp = Date.now();
-                       newWebView.partition = `persist:ig_${timestamp}`;
-                       newWebView.src = 'https://www.instagram.com/accounts/login/';
-                       newWebView.style.width = '100%';
-                       newWebView.style.height = '100%';
-                       
-                       // 추가 속성으로 완전 격리
-                       newWebView.setAttribute('webpreferences', 'contextIsolation=true, nodeIntegration=false');
-                       
-                       // 원래 WebView가 있던 위치에 삽입
-                       const container = document.querySelector('.webview-container') || document.body;
-                       container.appendChild(newWebView);
-                       console.log(`🔄 WebView ${index + 1} 새 파티션(${timestamp})으로 생성 완료`);
-                     } catch (e) {
-                       console.warn(`WebView ${index + 1} 재생성 실패:`, e);
-                     }
-                   }, 1000);
-                  
-                } catch (e) {
-                  console.warn(`WebView ${index + 1} 파괴 실패:`, e);
-                }
-              }, 2000);
-              
-            } catch (webviewError) {
-              console.warn(`WebView ${index + 1} 파괴 중 에러:`, webviewError);
-            }
-          });
-          
-        } catch (directError) {
-          console.warn('WebView 파괴 실패:', directError);
-        }
-        
-        console.log('💥 WebView 완전 파괴 완료');
-        
-      } catch (webviewError) {
-        console.warn('WebView 파괴 중 전체 에러:', webviewError);
-      }
-
-              // 4. IndexedDB 정리 (선택적)
-        console.log('🗄️ IndexedDB 정리 시작');
-        try {
-          if ('indexedDB' in window) {
-            console.log('📋 IndexedDB 데이터베이스 목록 확인 중...');
-            const databases = await window.indexedDB.databases();
-            console.log('📋 모든 IndexedDB 데이터베이스:');
-            databases.forEach(db => {
-              console.log(`  - ${db.name} (version: ${db.version})`);
-            });
-            console.log(`📊 총 ${databases.length}개의 데이터베이스`);
-            
-            const instagramDBs = databases.filter(db => 
-              db.name && (
-                db.name.toLowerCase().includes('instagram') ||
-                db.name.toLowerCase().includes('ig_') ||
-                db.name.toLowerCase().includes('session')
-              )
-            );
-            console.log(`🔍 Instagram 관련 데이터베이스: ${instagramDBs.length}개`);
-            
-            for (const db of instagramDBs) {
-              try {
-                if (db.name) {
-                  await window.indexedDB.deleteDatabase(db.name);
-                  console.log(`Deleted IndexedDB: ${db.name}`);
-                }
-              } catch (e) {
-                console.warn(`Failed to delete IndexedDB ${db.name}:`, e);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to clear IndexedDB:', e);
-        }
-
-      // 5. 쿠키 정리 (도메인 제한으로 인해 제한적)
-      console.log('🍪 쿠키 정리 시작');
-      
-      // 먼저 현재 쿠키 확인
-      console.log('📋 현재 쿠키 전체 내용:');
-      const allCookies = document.cookie.split(';').map(c => c.trim());
-      allCookies.forEach(cookie => {
-        console.log(`  - ${cookie}`);
+      // Use the clean disconnect service
+      await InstagramDisconnectService.disconnect({
+        clearServerData: true,
+        clearWebViewData: true,
+        notifyWebView: true
       });
-      console.log(`📊 총 ${allCookies.length}개의 쿠키`);
       
-      try {
-        // 현재 도메인에서 접근 가능한 Instagram 관련 쿠키만 정리
-        const cookiesToRemove = [
-          'ds_user_id',
-          'sessionid', 
-          'csrftoken',
-          'mid',
-          'ig_did',
-          'ig_nrcb',
-          'ps_n',
-          'rur',
-          'urlgen'
-        ];
-        
-        cookiesToRemove.forEach(cookieName => {
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.instagram.com`;
-          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=instagram.com`;
-        });
-        
-        console.log('Instagram cookies cleared');
-      } catch (e) {
-        console.warn('Failed to clear cookies:', e);
-      }
-
-      console.log('🎉 disconnectAccount 함수 완료!');
-      
-      // WebView 강제 리렌더링을 위한 이벤트 발생
-      setTimeout(() => {
-        try {
-          window.dispatchEvent(new CustomEvent('instagram-webview-force-reload'));
-          console.log('🔄 WebView 강제 리렌더링 이벤트 발생');
-        } catch (e) {
-          console.warn('WebView 강제 리렌더링 이벤트 발생 실패:', e);
-        }
-      }, 1000);
+      // Update local state
+      setInstagramAccount(null);
+      console.log('✅ Instagram account state cleared');
       
       toast({
         title: "Instagram disconnected",
-        description: "Successfully disconnected from Instagram. All local data has been cleared.",
+        description: "Successfully disconnected from Instagram. All data has been cleared.",
       });
+      
     } catch (error: any) {
       console.error('Failed to disconnect Instagram:', error);
       toast({
@@ -465,7 +124,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         description: "Failed to disconnect from Instagram.",
         variant: "destructive",
       });
-      throw error; // 에러를 다시 던져서 호출자가 처리할 수 있도록 함
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -475,17 +134,475 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     await checkConnection();
   }, [checkConnection]);
 
-  // 사용자가 로그인하면 Instagram 연결 상태를 확인
-  React.useEffect(() => {
-    if (user && token) {
-      // 자동으로 연결 상태 확인하지 않음 - Dashboard에서 필요할 때만 확인
-      console.log('User logged in, Instagram connection check ready');
-    } else {
-      setInstagramAccount(null);
-      // 로그아웃 시 연결 상태 초기화
-      setIsLoading(false);
+  const saveInstagramSession = async (sessionData: any) => {
+    try {
+      console.log('Saving Instagram session data:', sessionData);
+      
+      const username = sessionData?.username;
+      if (!username) {
+        throw new Error('Username not found in session data');
+      }
+
+      // Get current full cookie set from Electron API instead of using sessionData.cookies
+      let cookiesToSave = sessionData.cookies || {};
+      
+      try {
+        console.log('🔍 Getting current full cookies from Electron API for saving...');
+        
+        if ((window as any).electronAPI?.getInstagramCookies) {
+          const fullCookieResponse = await (window as any).electronAPI.getInstagramCookies();
+          if (fullCookieResponse && fullCookieResponse.cookies && Object.keys(fullCookieResponse.cookies).length > 0) {
+            console.log('✅ Using full cookie set from Electron API for saving');
+            console.log('📊 Cookie comparison - Original:', Object.keys(cookiesToSave).length, 'vs Full:', Object.keys(fullCookieResponse.cookies).length);
+            cookiesToSave = fullCookieResponse.cookies;
+          } else {
+            console.log('⚠️ Electron API returned empty cookies, using session data cookies');
+          }
+        } else if (window.ipcRenderer) {
+          const ipcCookies = await window.ipcRenderer.invoke('ig:get-instagram-cookies');
+          if (ipcCookies && ipcCookies.cookies && Object.keys(ipcCookies.cookies).length > 0) {
+            console.log('✅ Using full cookie set from IPC for saving');
+            console.log('📊 Cookie comparison - Original:', Object.keys(cookiesToSave).length, 'vs IPC:', Object.keys(ipcCookies.cookies).length);
+            cookiesToSave = ipcCookies.cookies;
+          } else {
+            console.log('⚠️ IPC returned empty cookies, using session data cookies');
+          }
+        } else {
+          console.log('⚠️ No Electron API available, using session data cookies');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to get full cookies, using session data cookies:', error);
+      }
+
+      console.log('🍪 Final cookies to save:', Object.keys(cookiesToSave));
+      console.log('📄 Cookie details for saving:', cookiesToSave);
+
+      // Prepare request data with full cookie set
+      const requestData = {
+        username: username,
+        cookies: cookiesToSave
+      };
+
+      console.log('Sending Instagram connect request:', requestData);
+      const response = await InstagramService.connectInstagramAccountApiV1InstagramMePost(requestData);
+      
+      console.log('Instagram connect response received:', response);
+      
+      // Update local state
+      setInstagramAccount(response);
+      
+      // Refresh connection to ensure consistency
+      await refreshConnection();
+      
+      return response;
+      
+    } catch (error) {
+      console.error('Failed to save Instagram session:', error);
+      throw error;
     }
-  }, [user, token]);
+  };
+
+  const injectCookiesToWebView = React.useCallback(async (cookies: Record<string, any>): Promise<boolean> => {
+    try {
+      console.log('Injecting cookies to WebView:', cookies);
+      
+      // Method 1: Electron API
+      if ((window as any).electronAPI?.injectCookiesToWebView) {
+        console.log('Using Electron API for cookie injection');
+        const result = await (window as any).electronAPI.injectCookiesToWebView(cookies);
+        console.log('Electron cookie injection result:', result);
+        return result;
+      }
+      
+      // Method 2: IPC Renderer
+      if (window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
+        console.log('Using IPC Renderer for cookie injection');
+        const result = await window.ipcRenderer.invoke('inject-cookies-to-webview', cookies);
+        console.log('IPC cookie injection result:', result);
+        return result;
+      }
+      
+      console.warn('No available method for cookie injection');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to inject cookies to WebView:', error);
+      return false;
+    }
+  }, []);
+
+  // Prevent multiple cookie tests running simultaneously
+  const cookieTestRunning = React.useRef(false);
+  
+  // Test cookie validity by creating a temporary webview and checking redirect
+  const testCookieValidity = React.useCallback(async (cookies: Record<string, any>): Promise<void> => {
+    // Prevent multiple tests running
+    if (cookieTestRunning.current) {
+      console.log('🔄 Cookie test already running, skipping...');
+      return;
+    }
+
+    try {
+      cookieTestRunning.current = true;
+      console.log('🧪 Testing cookie validity with temporary webview...');
+
+      // Check if required cookies are present
+      const requiredCookies = ['sessionid', 'ds_user_id'];
+      const missingCookies = requiredCookies.filter(key => !cookies[key]);
+
+      if (missingCookies.length > 0) {
+        console.warn('⚠️ Missing required cookies for validation:', missingCookies);
+        console.log('Available cookies:', Object.keys(cookies));
+        cookieTestRunning.current = false;
+        return;
+      }
+
+      // Create a temporary webview element (use same partition as main to see injected cookies)
+      const tempWebview = document.createElement('webview');
+      // Keep it off-screen but attached
+      tempWebview.style.position = 'absolute';
+      tempWebview.style.left = '-99999px';
+      tempWebview.style.top = '0';
+      tempWebview.style.width = '1px';
+      tempWebview.style.height = '1px';
+      tempWebview.setAttribute('partition', 'persist:ig');
+      tempWebview.setAttribute('webpreferences', 'contextIsolation=yes, nodeIntegration=no');
+      tempWebview.setAttribute('allowpopups', 'true');
+      document.body.appendChild(tempWebview);
+
+      let urlCheckTimeout: NodeJS.Timeout | null = null;
+      let cleanupDone = false;
+      let navigated = false;
+      let lastNavigatedUrl: string = '';
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      const cleanup = () => {
+        if (cleanupDone) return;
+        cleanupDone = true;
+
+        if (urlCheckTimeout) { clearTimeout(urlCheckTimeout); urlCheckTimeout = null; }
+        try {
+          tempWebview.removeEventListener('did-navigate', handleDidNavigate as any);
+          tempWebview.removeEventListener('did-navigate-in-page', handleDidNavigate as any);
+          tempWebview.removeEventListener('dom-ready', handleDomReady as any);
+          tempWebview.removeEventListener('did-fail-load', handleDidFailLoad as any);
+        } catch {}
+        try {
+          if (tempWebview && tempWebview.parentNode) {
+            document.body.removeChild(tempWebview);
+          }
+        } catch {}
+        cookieTestRunning.current = false;
+      };
+
+      // Enhanced error handling with retry logic
+      const handleDidFailLoad = (event: any) => {
+        if (cleanupDone) return;
+        console.warn(`🚫 Webview failed to load (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
+          errorCode: event.errorCode,
+          errorDescription: event.errorDescription,
+          url: event.validatedURL || 'unknown'
+        });
+
+        // If we have retries left and it's a network error, try again
+        if (retryCount < maxRetries && (event.errorCode === -2 || event.errorCode === -106 || event.errorCode === -118)) {
+          retryCount++;
+          console.log(`🔄 Retrying navigation (${retryCount}/${maxRetries})...`);
+
+          // Wait before retry
+          setTimeout(() => {
+            if (!cleanupDone && tempWebview && tempWebview.parentNode) {
+              try {
+                (tempWebview as any).src = 'https://www.instagram.com/';
+              } catch (error) {
+                console.error('Error during retry:', error);
+                cleanup();
+              }
+            }
+          }, 1000 * retryCount); // Exponential backoff
+
+          return;
+        }
+
+        // No more retries or non-recoverable error
+        console.error('❌ Cookie validation failed due to navigation errors - assuming cookies are invalid');
+        cleanup();
+      };
+      tempWebview.addEventListener('did-fail-load', handleDidFailLoad as any);
+
+      // Set up URL monitoring
+      const checkUrl = (navigatedUrl?: string) => {
+        try {
+          if (cleanupDone) return;
+          // Prefer URL from event if provided; otherwise, use API only if still attached
+          let currentUrl = navigatedUrl || '';
+          if (!currentUrl) {
+            const attached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+            if (!attached) return;
+            if (typeof (tempWebview as any).getURL === 'function') {
+              currentUrl = (tempWebview as any).getURL();
+            } else {
+              currentUrl = (tempWebview as any).src || '';
+            }
+          }
+          if (!currentUrl || currentUrl === 'about:blank') {
+            // Ignore initial blank navigation
+            return;
+          }
+          console.log('📍 Final URL after navigation:', currentUrl);
+
+          if (currentUrl.includes('/accounts/login') || currentUrl.includes('/login/')) {
+            console.log('❌ Cookie validation failed: Redirected to login page');
+            console.log('🔄 This indicates the cookies are expired or invalid');
+          } else if (currentUrl === 'https://www.instagram.com/' || (currentUrl.includes('instagram.com') && !currentUrl.includes('login'))) {
+            console.log('✅ Cookie validation passed: Stayed on main Instagram page');
+            console.log('🎉 This indicates the cookies are valid and user is logged in');
+          } else {
+            console.log('🤔 Unexpected URL after navigation:', currentUrl);
+          }
+        } catch (error) {
+          console.warn('Error checking URL:', error);
+        }
+
+        cleanup();
+      };
+
+      // After navigate completes, check URL and cleanup
+      const handleDidNavigate = (e: any) => {
+        if (cleanupDone) return;
+        lastNavigatedUrl = e?.url || lastNavigatedUrl;
+        // Defer slightly to allow redirects to settle
+        setTimeout(() => checkUrl(lastNavigatedUrl), 500);
+      };
+
+      tempWebview.addEventListener('did-navigate', handleDidNavigate as any);
+      tempWebview.addEventListener('did-navigate-in-page', handleDidNavigate as any);
+
+      // Wait for webview to be ready and inject cookies
+      const handleDomReady = async () => {
+        try {
+          if (cleanupDone) return;
+          const attached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+          if (!attached) {
+            console.warn('Temp webview dom-ready fired after detach; ignoring');
+            return;
+          }
+          console.log('🔧 Temporary webview DOM ready, injecting cookies...');
+
+          // Wait a bit for webview to be fully ready
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Inject cookies via Electron API using test partition
+          if ((window as any).electronAPI?.injectCookiesToWebView) {
+            const injected = await (window as any).electronAPI.injectCookiesToWebView(cookies);
+
+            if (injected) {
+              console.log('✅ Cookies injected to test webview');
+
+              // Wait before navigation
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              // Navigate to Instagram via src attribute with error handling
+              console.log('🌐 Navigating to instagram.com...');
+              if (!cleanupDone && !navigated) {
+                navigated = true;
+                // Guard again before mutating src
+                const stillAttached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+                if (stillAttached) {
+                  try {
+                    (tempWebview as any).src = 'https://www.instagram.com/';
+                  } catch (error) {
+                    console.error('❌ Error setting webview src:', error);
+                    cleanup();
+                  }
+                } else {
+                  console.warn('Temp webview detached before navigate; skipping');
+                  cleanup();
+                }
+              }
+            } else {
+              console.error('❌ Failed to inject cookies to test webview');
+              cleanup();
+            }
+          } else {
+            console.error('❌ Electron API not available for test webview');
+            cleanup();
+          }
+        } catch (error) {
+          console.error('Error in temporary webview setup:', error);
+          cleanup();
+        }
+      };
+      tempWebview.addEventListener('dom-ready', handleDomReady as any);
+
+      // Start with blank page
+      console.log('🔄 Starting temporary webview with blank page...');
+      try {
+        (tempWebview as any).src = 'about:blank';
+      } catch (error) {
+        console.error('❌ Error setting initial webview src:', error);
+        cleanup();
+        return;
+      }
+
+      // Fallback cleanup after 15 seconds (increased timeout)
+      setTimeout(() => {
+        if (!cleanupDone) {
+          console.log('⏰ Cookie validation timeout - cleaning up');
+          cleanup();
+        }
+      }, 15000);
+
+    } catch (error) {
+      console.error('Error in cookie validity test:', error);
+      cookieTestRunning.current = false;
+    }
+  }, [injectCookiesToWebView]);
+
+  // Debug function to check current WebView cookies
+  const debugCurrentCookies = React.useCallback(async () => {
+    try {
+      console.log('🔍 Checking current WebView cookies...');
+      
+      // Method 1: Check via Electron API
+      if ((window as any).electronAPI?.getInstagramCookies) {
+        const electronCookies = await (window as any).electronAPI.getInstagramCookies();
+        console.log('📊 Electron API cookies:', {
+          count: Object.keys(electronCookies.cookies || {}).length,
+          cookies: electronCookies.cookies,
+          raw: electronCookies.raw?.map((c: any) => ({ name: c.name, value: c.value?.substring(0, 20) + '...', httpOnly: c.httpOnly }))
+        });
+      }
+      
+      // Method 2: Check via IPC
+      if (window.ipcRenderer) {
+        const ipcCookies = await window.ipcRenderer.invoke('ig:get-instagram-cookies');
+        console.log('📊 IPC cookies:', {
+          count: Object.keys(ipcCookies.cookies || {}).length,
+          cookies: ipcCookies.cookies
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to check current cookies:', error);
+    }
+  }, []);
+
+  const restoreInstagramSession = React.useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('Restoring Instagram session...');
+      
+      // Debug: Check current cookies before restoration
+      await debugCurrentCookies();
+      
+      if (!instagramAccount) {
+        console.log('No Instagram account to restore');
+        return false;
+      }
+
+      // Get stored cookies from server
+      const cookies = instagramAccount.cookies;
+      if (!cookies || Object.keys(cookies).length === 0) {
+        console.log('No cookies available for restoration');
+        return false;
+      }
+
+      // Guard: Ensure required HttpOnly cookie exists (sessionid)
+      if (!cookies['sessionid']) {
+        console.warn('⚠️ Missing required session cookie (sessionid). Cannot restore authenticated session.');
+        toast({
+          title: 'Session refresh required',
+          description: 'Stored cookies are incomplete. Please sign in to Instagram once to refresh your session.',
+          variant: 'destructive'
+        });
+        return false;
+      }
+
+      console.log('Found cookies for restoration:', Object.keys(cookies));
+      console.log('Cookie details:', cookies);
+      
+      // Inject cookies to WebView
+      const injected = await injectCookiesToWebView(cookies);
+      
+      if (injected) {
+        console.log('✅ Instagram session restored successfully');
+
+        // Test cookie validity by checking redirect to login
+        // This is optional - if it fails, we still consider the injection successful
+        try {
+          await testCookieValidity(cookies);
+        } catch (error) {
+          console.warn('⚠️ Cookie validation test failed, but cookies were injected:', error);
+        }
+
+        return true;
+      } else {
+        console.warn('Failed to inject cookies to WebView');
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('Failed to restore Instagram session:', error);
+      return false;
+    }
+  }, [instagramAccount, injectCookiesToWebView]);
+
+  const clearWebViewCookies = React.useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🧹 Clearing WebView cookies for fresh start...');
+      
+      // Method 1: Electron API
+      if ((window as any).electronAPI?.clearWebViewCookies) {
+        console.log('Using Electron API for cookie clearing');
+        const result = await (window as any).electronAPI.clearWebViewCookies();
+        console.log('Electron cookie clearing result:', result);
+        return result;
+      }
+      
+      // Method 2: IPC Renderer
+      if (window.ipcRenderer && typeof window.ipcRenderer.invoke === 'function') {
+        console.log('Using IPC Renderer for cookie clearing');
+        const result = await window.ipcRenderer.invoke('clear-webview-cookies');
+        console.log('IPC cookie clearing result:', result);
+        return result;
+      }
+      
+      console.warn('No available method for cookie clearing');
+      return false;
+      
+    } catch (error) {
+      console.error('Failed to clear WebView cookies:', error);
+      return false;
+    }
+  }, []);
+
+  const prepareWebViewForState = React.useCallback(async (serverRegistered: boolean): Promise<boolean> => {
+    try {
+      console.log('🔧 Preparing WebView for state:', serverRegistered ? 'server_registered' : 'server_unregistered');
+      
+      if (serverRegistered) {
+        // 서버 등록 상태: 서버에서 받은 쿠키를 주입
+        console.log('📥 Server registered - injecting server cookies');
+        return await restoreInstagramSession();
+      } else {
+        // 서버 미등록 상태: 기존 쿠키를 모두 삭제
+        console.log('🗑️ Server unregistered - clearing existing cookies');
+        return await clearWebViewCookies();
+      }
+      
+    } catch (error) {
+      console.error('Failed to prepare WebView for state:', error);
+      return false;
+    }
+  }, [restoreInstagramSession, clearWebViewCookies]);
+
+  // Initialize connection check on mount
+  React.useEffect(() => {
+    if (token && user) {
+      checkConnection();
+    }
+  }, [token, user, checkConnection]);
 
   const value: InstagramContextType = {
     instagramAccount,
@@ -496,7 +613,21 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     disconnectAccount,
     refreshConnection,
     saveInstagramSession,
+    injectCookiesToWebView,
+    restoreInstagramSession,
+    clearWebViewCookies,
+    prepareWebViewForState,
+    debugCurrentCookies,
+    setNavigate: setNavigate,
   };
+
+  // Expose debug function globally for console access
+  React.useEffect(() => {
+    (window as any).debugInstagramCookies = debugCurrentCookies;
+    return () => {
+      delete (window as any).debugInstagramCookies;
+    };
+  }, [debugCurrentCookies]);
 
   return (
     <InstagramContext.Provider value={value}>
