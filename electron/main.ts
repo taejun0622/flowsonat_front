@@ -357,25 +357,52 @@ async function injectInstagramCookies(cookies: Record<string, any>): Promise<boo
   try {
     const igSession = session.fromPartition('persist:ig');
     const cookieList = Object.entries(cookies || {});
-    if (!cookieList.length) return false;
+    if (!cookieList.length) {
+      console.log('No cookies to inject');
+      return false;
+    }
+
+    console.log(`Injecting ${cookieList.length} cookies:`, cookieList.map(([name]) => name));
 
     // Use secure URL for cookie scope
     const url = 'https://www.instagram.com';
 
+    let successCount = 0;
+    let failureCount = 0;
+
     for (const [name, value] of cookieList) {
-      // Minimal cookie set; extend as needed
-      await igSession.cookies.set({
-        url,
-        name,
-        value: String(value),
-        domain: '.instagram.com',
-        path: '/',
-        secure: true,
-        httpOnly: false,
-        sameSite: 'lax',
-      });
+      try {
+        // Special handling for sessionid (should be httpOnly)
+        const isHttpOnly = ['sessionid'].includes(name);
+        
+        const cookieDetails = {
+          url,
+          name,
+          value: String(value),
+          domain: '.instagram.com',
+          path: '/',
+          secure: true,
+          httpOnly: isHttpOnly,
+          sameSite: 'lax' as const,
+        };
+        
+        await igSession.cookies.set(cookieDetails);
+        console.log(`✅ Cookie injected: ${name}`);
+        successCount++;
+      } catch (cookieError) {
+        console.error(`❌ Failed to inject cookie ${name}:`, cookieError);
+        failureCount++;
+      }
     }
-    return true;
+    
+    console.log(`Cookie injection result: ${successCount} success, ${failureCount} failed`);
+    
+    // Verify injected cookies
+    const injectedCookies = await igSession.cookies.get({ url });
+    console.log(`Verification: ${injectedCookies.length} cookies now in session:`, 
+      injectedCookies.map(c => c.name));
+    
+    return successCount > 0;
   } catch (e) {
     console.error('injectInstagramCookies failed:', e);
     return false;

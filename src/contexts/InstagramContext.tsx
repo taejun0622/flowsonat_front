@@ -20,6 +20,7 @@ interface InstagramContextType {
   restoreInstagramSession: () => Promise<boolean>;
   clearWebViewCookies: () => Promise<boolean>;
   prepareWebViewForState: (serverRegistered: boolean) => Promise<boolean>;
+  debugCurrentCookies: () => Promise<void>;
   setNavigate: (navigate: NavigateFunction) => void;
 }
 
@@ -142,10 +143,44 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         throw new Error('Username not found in session data');
       }
 
-      // Prepare request data
+      // Get current full cookie set from Electron API instead of using sessionData.cookies
+      let cookiesToSave = sessionData.cookies || {};
+      
+      try {
+        console.log('🔍 Getting current full cookies from Electron API for saving...');
+        
+        if ((window as any).electronAPI?.getInstagramCookies) {
+          const fullCookieResponse = await (window as any).electronAPI.getInstagramCookies();
+          if (fullCookieResponse && fullCookieResponse.cookies && Object.keys(fullCookieResponse.cookies).length > 0) {
+            console.log('✅ Using full cookie set from Electron API for saving');
+            console.log('📊 Cookie comparison - Original:', Object.keys(cookiesToSave).length, 'vs Full:', Object.keys(fullCookieResponse.cookies).length);
+            cookiesToSave = fullCookieResponse.cookies;
+          } else {
+            console.log('⚠️ Electron API returned empty cookies, using session data cookies');
+          }
+        } else if (window.ipcRenderer) {
+          const ipcCookies = await window.ipcRenderer.invoke('ig:get-instagram-cookies');
+          if (ipcCookies && ipcCookies.cookies && Object.keys(ipcCookies.cookies).length > 0) {
+            console.log('✅ Using full cookie set from IPC for saving');
+            console.log('📊 Cookie comparison - Original:', Object.keys(cookiesToSave).length, 'vs IPC:', Object.keys(ipcCookies.cookies).length);
+            cookiesToSave = ipcCookies.cookies;
+          } else {
+            console.log('⚠️ IPC returned empty cookies, using session data cookies');
+          }
+        } else {
+          console.log('⚠️ No Electron API available, using session data cookies');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to get full cookies, using session data cookies:', error);
+      }
+
+      console.log('🍪 Final cookies to save:', Object.keys(cookiesToSave));
+      console.log('📄 Cookie details for saving:', cookiesToSave);
+
+      // Prepare request data with full cookie set
       const requestData = {
         username: username,
-        cookies: sessionData.cookies || {}
+        cookies: cookiesToSave
       };
 
       console.log('Sending Instagram connect request:', requestData);
@@ -196,9 +231,168 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     }
   }, []);
 
+  // Prevent multiple cookie tests running simultaneously
+  const cookieTestRunning = React.useRef(false);
+  
+  // Test cookie validity by creating a temporary webview and checking redirect
+  const testCookieValidity = React.useCallback(async (cookies: Record<string, any>): Promise<void> => {
+    // Prevent multiple tests running
+    if (cookieTestRunning.current) {
+      console.log('🔄 Cookie test already running, skipping...');
+      return;
+    }
+    
+    try {
+      cookieTestRunning.current = true;
+      console.log('🧪 Testing cookie validity with temporary webview...');
+      
+      // Check if required cookies are present
+      const requiredCookies = ['sessionid', 'ds_user_id'];
+      const missingCookies = requiredCookies.filter(key => !cookies[key]);
+      
+      if (missingCookies.length > 0) {
+        console.warn('⚠️ Missing required cookies for validation:', missingCookies);
+        console.log('Available cookies:', Object.keys(cookies));
+        cookieTestRunning.current = false;
+        return;
+      }
+      
+      // Create a temporary webview element
+      const tempWebview = document.createElement('webview');
+      tempWebview.style.display = 'none';
+      tempWebview.style.width = '1px';
+      tempWebview.style.height = '1px';
+      tempWebview.partition = 'persist:ig-test';
+      document.body.appendChild(tempWebview);
+      
+      let urlCheckTimeout: NodeJS.Timeout;
+      let cleanupDone = false;
+      
+      const cleanup = () => {
+        if (cleanupDone) return;
+        cleanupDone = true;
+        
+        if (urlCheckTimeout) clearTimeout(urlCheckTimeout);
+        if (tempWebview && tempWebview.parentNode) {
+          document.body.removeChild(tempWebview);
+        }
+        cookieTestRunning.current = false;
+      };
+      
+      // Set up error handling
+      tempWebview.addEventListener('did-fail-load', (event: any) => {
+        console.warn('🚫 Webview failed to load:', event);
+        cleanup();
+      });
+      
+      // Set up URL monitoring  
+      const checkUrl = () => {
+        try {
+          const currentUrl = tempWebview.src || '';
+          console.log('📍 Final URL after navigation:', currentUrl);
+          
+          if (currentUrl.includes('/accounts/login') || currentUrl.includes('/login/')) {
+            console.log('❌ Cookie validation failed: Redirected to login page');
+            console.log('🔄 This indicates the cookies are expired or invalid');
+          } else if (currentUrl === 'https://www.instagram.com/' || (currentUrl.includes('instagram.com') && !currentUrl.includes('login'))) {
+            console.log('✅ Cookie validation passed: Stayed on main Instagram page');
+            console.log('🎉 This indicates the cookies are valid and user is logged in');
+          } else {
+            console.log('🤔 Unexpected URL after navigation:', currentUrl);
+          }
+        } catch (error) {
+          console.warn('Error checking URL:', error);
+        }
+        
+        cleanup();
+      };
+      
+      // Wait for webview to be ready and inject cookies
+      tempWebview.addEventListener('dom-ready', async () => {
+        try {
+          console.log('🔧 Temporary webview DOM ready, injecting cookies...');
+          
+          // Wait a bit for webview to be fully ready
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Inject cookies via Electron API using test partition
+          if ((window as any).electronAPI?.injectCookiesToWebView) {
+            const injected = await (window as any).electronAPI.injectCookiesToWebView(cookies);
+            
+            if (injected) {
+              console.log('✅ Cookies injected to test webview');
+              
+              // Wait before navigation
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              // Navigate to Instagram
+              console.log('🌐 Navigating to instagram.com...');
+              tempWebview.loadURL('https://www.instagram.com/');
+              
+              // Check URL after navigation completes
+              urlCheckTimeout = setTimeout(checkUrl, 5000);
+            } else {
+              console.error('❌ Failed to inject cookies to test webview');
+              cleanup();
+            }
+          } else {
+            console.error('❌ Electron API not available for test webview');
+            cleanup();
+          }
+        } catch (error) {
+          console.error('Error in temporary webview setup:', error);
+          cleanup();
+        }
+      });
+      
+      // Start with blank page
+      console.log('🔄 Starting temporary webview with blank page...');
+      tempWebview.src = 'about:blank';
+      
+      // Fallback cleanup after 10 seconds
+      setTimeout(cleanup, 10000);
+      
+    } catch (error) {
+      console.error('Error in cookie validity test:', error);
+      cookieTestRunning.current = false;
+    }
+  }, [injectCookiesToWebView]);
+
+  // Debug function to check current WebView cookies
+  const debugCurrentCookies = React.useCallback(async () => {
+    try {
+      console.log('🔍 Checking current WebView cookies...');
+      
+      // Method 1: Check via Electron API
+      if ((window as any).electronAPI?.getInstagramCookies) {
+        const electronCookies = await (window as any).electronAPI.getInstagramCookies();
+        console.log('📊 Electron API cookies:', {
+          count: Object.keys(electronCookies.cookies || {}).length,
+          cookies: electronCookies.cookies,
+          raw: electronCookies.raw?.map((c: any) => ({ name: c.name, value: c.value?.substring(0, 20) + '...', httpOnly: c.httpOnly }))
+        });
+      }
+      
+      // Method 2: Check via IPC
+      if (window.ipcRenderer) {
+        const ipcCookies = await window.ipcRenderer.invoke('ig:get-instagram-cookies');
+        console.log('📊 IPC cookies:', {
+          count: Object.keys(ipcCookies.cookies || {}).length,
+          cookies: ipcCookies.cookies
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to check current cookies:', error);
+    }
+  }, []);
+
   const restoreInstagramSession = React.useCallback(async (): Promise<boolean> => {
     try {
       console.log('Restoring Instagram session...');
+      
+      // Debug: Check current cookies before restoration
+      await debugCurrentCookies();
       
       if (!instagramAccount) {
         console.log('No Instagram account to restore');
@@ -213,12 +407,17 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       }
 
       console.log('Found cookies for restoration:', Object.keys(cookies));
+      console.log('Cookie details:', cookies);
       
       // Inject cookies to WebView
       const injected = await injectCookiesToWebView(cookies);
       
       if (injected) {
         console.log('✅ Instagram session restored successfully');
+        
+        // Test cookie validity by checking redirect to login
+        await testCookieValidity(cookies);
+        
         return true;
       } else {
         console.warn('Failed to inject cookies to WebView');
@@ -300,8 +499,17 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
     restoreInstagramSession,
     clearWebViewCookies,
     prepareWebViewForState,
+    debugCurrentCookies,
     setNavigate: setNavigate,
   };
+
+  // Expose debug function globally for console access
+  React.useEffect(() => {
+    (window as any).debugInstagramCookies = debugCurrentCookies;
+    return () => {
+      delete (window as any).debugInstagramCookies;
+    };
+  }, [debugCurrentCookies]);
 
   return (
     <InstagramContext.Provider value={value}>

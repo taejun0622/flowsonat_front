@@ -275,12 +275,39 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       setForceReload(prev => prev + 1);
     };
 
+    // Handle full cookies received from Electron API
+    const handleFullCookiesReceived = (event: CustomEvent) => {
+      console.log('[WebView] 📥 Full cookies received via Electron API');
+      const { cookies, originalSessionData } = event.detail;
+      
+      // Create updated session data with full cookie set
+      const updatedSessionData = {
+        ...originalSessionData,
+        cookies: cookies,
+        detectionMethod: originalSessionData.detectionMethod + '_with_electron_cookies'
+      };
+      
+      console.log('[WebView] 🔄 Updated session data with full cookies:', {
+        cookieCount: Object.keys(cookies).length,
+        cookieNames: Object.keys(cookies),
+        detectionMethod: updatedSessionData.detectionMethod
+      });
+      
+      // Trigger Instagram login callback with updated data
+      if (onInstagramLogin) {
+        console.log('[WebView] 🚀 Triggering login callback with full cookie set');
+        onInstagramLogin(updatedSessionData);
+      }
+    };
+
     window.addEventListener('instagram-webview-force-reload', handleForceReload);
+    window.addEventListener('instagram-full-cookies-received', handleFullCookiesReceived as EventListener);
     
     return () => {
       window.removeEventListener('instagram-webview-force-reload', handleForceReload);
+      window.removeEventListener('instagram-full-cookies-received', handleFullCookiesReceived as EventListener);
     };
-  }, []);
+  }, [onInstagramLogin]);
 
   // 확장프로그램 활성화 상태 변경 감지 (Manager decides; trust enableExtension)
   useEffect(() => {

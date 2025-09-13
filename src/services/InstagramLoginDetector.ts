@@ -310,12 +310,13 @@ export class InstagramLoginDetector {
               }
             });
             
+            // Get all cookies including HttpOnly via Electron API
             var sessionData = {
               isLoggedIn: true,
               username: username || 'instagram_user',
               dsUserId: dsUserId,
               sessionId: sessionId,
-              cookies: structuredCookies,
+              cookies: structuredCookies, // Will be updated with full cookies below
               rawCookies: document.cookie,
               detectionMethod: username ? 'cookies_and_dom' : 'cookies',
               timestamp: new Date().toISOString(),
@@ -323,6 +324,38 @@ export class InstagramLoginDetector {
               psnCookies: psnCookies,
               hasPsnZero: hasPsnZero
             };
+            
+            // Debug: Show current DOM cookies before Electron API call
+            console.log('🍪 Current DOM cookies before Electron API:', document.cookie);
+            console.log('🍪 Structured DOM cookies:', structuredCookies);
+            
+            // Try to get complete cookie set including HttpOnly cookies via Electron
+            if (window.electronAPI && window.electronAPI.getInstagramCookies) {
+              console.log('🔍 Attempting to get full cookies via Electron API...');
+              // Use Promise-based approach instead of await in sync context
+              window.electronAPI.getInstagramCookies().then(function(fullCookieResponse) {
+                if (fullCookieResponse && fullCookieResponse.cookies) {
+                  console.log('✅ Got full cookie set via Electron:', Object.keys(fullCookieResponse.cookies));
+                  console.log('📊 Full cookie details:', fullCookieResponse.cookies);
+                  console.log('📈 Cookie count comparison - DOM:', Object.keys(structuredCookies).length, 'vs Electron:', Object.keys(fullCookieResponse.cookies).length);
+                  
+                  // Update cookies and re-trigger detection with full cookie set
+                  window.dispatchEvent(new CustomEvent('instagram-full-cookies-received', {
+                    detail: {
+                      cookies: fullCookieResponse.cookies,
+                      originalSessionData: sessionData
+                    }
+                  }));
+                } else {
+                  console.log('❌ No cookies from Electron API, using DOM cookies');
+                  console.log('📊 Electron API response:', fullCookieResponse);
+                }
+              }).catch(function(error) {
+                console.warn('❌ Failed to get cookies via Electron API:', error);
+              });
+            } else {
+              console.log('❌ Electron API not available, using DOM cookies only');
+            }
             
             console.log('Returning login success data:', sessionData);
             console.log('=== End Debug ===');
@@ -349,7 +382,7 @@ export class InstagramLoginDetector {
                   username: nr.username || 'instagram_user',
                   dsUserId: nr.dsUserId,
                   sessionId: null,
-                  cookies: structuredCookies,
+                  cookies: structuredCookies, // Will be updated with full cookies below
                   rawCookies: document.cookie,
                   detectionMethod: 'network',
                   timestamp: new Date().toISOString(),
@@ -357,6 +390,30 @@ export class InstagramLoginDetector {
                   psnCookies: psnCookies,
                   hasPsnZero: hasPsnZero
                 };
+                
+                // Try to get complete cookie set including HttpOnly cookies via Electron
+                if (window.electronAPI && window.electronAPI.getInstagramCookies) {
+                  console.log('Attempting to get full cookies via Electron API (network fallback)...');
+                  // Use Promise-based approach for network fallback too
+                  window.electronAPI.getInstagramCookies().then(function(fullCookieResponse2) {
+                    if (fullCookieResponse2 && fullCookieResponse2.cookies) {
+                      console.log('Got full cookie set via Electron (network fallback):', Object.keys(fullCookieResponse2.cookies));
+                      // Update cookies and re-trigger detection with full cookie set
+                      window.dispatchEvent(new CustomEvent('instagram-full-cookies-received', {
+                        detail: {
+                          cookies: fullCookieResponse2.cookies,
+                          originalSessionData: sessionData2
+                        }
+                      }));
+                    } else {
+                      console.log('No cookies from Electron API (network fallback), using DOM cookies');
+                    }
+                  }).catch(function(error) {
+                    console.warn('Failed to get cookies via Electron API (network fallback):', error);
+                  });
+                } else {
+                  console.log('Electron API not available (network fallback), using DOM cookies only');
+                }
                 console.log('Returning login success via network fallback:', sessionData2);
                 console.log('=== End Debug ===');
                 return JSON.stringify({ type: 'INSTAGRAM_LOGIN_SUCCESS', data: sessionData2 });
