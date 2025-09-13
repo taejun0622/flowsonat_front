@@ -197,6 +197,17 @@ export class AutomationService {
         // Wait for a common layout element on profile/suggested pages
         await this.waitForSelector('main, header', 1500);
       } catch {}
+      
+      // Check for page unavailable error after navigation
+      try {
+        const isPageUnavailable = await this.checkForPageUnavailableError();
+        if (isPageUnavailable) {
+          console.log(`[Automation] Page unavailable detected after navigation to ${profileUrl}`);
+          // Don't throw error, let the caller handle the page unavailable state
+        }
+      } catch (error) {
+        console.warn('[Automation] Error checking for page unavailable after navigation:', error);
+      }
 
       // Collect profile information and send to history API
       try {
@@ -336,6 +347,20 @@ export class AutomationService {
           // Small human-like settle before interacting
           await this.randomDelay(200, 600);
           
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username}, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            unfollowedCount++;
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
+          
           // Check if unfollow button exists and click it
           const unfollowed = await this.clickUnfollowButton();
           if (unfollowed) {
@@ -391,6 +416,13 @@ export class AutomationService {
           const profileUrl = `https://www.instagram.com/${benchmark.ig.username}`;
           await this.navigateToProfile(profileUrl);
           await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Benchmark profile ${benchmark.ig.username} is unavailable, skipping target collection`);
+            continue;
+          }
           
           // Check if follow button exists
           const canFollow = await this.checkIfCanFollow();
@@ -516,6 +548,19 @@ export class AutomationService {
           const profileUrl = `https://www.instagram.com/${target.ig.username}`;
           await this.navigateToProfile(profileUrl);
           await this.randomDelay(250, 650);
+          
+          // Check if the page shows "Sorry, this page isn't available" error
+          const isPageUnavailable = await this.checkForPageUnavailableError();
+          if (isPageUnavailable) {
+            console.log(`[Automation] Page unavailable for ${target.ig.username} during follow, updating status to UNFOLLOWED`);
+            // Update target stage to UNFOLLOWED when page is unavailable
+            await InstagramService.updateTargetApiV1InstagramTargetsTargetIdPut(target.id, {
+              stage: StageEnum.UNFOLLOWED
+            });
+            this.options.onAction?.('unfollow', target.ig.username, true);
+            await this.delayAround(this.options.scrollDelay, 0.5);
+            continue;
+          }
           
           // Check if we can follow
           const canFollow = await this.checkIfCanFollow();
@@ -1228,6 +1273,70 @@ export class AutomationService {
     const min = Math.floor(base * (1 - jitter));
     const max = Math.floor(base * (1 + jitter));
     return this.randomDelay(min, max);
+  }
+
+  /**
+   * Check if the current page shows "Sorry, this page isn't available" error
+   */
+  private async checkForPageUnavailableError(): Promise<boolean> {
+    try {
+      const result = await this.webviewApi.executeScript(`
+        (function() {
+          try {
+            // Look for the "Sorry, this page isn't available" error message
+            const errorTexts = [
+              "Sorry, this page isn't available",
+              "Sorry, this page isn't available.",
+              "Sorry, this page isn't available.",
+              "This page isn't available",
+              "Page not found",
+              "User not found"
+            ];
+            
+            // Check page title
+            const title = document.title || '';
+            if (errorTexts.some(text => title.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for error messages in the page content
+            const bodyText = document.body ? document.body.innerText || document.body.textContent || '' : '';
+            if (errorTexts.some(text => bodyText.toLowerCase().includes(text.toLowerCase()))) {
+              return true;
+            }
+            
+            // Check for specific error elements
+            const errorSelectors = [
+              'h2:contains("Sorry, this page isn\'t available")',
+              '[data-testid="error-page"]',
+              '.error-page',
+              'main h2',
+              'main h1'
+            ];
+            
+            for (const selector of errorSelectors) {
+              const elements = document.querySelectorAll(selector);
+              for (const element of elements) {
+                const text = element.innerText || element.textContent || '';
+                if (errorTexts.some(errorText => text.toLowerCase().includes(errorText.toLowerCase()))) {
+                  return true;
+                }
+              }
+            }
+            
+            return false;
+          } catch (e) {
+            console.error('Error checking for page unavailable:', e);
+            return false;
+          }
+        })();
+      `);
+      
+      return result === true;
+    } catch (error) {
+      console.error('[Automation] Error checking for page unavailable:', error);
+      return false;
+    }
   }
 
   /**
