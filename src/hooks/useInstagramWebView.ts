@@ -10,7 +10,10 @@ import {
   InstagramModalState
 } from '@/types/instagram';
 
+import { useLocation } from 'react-router-dom';
+
 export const useInstagramWebView = () => {
+  const location = useLocation();
   const { isConnected, connectAccount, disconnectAccount, saveInstagramSession, restoreInstagramSession, injectCookiesToWebView } = useInstagram();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -45,7 +48,7 @@ export const useInstagramWebView = () => {
   }, [isConnected]);
 
   // Instagram 로그인 상태 감지 시 호출 (로그아웃 플로우용)
-  const handleInstagramLoginDetected = useCallback(async (sessionData: any) => {
+  const handleInstagramLoginDetected = useCallback(async (sessionData: any, pathname: string) => {
     try {
       console.log('=== Instagram Login Detection Flow ===');
       console.log('Session data received:', sessionData);
@@ -121,11 +124,17 @@ export const useInstagramWebView = () => {
 
         // WebView 페이지에서는 Dashboard로 이동하지 않고 현재 페이지에서 automation 활성화
         // Dashboard에서는 WebView가 없으므로 navigate하지 않음
-        if (window.location.pathname !== '/webview') {
-          console.log('Not in WebView page, navigating to dashboard');
+        // automation 실행 중이거나 minimal 모드일 때는 대시보드로 이동하지 않음
+        const urlParams = new URLSearchParams(window.location.search);
+        const isMinimalMode = urlParams.get('minimal') === '1';
+        const isAutoExecuteMode = urlParams.get('autoExecute') === '1';
+        const isAutomationMode = isMinimalMode || isAutoExecuteMode;
+
+        if (window.location.pathname !== '/webview' && !isAutomationMode) {
+          console.log('Not in WebView page and not in automation mode, navigating to dashboard');
           navigate('/dashboard');
         } else {
-          console.log('In WebView page, staying here to allow automation');
+          console.log('In WebView page or automation mode, staying here to allow automation');
         }
       }
 

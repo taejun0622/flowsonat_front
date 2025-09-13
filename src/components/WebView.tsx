@@ -229,7 +229,45 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return;
     }
 
-    const prepareWebView = async () => {
+    // Early cookie injection immediately when Instagram URL is set
+    const injectCookiesImmediately = async () => {
+      try {
+        console.log('[WebView] 🚀 Immediate cookie injection for URL:', src);
+        console.log('[WebView] Instagram state:', instagramState);
+        
+        // Determine server registration status
+        let isServerRegistered = false;
+        if (instagramState === 'instagram_logged_in_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_logged_out_server_registered') {
+          isServerRegistered = true;
+        } else if (instagramState === 'instagram_login_detected') {
+          console.log('[WebView] Skipping immediate cookie injection for login_detected');
+          return;
+        }
+        
+        if (isServerRegistered) {
+          console.log('[WebView] 🍪 Injecting server cookies immediately before page loads');
+          await onPrepareWebView(isServerRegistered);
+          console.log('[WebView] ✅ Immediate cookie injection completed');
+          return true; // Signal that cookies were injected
+        }
+        return false;
+      } catch (error) {
+        console.error('[WebView] ❌ Failed immediate cookie injection:', error);
+        return false;
+      }
+    };
+
+    // First, try to inject cookies immediately
+    injectCookiesImmediately().then((injected) => {
+      if (injected) {
+        console.log('[WebView] Cookies injected immediately, skipping later preparation');
+        return;
+      }
+      
+      // If not injected immediately, proceed with normal preparation
+      const prepareWebView = async () => {
       try {
         console.log('[WebView] Preparing WebView for Instagram state:', instagramState);
 
@@ -271,7 +309,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     };
 
-    prepareWebView();
+      prepareWebView();
+    });
   }, [src, instagramState, onPrepareWebView]);
 
   // Instagram disconnect 후 강제 리렌더링 이벤트 감지
@@ -1193,13 +1232,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     };
 
-    // Handle page start loading - inject cookies before content loads
-    const handleDidStartLoading = async () => {
+    // Handle navigation start - inject cookies before content loads
+    const handleDidNavigateStart = async (event: any) => {
       try {
-        console.log('[WebView] Page started loading - injecting cookies early');
-        const url = (webviewRef.current && typeof webviewRef.current.getURL === 'function') 
-          ? webviewRef.current.getURL() 
-          : currentSrc;
+        const url = event.url || currentSrc;
+        console.log('[WebView] Navigation started - injecting cookies early for URL:', url);
         
         // Only inject cookies for Instagram pages
         if (typeof url === 'string' && url.includes('instagram.com')) {
@@ -1233,11 +1270,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           await prepareWebView();
         }
       } catch (error) {
-        console.error('[WebView] Error in did-start-loading handler:', error);
+        console.error('[WebView] Error in navigation handler:', error);
       }
     };
 
-    webview.addEventListener('did-start-loading', handleDidStartLoading);
+    webview.addEventListener('will-navigate', handleDidNavigateStart as any);
     webview.addEventListener('did-finish-load', handleLoad);
     webview.addEventListener('did-fail-load', handleError);
     webview.addEventListener('dom-ready', handleDomReady);
@@ -1247,7 +1284,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     
 
     return () => {
-      webview.removeEventListener('did-start-loading', handleDidStartLoading);
+      webview.removeEventListener('will-navigate', handleDidNavigateStart as any);
       webview.removeEventListener('did-finish-load', handleLoad);
       webview.removeEventListener('did-fail-load', handleError);
       webview.removeEventListener('dom-ready', handleDomReady);
