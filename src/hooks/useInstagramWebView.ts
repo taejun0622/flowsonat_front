@@ -22,6 +22,11 @@ export const useInstagramWebView = () => {
   // early cookie injection before the WebView starts navigating.
   const [webViewStatus, setWebViewStatus] = useState<InstagramWebViewStatus>(() => ({
     state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered',
+    data: {
+      isWebViewLoggedIn: false,
+      hasServerStorage: !!isConnected,
+      lastChecked: new Date()
+    },
     isInstagramLoggedIn: false,
     isServerRegistered: !!isConnected,
     lastChecked: new Date()
@@ -44,6 +49,11 @@ export const useInstagramWebView = () => {
       if (isConnected && !prev.isServerRegistered) {
         return {
           ...prev,
+          data: {
+            ...prev.data,
+            hasServerStorage: true,
+            lastChecked: new Date()
+          },
           isServerRegistered: true,
           state: prev.isInstagramLoggedIn ? 'instagram_logged_in' : 'instagram_logged_out_server_registered',
           lastChecked: new Date()
@@ -54,6 +64,13 @@ export const useInstagramWebView = () => {
       if (!isConnected && prev.isServerRegistered) {
         return {
           ...prev,
+          data: {
+            ...prev.data,
+            hasServerStorage: false,
+            username: undefined,
+            dsUserId: undefined,
+            lastChecked: new Date()
+          },
           isServerRegistered: false,
           state: prev.isInstagramLoggedIn ? 'instagram_login_detected' : 'instagram_logged_out_server_unregistered',
           username: undefined,
@@ -98,6 +115,14 @@ export const useInstagramWebView = () => {
         
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: true,
+            hasServerStorage: false,
+            username: sessionData.username,
+            dsUserId: sessionData.dsUserId,
+            lastChecked: new Date()
+          },
           state: 'instagram_login_detected',
           isInstagramLoggedIn: true,
           isServerRegistered: false,
@@ -127,6 +152,14 @@ export const useInstagramWebView = () => {
         
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: true,
+            hasServerStorage: true,
+            username: sessionData.username,
+            dsUserId: sessionData.dsUserId,
+            lastChecked: new Date()
+          },
           state: 'instagram_logged_in',
           isInstagramLoggedIn: true,
           isServerRegistered: true,
@@ -190,6 +223,14 @@ export const useInstagramWebView = () => {
     if (isLoggedIn) {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: isConnected,
+          username: sessionData?.username ?? prev.username,
+          dsUserId: sessionData?.dsUserId ?? prev.dsUserId,
+          lastChecked: new Date()
+        },
         // If logged-in on Instagram but not server-registered yet, reflect 'login_detected'
         state: isConnected ? 'instagram_logged_in' : 'instagram_login_detected',
         isInstagramLoggedIn: true,
@@ -211,6 +252,14 @@ export const useInstagramWebView = () => {
     } else {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: false,
+          hasServerStorage: isConnected,
+          username: undefined,
+          dsUserId: undefined,
+          lastChecked: new Date()
+        },
         state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered',
         isInstagramLoggedIn: false,
         isServerRegistered: isConnected,
@@ -231,6 +280,14 @@ export const useInstagramWebView = () => {
       
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: true,
+          username: modalState.detectedUsername,
+          dsUserId: modalState.detectedSessionData?.dsUserId,
+          lastChecked: new Date()
+        },
         state: 'instagram_logged_in',
         isInstagramLoggedIn: true,
         isServerRegistered: true,
@@ -336,6 +393,14 @@ export const useInstagramWebView = () => {
       
       setWebViewStatus((prev: InstagramWebViewStatus) => ({
         ...prev,
+        data: {
+          ...prev.data,
+          isWebViewLoggedIn: true,
+          hasServerStorage: true,
+          username: username,
+          dsUserId: sessionData.dsUserId || webViewStatus.dsUserId,
+          lastChecked: new Date()
+        },
         state: 'instagram_logged_in',
         isInstagramLoggedIn: true,
         isServerRegistered: true,
@@ -378,6 +443,14 @@ export const useInstagramWebView = () => {
 
     setWebViewStatus((prev: InstagramWebViewStatus) => ({
       ...prev,
+      data: {
+        ...prev.data,
+        isWebViewLoggedIn: false,
+        hasServerStorage: false,
+        username: undefined,
+        dsUserId: undefined,
+        lastChecked: new Date()
+      },
       state: 'instagram_logged_out_server_unregistered',
       isInstagramLoggedIn: false,
       isServerRegistered: false,
@@ -490,6 +563,12 @@ export const useInstagramWebView = () => {
             console.log('Instagram session restored successfully');
             setWebViewStatus((prev: InstagramWebViewStatus) => ({
               ...prev,
+              data: {
+                ...prev.data,
+                isWebViewLoggedIn: true,
+                hasServerStorage: true,
+                lastChecked: new Date()
+              },
               state: 'instagram_logged_in',
               isInstagramLoggedIn: true,
               isServerRegistered: true,
@@ -525,6 +604,11 @@ export const useInstagramWebView = () => {
           await disconnectAccount();
           setWebViewStatus((prev: InstagramWebViewStatus) => ({
             ...prev,
+            data: {
+              ...prev.data,
+              hasServerStorage: false,
+              lastChecked: new Date()
+            },
             state: 'instagram_logged_out_server_unregistered',
             isServerRegistered: false,
             lastChecked: new Date()
@@ -558,6 +642,12 @@ export const useInstagramWebView = () => {
             console.log('Instagram session restored successfully for login');
             setWebViewStatus((prev: InstagramWebViewStatus) => ({
               ...prev,
+              data: {
+                ...prev.data,
+                isWebViewLoggedIn: true,
+                hasServerStorage: true,
+                lastChecked: new Date()
+              },
               state: 'instagram_logged_in',
               isInstagramLoggedIn: true,
               isServerRegistered: true,
@@ -582,6 +672,11 @@ export const useInstagramWebView = () => {
         // Instagram 로그아웃 (실제로는 Instagram에서 로그아웃 처리)
         setWebViewStatus((prev: InstagramWebViewStatus) => ({
           ...prev,
+          data: {
+            ...prev.data,
+            isWebViewLoggedIn: false,
+            lastChecked: new Date()
+          },
           state: 'instagram_logged_out_server_registered',
           isInstagramLoggedIn: false,
           lastChecked: new Date()
@@ -611,6 +706,11 @@ export const useInstagramWebView = () => {
   useEffect(() => {
     setWebViewStatus((prev: InstagramWebViewStatus) => ({
       ...prev,
+      data: {
+        ...prev.data,
+        hasServerStorage: isConnected,
+        lastChecked: new Date()
+      },
       isServerRegistered: isConnected,
       state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered'
     }));

@@ -473,7 +473,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   // Instagram 로그인 감지 핸들러
   const handleInstagramLogin = useCallback((sessionData: any) => {
-    handleInstagramLoginDetected(sessionData);
+    handleInstagramLoginDetected(sessionData, window.location.pathname);
   }, [handleInstagramLoginDetected]);
 
   // 상태바 아이콘 렌더링
@@ -560,11 +560,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
           <div className="flex items-center justify-between p-4 bg-black/10 border-b border-black/20">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => handleActionClick(uiConfig.primaryAction.action)}
-                variant={uiConfig.primaryAction.variant || 'default'}
+                onClick={() => uiConfig.primaryAction?.action && handleActionClick(uiConfig.primaryAction.action)}
+                variant={uiConfig.primaryAction?.variant || 'default'}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
               >
-                {uiConfig.primaryAction.label}
+                {uiConfig.primaryAction?.label}
               </Button>
               
               {uiConfig.secondaryAction && (
@@ -579,7 +579,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
             </div>
             
             <div className="text-xs text-white/60">
-              {webViewStatus.lastChecked.toLocaleTimeString()}
+              {webViewStatus.lastChecked?.toLocaleTimeString()}
             </div>
           </div>
         </>
