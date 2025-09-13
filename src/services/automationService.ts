@@ -1,5 +1,5 @@
 import { InstagramService } from '@/api/services/InstagramService';
-import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate } from '@/api';
+import { BenchmarkResponse, TargetResponse, FollowResponse, StageEnum, HealthEnum, StatusEnum, BulkTargetCreate, TargetCreate, BulkFollowRequest1, BulkFollowRequest2, SuggestionCreate, TargetBulkUpdate } from '@/api';
 import { ProfileCollectionService } from './profileCollectionService';
 
 export interface AutomationOptions {
@@ -1049,12 +1049,12 @@ export class AutomationService {
   }
 
   /**
-   * Send followers to API using BulkFollowRequest1
-   * Multiple followers following one account (my account)
+   * Send followers to API using TargetBulkUpdate
+   * Update followers' stage to FOLLOW_BACK
    */
   private async sendFollowersToAPI(followers: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Would send ${followers.length} followers to API (API call disabled)...`);
+      console.log(`[Automation] Updating ${followers.length} followers to FOLLOW_BACK stage...`);
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 followers at a time
@@ -1067,30 +1067,33 @@ export class AutomationService {
       let totalSent = 0;
       for (const batch of batches) {
         try {
-          const bulkRequest: BulkFollowRequest1 = {
-            follower_usernames: batch,
-            following_username: this.instagramUsername
+          const bulkUpdateRequest: TargetBulkUpdate = {
+            updates: batch.map(username => ({
+              ig_username: username,
+              stage: StageEnum.FOLLOW_BACK
+            }))
           };
           
-          // API call removed - just log what would be sent
-          console.log(`[Automation] Would send batch of ${batch.length} followers:`, bulkRequest);
+          await InstagramService.bulkUpdateTargetsApiV1InstagramTargetsBulkPut(
+            bulkUpdateRequest
+          );
           
           totalSent += batch.length;
-          console.log(`[Automation] Would send ${batch.length} followers to API (${totalSent}/${followers.length})`);
+          console.log(`[Automation] Updated ${batch.length} followers to FOLLOW_BACK stage (${totalSent}/${followers.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to process followers batch:`, error);
+          console.error(`[Automation] Failed to update followers batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Would have sent ${totalSent}/${followers.length} followers to API`);
+      console.log(`[Automation] Successfully updated ${totalSent}/${followers.length} followers to FOLLOW_BACK stage`);
       
     } catch (error) {
-      console.error('[Automation] Error processing followers:', error);
+      console.error('[Automation] Error updating followers to FOLLOW_BACK stage:', error);
     }
   }
 
