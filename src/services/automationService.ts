@@ -844,6 +844,32 @@ export class AutomationService {
     }
   }
 
+  private async getAllRequestedTargets(): Promise<TargetResponse[]> {
+    try {
+      // Get all targets with REQUESTED stage (no date filtering)
+      const allTargets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
+        this.benchmark.id,
+        StageEnum.REQUESTED
+      );
+      
+      // Handle new response schema - check if targets is directly an array or nested in a property
+      let targetsArray: TargetResponse[] = [];
+      if (Array.isArray(allTargets)) {
+        targetsArray = allTargets;
+      } else if (allTargets && Array.isArray(allTargets.targets)) {
+        targetsArray = allTargets.targets;
+      } else {
+        console.warn('[Automation] Unexpected targets response format:', allTargets);
+        return [];
+      }
+      
+      return targetsArray;
+    } catch (error) {
+      console.error('[Automation] Get all requested targets error:', error);
+      return [];
+    }
+  }
+
   private async getPendingTargets(): Promise<TargetResponse[]> {
     try {
       const targets = await InstagramService.getTargetsApiV1InstagramBenchmarksBenchmarkIdTargetsGet(
@@ -1050,18 +1076,35 @@ export class AutomationService {
 
   /**
    * Send followers to API using TargetBulkUpdate
-   * Update followers' stage to FOLLOW_BACK
+   * Update only REQUESTED stage followers to FOLLOW_BACK
    */
   private async sendFollowersToAPI(followers: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Updating ${followers.length} followers to FOLLOW_BACK stage...`);
+      console.log(`[Automation] Filtering REQUESTED stage targets from ${followers.length} followers...`);
+      
+      // Get all REQUESTED stage targets (no date filtering)
+      const requestedTargets = await this.getAllRequestedTargets();
+      console.log(`[Automation] Found ${requestedTargets.length} REQUESTED stage targets`);
+      
+      // Filter followers that are in REQUESTED stage targets
+      const requestedUsernames = requestedTargets.map(target => target.ig.username);
+      const followersToUpdate = followers.filter(follower => 
+        requestedUsernames.includes(follower)
+      );
+      
+      console.log(`[Automation] Found ${followersToUpdate.length} followers that are REQUESTED stage targets`);
+      
+      if (followersToUpdate.length === 0) {
+        console.log(`[Automation] No REQUESTED stage followers found to update`);
+        return;
+      }
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 followers at a time
       const batches = [];
       
-      for (let i = 0; i < followers.length; i += batchSize) {
-        batches.push(followers.slice(i, i + batchSize));
+      for (let i = 0; i < followersToUpdate.length; i += batchSize) {
+        batches.push(followersToUpdate.slice(i, i + batchSize));
       }
       
       let totalSent = 0;
@@ -1079,7 +1122,7 @@ export class AutomationService {
           );
           
           totalSent += batch.length;
-          console.log(`[Automation] Updated ${batch.length} followers to FOLLOW_BACK stage (${totalSent}/${followers.length})`);
+          console.log(`[Automation] Updated ${batch.length} REQUESTED followers to FOLLOW_BACK stage (${totalSent}/${followersToUpdate.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
@@ -1090,10 +1133,10 @@ export class AutomationService {
         }
       }
       
-      console.log(`[Automation] Successfully updated ${totalSent}/${followers.length} followers to FOLLOW_BACK stage`);
+      console.log(`[Automation] Successfully updated ${totalSent}/${followersToUpdate.length} REQUESTED followers to FOLLOW_BACK stage`);
       
     } catch (error) {
-      console.error('[Automation] Error updating followers to FOLLOW_BACK stage:', error);
+      console.error('[Automation] Error updating REQUESTED followers to FOLLOW_BACK stage:', error);
     }
   }
 
