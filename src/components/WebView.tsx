@@ -66,7 +66,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   obscured = false
 }, ref) => {
   const webviewRef = useRef<any>(null);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  // If server is registered, defer navigation until cookies are injected
+  const serverRegistered = !!instagramState && (
+    instagramState === 'instagram_logged_out_server_registered' ||
+    instagramState === 'instagram_logged_in_server_registered'
+  );
+  const shouldDeferInitialLoad = Boolean(src?.includes('instagram.com') && serverRegistered && onPrepareWebView);
+
+  // Start with about:blank when we need to inject cookies first
+  const [currentSrc, setCurrentSrc] = useState(shouldDeferInitialLoad ? 'about:blank' : src);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
@@ -75,6 +83,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [isDomReady, setIsDomReady] = useState(false);
   const isDomReadyRef = useRef(false);
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const preparingRef = useRef(false);
+  const preparedOnceRef = useRef(false);
+  const loginRedirectedRef = useRef(false);
 
   // Helper function to safely execute JavaScript in WebView
   const safeExecuteJavaScript = async (script: string, retries = 3, forceExecute = false): Promise<any> => {
@@ -135,6 +146,15 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       const isLoggedIn = missing.length === 0;
       console.log('[CookieCheck] URL host ok:', isInstagramHost, 'missing:', missing, 'isLoggedIn:', isLoggedIn);
       onLoginStatusCheck?.(isLoggedIn, undefined);
+      // If not logged-in but server is registered, proactively navigate to login once
+      const serverReg = instagramState === 'instagram_logged_out_server_registered' || instagramState === 'instagram_logged_in_server_registered';
+      if (!isLoggedIn && serverReg && !loginRedirectedRef.current && typeof setCurrentSrc === 'function') {
+        console.log('[CookieCheck] Not logged in with server-registered; redirecting to Instagram login page');
+        loginRedirectedRef.current = true;
+        setCurrentSrc('https://www.instagram.com/accounts/login/');
+        setIsDomReady(false);
+        isDomReadyRef.current = false;
+      }
       // If logged in by cookies, try to fetch current user via main (no DOM required)
       if (isLoggedIn) {
         try {
@@ -205,23 +225,72 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     } catch {
       return false;
     }
-  }, [currentSrc, onLoginStatusCheck, onInstagramLogin]);
+  }, [currentSrc, onLoginStatusCheck, onInstagramLogin, instagramState]);
 
   useEffect(() => {
     console.log('[WebView] Source URL changed:', src);
     console.log('[WebView] Previous source:', currentSrc);
-    
-    // Only update if the URL is actually different to avoid unnecessary reloads
-    if (src !== currentSrc) {
-      console.log('[WebView] URL is different, updating currentSrc');
-      setCurrentSrc(src);
-      // New navigation; wait for next dom-ready
-      setIsDomReady(false);
-      isDomReadyRef.current = false;
-    } else {
-      console.log('[WebView] URL is the same, skipping update to preserve session');
-    }
-  }, [src, currentSrc]);
+
+    // If we should defer (server-registered), ensure cookies are injected BEFORE setting real URL
+    const maybePrepareAndNavigate = async () => {
+      if (!src?.includes('instagram.com') || !onPrepareWebView) {
+        // No special handling needed; update when different
+        if (src !== currentSrc) {
+          console.log('[WebView] URL is different, updating currentSrc');
+          setCurrentSrc(src);
+          setIsDomReady(false);
+          isDomReadyRef.current = false;
+        } else {
+          console.log('[WebView] URL is the same, skipping update to preserve session');
+        }
+        return;
+      }
+
+      if (serverRegistered) {
+        // Prevent duplicate prepare in StrictMode/dev
+        if (preparedOnceRef.current || preparingRef.current) {
+          console.log('[WebView] Prepare already handled, updating src if needed');
+          if (src !== currentSrc) {
+            setCurrentSrc(src);
+            setIsDomReady(false);
+            isDomReadyRef.current = false;
+          }
+          return;
+        }
+        try {
+          preparingRef.current = true;
+          console.log('[WebView] ⏸️ Deferring navigation until cookies injected');
+          if (currentSrc !== 'about:blank') setCurrentSrc('about:blank');
+          // Inject cookies first
+          await onPrepareWebView(true);
+          preparedOnceRef.current = true;
+          console.log('[WebView] ✅ Cookies injected, proceeding to navigate');
+          setCurrentSrc(src);
+          setIsDomReady(false);
+          isDomReadyRef.current = false;
+        } catch (e) {
+          console.error('[WebView] ❌ Failed to prepare before navigation:', e);
+          // Fallback to navigating anyway
+          setCurrentSrc(src);
+        } finally {
+          preparingRef.current = false;
+        }
+        return;
+      }
+
+      // Not server registered; normal update
+      if (src !== currentSrc) {
+        console.log('[WebView] URL is different, updating currentSrc');
+        setCurrentSrc(src);
+        setIsDomReady(false);
+        isDomReadyRef.current = false;
+      } else {
+        console.log('[WebView] URL is the same, skipping update to preserve session');
+      }
+    };
+
+    maybePrepareAndNavigate();
+  }, [src, currentSrc, serverRegistered, onPrepareWebView]);
 
   // Instagram 상태에 따른 쿠키 처리 (WebView 로드 전)
   useEffect(() => {
@@ -234,6 +303,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       try {
         console.log('[WebView] 🚀 Immediate cookie injection for URL:', src);
         console.log('[WebView] Instagram state:', instagramState);
+        // If we already handled deferred prepare, skip this path to avoid duplication
+        if (preparedOnceRef.current || preparingRef.current) {
+          console.log('[WebView] Skipping immediate injection — already prepared via deferred path');
+          return true;
+        }
         
         // Determine server registration status
         let isServerRegistered = false;
@@ -250,6 +324,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           console.log('[WebView] 🍪 Injecting server cookies immediately before page loads');
           await onPrepareWebView(isServerRegistered);
           console.log('[WebView] ✅ Immediate cookie injection completed');
+          preparedOnceRef.current = true;
           return true; // Signal that cookies were injected
         }
         return false;
@@ -288,8 +363,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           isServerRegistered = false;
         }
 
-        // Skip preparation if cookies were already injected in did-start-loading
-        if (isServerRegistered) {
+        // Skip preparation if cookies were already injected in deferred or immediate path
+        if (isServerRegistered || preparedOnceRef.current || preparingRef.current) {
           console.log('[WebView] Skipping late WebView preparation - cookies already injected early');
           return;
         }
@@ -1070,7 +1145,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           // Quick cookie-based check first
           checkLoginViaCookies();
           // Also run detailed detection script
-          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript())
+          safeExecuteJavaScript(InstagramWebViewScripts.getDetailedLoginCheckScript(), 3, true)
             .then((result: string) => {
               console.log('[WebView] Detailed detection script result:', result);
               if (!result) return;
@@ -1146,7 +1221,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
               } catch (e) {}
             `;
             
-            const result = await safeExecuteJavaScript(injectionScript);
+            const result = await safeExecuteJavaScript(injectionScript, 3, true);
             if (result === null) {
               console.warn('Extension injection failed, retrying in 1000ms...');
               setTimeout(injectExtension, 1000);
@@ -1162,7 +1237,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
                 // Ignore errors when posting message
               }
               
-              await safeExecuteJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`);
+              await safeExecuteJavaScript(`window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');`, 3, true);
               console.log('✅ Extension 컨트롤러 활성화 완료');
             }, 200);
           } catch (error) {

@@ -18,12 +18,14 @@ export const useInstagramWebView = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [webViewStatus, setWebViewStatus] = useState<InstagramWebViewStatus>({
-    state: 'instagram_logged_out_server_unregistered',
+  // Initialize WebView status based on current server registration to enable
+  // early cookie injection before the WebView starts navigating.
+  const [webViewStatus, setWebViewStatus] = useState<InstagramWebViewStatus>(() => ({
+    state: isConnected ? 'instagram_logged_out_server_registered' : 'instagram_logged_out_server_unregistered',
     isInstagramLoggedIn: false,
-    isServerRegistered: false,
+    isServerRegistered: !!isConnected,
     lastChecked: new Date()
-  });
+  }));
 
   const [modalState, setModalState] = useState<InstagramModalState>({
     showConfirmModal: false,
@@ -34,17 +36,34 @@ export const useInstagramWebView = () => {
   // While the user chooses manual input or dismisses confirm, suppress auto-confirm for this dsUserId
   const [suppressedForDsUserId, setSuppressedForDsUserId] = useState<string | null>(null);
 
-  // Instagram 연결 상태 변경 시 WebView 상태 초기화
+  // Keep WebView state aligned with server registration so the WebView
+  // can decide cookie handling before load.
   useEffect(() => {
-    if (!isConnected) {
-      console.log('Instagram disconnected, resetting WebView status');
-      setWebViewStatus({
-        state: 'instagram_logged_out_server_unregistered',
-        isInstagramLoggedIn: false,
-        isServerRegistered: false,
-        lastChecked: new Date()
-      });
-    }
+    setWebViewStatus((prev) => {
+      // If server is connected but state isn't marked as registered yet, update it
+      if (isConnected && !prev.isServerRegistered) {
+        return {
+          ...prev,
+          isServerRegistered: true,
+          state: prev.isInstagramLoggedIn ? 'instagram_logged_in' : 'instagram_logged_out_server_registered',
+          lastChecked: new Date()
+        };
+      }
+
+      // If server is disconnected but state still marked as registered, reset
+      if (!isConnected && prev.isServerRegistered) {
+        return {
+          ...prev,
+          isServerRegistered: false,
+          state: prev.isInstagramLoggedIn ? 'instagram_login_detected' : 'instagram_logged_out_server_unregistered',
+          username: undefined,
+          dsUserId: undefined,
+          detectedSessionData: undefined,
+          lastChecked: new Date()
+        };
+      }
+      return prev;
+    });
   }, [isConnected]);
 
   // Instagram 로그인 상태 감지 시 호출 (로그아웃 플로우용)

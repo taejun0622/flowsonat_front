@@ -406,6 +406,17 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         return false;
       }
 
+      // Guard: Ensure required HttpOnly cookie exists (sessionid)
+      if (!cookies['sessionid']) {
+        console.warn('⚠️ Missing required session cookie (sessionid). Cannot restore authenticated session.');
+        toast({
+          title: 'Session refresh required',
+          description: 'Stored cookies are incomplete. Please sign in to Instagram once to refresh your session.',
+          variant: 'destructive'
+        });
+        return false;
+      }
+
       console.log('Found cookies for restoration:', Object.keys(cookies));
       console.log('Cookie details:', cookies);
       

@@ -21,6 +21,8 @@ import { DashboardPage } from '@/pages/DashboardPage';
 
 // WebView
 import WebViewPage from '@/pages/WebViewPage';
+import LoginWebViewPage from '@/pages/LoginWebViewPage';
+import AutomationWebViewPage from '@/pages/AutomationWebViewPage';
 import { InstagramConnectionFlowPage } from '@/pages/InstagramConnectionFlowPage';
 
 import { useInstagram } from '@/contexts/InstagramContext';
@@ -81,15 +83,25 @@ function App() {
                   }
                 />
                 
-                {/* WebView Route - Full screen webview */}
+                {/* WebView Routes - split for login and automation */}
                 <Route
-                  path="/webview"
+                  path="/webview/login"
                   element={
                     <ProtectedRoute>
-                      <WebViewPage />
+                      <LoginWebViewPage />
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/webview/automation"
+                  element={
+                    <ProtectedRoute>
+                      <AutomationWebViewPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Backward compatibility: redirect /webview to /webview/automation */}
+                <Route path="/webview" element={<Navigate to="/webview/automation" replace />} />
 
                 {/* Instagram Connection Flow Route */}
                 <Route

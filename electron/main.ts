@@ -370,22 +370,41 @@ async function injectInstagramCookies(cookies: Record<string, any>): Promise<boo
     let successCount = 0;
     let failureCount = 0;
 
+    // Load existing cookies to preserve httpOnly flags and avoid overwrite errors
+    const existingA = await igSession.cookies.get({ domain: 'instagram.com' });
+    const existingB = await igSession.cookies.get({ domain: '.instagram.com' });
+    const existingByName: Record<string, Electron.Cookie> = {};
+    for (const c of [...existingA, ...existingB]) {
+      if (!c || !c.name) continue;
+      if (!(c.name in existingByName)) existingByName[c.name] = c;
+    }
+
+    const KNOWN_HTTP_ONLY = new Set(['sessionid', 'rur', 'datr', 'ig_did']);
+
     for (const [name, value] of cookieList) {
       try {
-        // Special handling for sessionid (should be httpOnly)
-        const isHttpOnly = ['sessionid'].includes(name);
-        
+        const existing = existingByName[name];
+        const desiredValue = String(value);
+        const isHttpOnly = existing?.httpOnly || KNOWN_HTTP_ONLY.has(name);
+
+        // Skip update if same value already set
+        if (existing && existing.value === desiredValue) {
+          console.log(`⏭️  Skipping cookie (unchanged): ${name}`);
+          successCount++;
+          continue;
+        }
+
         const cookieDetails = {
           url,
           name,
-          value: String(value),
+          value: desiredValue,
           domain: '.instagram.com',
           path: '/',
           secure: true,
           httpOnly: isHttpOnly,
           sameSite: 'lax' as const,
         };
-        
+
         await igSession.cookies.set(cookieDetails);
         console.log(`✅ Cookie injected: ${name}`);
         successCount++;
@@ -1018,43 +1037,13 @@ app.whenReady().then(() => {
     }
   })
 
-  /** Renderer request: Inject cookies to Instagram WebView */
-  ipcMain.handle('ig:inject-cookies', async (event, cookies: Record<string, any>) => {
+  /** Renderer request: Inject cookies to Instagram WebView (unified) */
+  ipcMain.handle('ig:inject-cookies', async (_event, cookies: Record<string, any>) => {
     try {
-      console.log('Injecting cookies to Instagram WebView:', cookies)
-      
-      // Instagram 세션에 쿠키 설정
-      const igSession = session.fromPartition('persist:ig')
-      
-      // 각 쿠키를 Instagram 도메인에 설정
-      for (const [name, value] of Object.entries(cookies)) {
-        if (name && value) {
-          try {
-            await igSession.cookies.set({
-              url: 'https://www.instagram.com',
-              name: name,
-              value: String(value),
-              domain: '.instagram.com',
-              path: '/',
-              secure: true,
-              httpOnly: false,
-              sameSite: 'no-restriction'
-            })
-            console.log(`Cookie set: ${name}=${value}`)
-          } catch (cookieError) {
-            console.warn(`Failed to set cookie ${name}:`, cookieError)
-          }
-        }
-      }
-      
-      // 쿠키 저장소 플러시
-      await igSession.cookies.flushStore()
-      console.log('Cookies injected successfully')
-      
-      return true
-    } catch (error) {
-      console.error('Failed to inject cookies:', error)
-      return false
+      return await injectInstagramCookies(cookies || {});
+    } catch (e) {
+      console.error('Failed to inject cookies (unified handler):', e);
+      return false;
     }
   })
 
