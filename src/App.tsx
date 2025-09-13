@@ -60,7 +60,7 @@ function App() {
               loop={true}
               seed={1000}
             >
-              <div className="relative w-full h-full overflow-auto">
+              <div className="relative w-full h-full min-h-0 overflow-auto">
                 <RouteDebugger />
                 <Routes>
                 {/* Test Route */}

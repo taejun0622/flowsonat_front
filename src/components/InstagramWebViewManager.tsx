@@ -211,8 +211,40 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const forceExtension = (() => {
     try { return new URLSearchParams(window.location.search).get('forceExtension') === '1'; } catch { return false; }
   })();
-  // Activate extension only when IG is logged in AND server-registered, unless forced via query
-  const extensionActive = (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) || forceExtension;
+
+  // Enhanced extension activation logic for automation context
+  const shouldActivateExtension = () => {
+    // Force extension if explicitly requested
+    if (forceExtension) return true;
+
+    // Original condition: Instagram login detected AND server registered
+    if (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) return true;
+
+    // Automation fallback: If server registered AND we're in automation context AND have stored session
+    // This handles cases where Instagram login detection fails but cookies were injected
+    const isAutomationContext = window.location.pathname === '/webview/automation' || minimal;
+    const hasStoredSession = !!instagramAccount?.cookies?.sessionid;
+    const isServerRegistered = webViewStatus.isServerRegistered || !!instagramAccount;
+
+    if (isAutomationContext && isServerRegistered && hasStoredSession) {
+      console.log('🔧 Activating extension in automation context despite login detection failure');
+      console.log('Context:', { isAutomationContext, isServerRegistered, hasStoredSession });
+      return true;
+    }
+
+    return false;
+  };
+
+  const extensionActive = shouldActivateExtension();
+
+  console.log('[InstagramWebViewManager] Debug render state:', {
+    extensionActive,
+    webViewStatus: webViewStatus.state,
+    isInstagramLoggedIn: webViewStatus.isInstagramLoggedIn,
+    isServerRegistered: webViewStatus.isServerRegistered,
+    instagramAccount: !!instagramAccount,
+    modal: { showConfirmModal: modalState.showConfirmModal, showManualModal: modalState.showManualModal }
+  });
 
   // Block-only handler: physical mouse events are blocked from reaching the WebView
   const blockOnly = useCallback((e: React.SyntheticEvent) => {
@@ -472,7 +504,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   };
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* Header, Status, and Actions hidden in minimal mode */}
       {!minimal && (
         <>
@@ -551,7 +583,7 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       )}
 
       {/* WebView Container */}
-      <div className="flex-1 relative" id="ig-webview-container">
+      <div className="flex-1 relative min-h-0" id="ig-webview-container">
         <WebView
           ref={webviewApiRef}
           src={currentUrl}

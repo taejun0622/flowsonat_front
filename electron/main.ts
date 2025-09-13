@@ -25,7 +25,13 @@ process.env.APP_ROOT = path.join(__dirname, '..')
 //   (can be toggled off later if unnecessary)
 try {
   if (process.platform === 'darwin') {
-    app.disableHardwareAcceleration()
+    // Disable GPU only when explicitly requested to avoid blank webview issues on some macOS setups
+    if (process.env.ELECTRON_DISABLE_GPU === '1') {
+      app.disableHardwareAcceleration()
+      console.log('[Electron] Hardware acceleration disabled via ELECTRON_DISABLE_GPU=1')
+    } else {
+      console.log('[Electron] Hardware acceleration enabled (default)')
+    }
     // IMPORTANT: Do not enable V8 jitless here — it disables WebAssembly in many
     // Chromium/V8 builds and breaks sites like Instagram/Facebook login flows.
     // If you ever need jitless for stability, guard it behind an env flag.

@@ -241,56 +241,117 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       console.log('🔄 Cookie test already running, skipping...');
       return;
     }
-    
+
     try {
       cookieTestRunning.current = true;
       console.log('🧪 Testing cookie validity with temporary webview...');
-      
+
       // Check if required cookies are present
       const requiredCookies = ['sessionid', 'ds_user_id'];
       const missingCookies = requiredCookies.filter(key => !cookies[key]);
-      
+
       if (missingCookies.length > 0) {
         console.warn('⚠️ Missing required cookies for validation:', missingCookies);
         console.log('Available cookies:', Object.keys(cookies));
         cookieTestRunning.current = false;
         return;
       }
-      
-      // Create a temporary webview element
+
+      // Create a temporary webview element (use same partition as main to see injected cookies)
       const tempWebview = document.createElement('webview');
-      tempWebview.style.display = 'none';
+      // Keep it off-screen but attached
+      tempWebview.style.position = 'absolute';
+      tempWebview.style.left = '-99999px';
+      tempWebview.style.top = '0';
       tempWebview.style.width = '1px';
       tempWebview.style.height = '1px';
-      tempWebview.partition = 'persist:ig-test';
+      tempWebview.setAttribute('partition', 'persist:ig');
+      tempWebview.setAttribute('webpreferences', 'contextIsolation=yes, nodeIntegration=no');
+      tempWebview.setAttribute('allowpopups', 'true');
       document.body.appendChild(tempWebview);
-      
-      let urlCheckTimeout: NodeJS.Timeout;
+
+      let urlCheckTimeout: NodeJS.Timeout | null = null;
       let cleanupDone = false;
-      
+      let navigated = false;
+      let lastNavigatedUrl: string = '';
+      let retryCount = 0;
+      const maxRetries = 2;
+
       const cleanup = () => {
         if (cleanupDone) return;
         cleanupDone = true;
-        
-        if (urlCheckTimeout) clearTimeout(urlCheckTimeout);
-        if (tempWebview && tempWebview.parentNode) {
-          document.body.removeChild(tempWebview);
-        }
+
+        if (urlCheckTimeout) { clearTimeout(urlCheckTimeout); urlCheckTimeout = null; }
+        try {
+          tempWebview.removeEventListener('did-navigate', handleDidNavigate as any);
+          tempWebview.removeEventListener('did-navigate-in-page', handleDidNavigate as any);
+          tempWebview.removeEventListener('dom-ready', handleDomReady as any);
+          tempWebview.removeEventListener('did-fail-load', handleDidFailLoad as any);
+        } catch {}
+        try {
+          if (tempWebview && tempWebview.parentNode) {
+            document.body.removeChild(tempWebview);
+          }
+        } catch {}
         cookieTestRunning.current = false;
       };
-      
-      // Set up error handling
-      tempWebview.addEventListener('did-fail-load', (event: any) => {
-        console.warn('🚫 Webview failed to load:', event);
+
+      // Enhanced error handling with retry logic
+      const handleDidFailLoad = (event: any) => {
+        if (cleanupDone) return;
+        console.warn(`🚫 Webview failed to load (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
+          errorCode: event.errorCode,
+          errorDescription: event.errorDescription,
+          url: event.validatedURL || 'unknown'
+        });
+
+        // If we have retries left and it's a network error, try again
+        if (retryCount < maxRetries && (event.errorCode === -2 || event.errorCode === -106 || event.errorCode === -118)) {
+          retryCount++;
+          console.log(`🔄 Retrying navigation (${retryCount}/${maxRetries})...`);
+
+          // Wait before retry
+          setTimeout(() => {
+            if (!cleanupDone && tempWebview && tempWebview.parentNode) {
+              try {
+                (tempWebview as any).src = 'https://www.instagram.com/';
+              } catch (error) {
+                console.error('Error during retry:', error);
+                cleanup();
+              }
+            }
+          }, 1000 * retryCount); // Exponential backoff
+
+          return;
+        }
+
+        // No more retries or non-recoverable error
+        console.error('❌ Cookie validation failed due to navigation errors - assuming cookies are invalid');
         cleanup();
-      });
-      
-      // Set up URL monitoring  
-      const checkUrl = () => {
+      };
+      tempWebview.addEventListener('did-fail-load', handleDidFailLoad as any);
+
+      // Set up URL monitoring
+      const checkUrl = (navigatedUrl?: string) => {
         try {
-          const currentUrl = tempWebview.src || '';
+          if (cleanupDone) return;
+          // Prefer URL from event if provided; otherwise, use API only if still attached
+          let currentUrl = navigatedUrl || '';
+          if (!currentUrl) {
+            const attached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+            if (!attached) return;
+            if (typeof (tempWebview as any).getURL === 'function') {
+              currentUrl = (tempWebview as any).getURL();
+            } else {
+              currentUrl = (tempWebview as any).src || '';
+            }
+          }
+          if (!currentUrl || currentUrl === 'about:blank') {
+            // Ignore initial blank navigation
+            return;
+          }
           console.log('📍 Final URL after navigation:', currentUrl);
-          
+
           if (currentUrl.includes('/accounts/login') || currentUrl.includes('/login/')) {
             console.log('❌ Cookie validation failed: Redirected to login page');
             console.log('🔄 This indicates the cookies are expired or invalid');
@@ -303,34 +364,63 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
         } catch (error) {
           console.warn('Error checking URL:', error);
         }
-        
+
         cleanup();
       };
-      
+
+      // After navigate completes, check URL and cleanup
+      const handleDidNavigate = (e: any) => {
+        if (cleanupDone) return;
+        lastNavigatedUrl = e?.url || lastNavigatedUrl;
+        // Defer slightly to allow redirects to settle
+        setTimeout(() => checkUrl(lastNavigatedUrl), 500);
+      };
+
+      tempWebview.addEventListener('did-navigate', handleDidNavigate as any);
+      tempWebview.addEventListener('did-navigate-in-page', handleDidNavigate as any);
+
       // Wait for webview to be ready and inject cookies
-      tempWebview.addEventListener('dom-ready', async () => {
+      const handleDomReady = async () => {
         try {
+          if (cleanupDone) return;
+          const attached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+          if (!attached) {
+            console.warn('Temp webview dom-ready fired after detach; ignoring');
+            return;
+          }
           console.log('🔧 Temporary webview DOM ready, injecting cookies...');
-          
+
           // Wait a bit for webview to be fully ready
           await new Promise(resolve => setTimeout(resolve, 500));
-          
+
           // Inject cookies via Electron API using test partition
           if ((window as any).electronAPI?.injectCookiesToWebView) {
             const injected = await (window as any).electronAPI.injectCookiesToWebView(cookies);
-            
+
             if (injected) {
               console.log('✅ Cookies injected to test webview');
-              
+
               // Wait before navigation
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              // Navigate to Instagram
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              // Navigate to Instagram via src attribute with error handling
               console.log('🌐 Navigating to instagram.com...');
-              tempWebview.loadURL('https://www.instagram.com/');
-              
-              // Check URL after navigation completes
-              urlCheckTimeout = setTimeout(checkUrl, 5000);
+              if (!cleanupDone && !navigated) {
+                navigated = true;
+                // Guard again before mutating src
+                const stillAttached = (tempWebview as any).isConnected ?? document.body.contains(tempWebview);
+                if (stillAttached) {
+                  try {
+                    (tempWebview as any).src = 'https://www.instagram.com/';
+                  } catch (error) {
+                    console.error('❌ Error setting webview src:', error);
+                    cleanup();
+                  }
+                } else {
+                  console.warn('Temp webview detached before navigate; skipping');
+                  cleanup();
+                }
+              }
             } else {
               console.error('❌ Failed to inject cookies to test webview');
               cleanup();
@@ -343,15 +433,27 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
           console.error('Error in temporary webview setup:', error);
           cleanup();
         }
-      });
-      
+      };
+      tempWebview.addEventListener('dom-ready', handleDomReady as any);
+
       // Start with blank page
       console.log('🔄 Starting temporary webview with blank page...');
-      tempWebview.src = 'about:blank';
-      
-      // Fallback cleanup after 10 seconds
-      setTimeout(cleanup, 10000);
-      
+      try {
+        (tempWebview as any).src = 'about:blank';
+      } catch (error) {
+        console.error('❌ Error setting initial webview src:', error);
+        cleanup();
+        return;
+      }
+
+      // Fallback cleanup after 15 seconds (increased timeout)
+      setTimeout(() => {
+        if (!cleanupDone) {
+          console.log('⏰ Cookie validation timeout - cleaning up');
+          cleanup();
+        }
+      }, 15000);
+
     } catch (error) {
       console.error('Error in cookie validity test:', error);
       cookieTestRunning.current = false;
@@ -425,10 +527,15 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       
       if (injected) {
         console.log('✅ Instagram session restored successfully');
-        
+
         // Test cookie validity by checking redirect to login
-        await testCookieValidity(cookies);
-        
+        // This is optional - if it fails, we still consider the injection successful
+        try {
+          await testCookieValidity(cookies);
+        } catch (error) {
+          console.warn('⚠️ Cookie validation test failed, but cookies were injected:', error);
+        }
+
         return true;
       } else {
         console.warn('Failed to inject cookies to WebView');

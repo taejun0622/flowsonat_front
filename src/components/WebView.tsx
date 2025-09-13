@@ -83,6 +83,9 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [isDomReady, setIsDomReady] = useState(false);
   const isDomReadyRef = useRef(false);
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const injectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const injectionAttemptsRef = useRef(0);
+  const destroyedRef = useRef(false);
   const preparingRef = useRef(false);
   const preparedOnceRef = useRef(false);
   const loginRedirectedRef = useRef(false);
@@ -91,7 +94,13 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const safeExecuteJavaScript = async (script: string, retries = 3, forceExecute = false): Promise<any> => {
     const webview = webviewRef.current as any;
     // Ensure DOM-ready and the <webview> is still attached to DOM
-    if (!webview || !(webview.isConnected ?? document.body.contains(webview))) {
+    // For forced execution (automation), be more permissive
+    if (!webview) {
+      console.warn('WebView not ready for JavaScript execution');
+      return null;
+    }
+
+    if (!forceExecute && !(webview.isConnected ?? document.body.contains(webview))) {
       console.warn('WebView not ready for JavaScript execution');
       return null;
     }
@@ -100,6 +109,16 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     if (!forceExecute && !isDomReadyRef.current) {
       console.warn('WebView DOM not ready for JavaScript execution');
       return null;
+    }
+
+    // Additional safety check: verify webview is still functional
+    // Only block execution for blank page if not forcing execution
+    if (!forceExecute && typeof webview.getURL === 'function') {
+      const currentUrl = webview.getURL();
+      if (!currentUrl || currentUrl === 'about:blank') {
+        console.warn('WebView not fully loaded (blank page), skipping script execution');
+        return null;
+      }
     }
 
     for (let i = 0; i < retries; i++) {
@@ -145,7 +164,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       const missing = required.filter((k) => !cookies[k]);
       const isLoggedIn = missing.length === 0;
       console.log('[CookieCheck] URL host ok:', isInstagramHost, 'missing:', missing, 'isLoggedIn:', isLoggedIn);
-      onLoginStatusCheck?.(isLoggedIn, undefined);
+      onLoginStatusCheck?.(isLoggedIn);
       // If not logged-in but server is registered, proactively navigate to login once
       const serverReg = instagramState === 'instagram_logged_out_server_registered' || instagramState === 'instagram_logged_in_server_registered';
       if (!isLoggedIn && serverReg && !loginRedirectedRef.current && typeof setCurrentSrc === 'function') {
@@ -228,6 +247,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   }, [currentSrc, onLoginStatusCheck, onInstagramLogin, instagramState]);
 
   useEffect(() => {
+    destroyedRef.current = false;
     console.log('[WebView] Source URL changed:', src);
     console.log('[WebView] Previous source:', currentSrc);
 
@@ -451,7 +471,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   useEffect(() => {
     console.log('🔄 Extension 상태 변경 감지:', { extensionActive });
     
-    if (!isDomReady) {
+    if (!isDomReady || !isDomReadyRef.current) {
       console.log('⚠️ WebView DOM not ready');
       return;
     }
@@ -478,7 +498,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_ACTIVATE'
           }, '*');
-        `);
+        `, 3, true);
         setExtensionActive(true);
       }
     },
@@ -488,7 +508,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_DEACTIVATE'
           }, '*');
-        `);
+        `, 3, true);
         setExtensionActive(false);
       }
     },
@@ -504,7 +524,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*');
             window.postMessage({ type: 'FLOWSONAT_MOVE_CURSOR', data: { x: ${x}, y: ${y} } }, '*');
           }
-          return true; } catch(e){ return false; } })();`);
+          return true; } catch(e){ return false; } })();`, 3, true);
       }
     },
     click: async (x: number, y: number, button: 'left' | 'right' = 'left') => {
@@ -515,7 +535,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_CLICK',
             data: { x: ${x}, y: ${y}, button: '${button}' }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     doubleClick: async (x: number, y: number) => {
@@ -526,7 +546,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DOUBLE_CLICK',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     startDrag: async (x: number, y: number) => {
@@ -536,7 +556,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DRAG_START',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     dragMove: async (x: number, y: number) => {
@@ -546,7 +566,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             type: 'FLOWSONAT_DRAG_MOVE',
             data: { x: ${x}, y: ${y} }
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     endDrag: async () => {
@@ -555,7 +575,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           window.postMessage({
             type: 'FLOWSONAT_DRAG_END'
           }, '*');
-        `);
+        `, 3, true);
       }
     },
     scroll: async (x: number, y: number, deltaX: number, deltaY: number) => {
@@ -594,7 +614,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_SCROLLABLE_AREAS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_SCROLLABLE_AREAS result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -617,7 +637,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_CLICKABLE_ELEMENTS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_CLICKABLE_ELEMENTS result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -640,7 +660,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_ELEMENT_BY_TEXT', { text });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_TEXT result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -663,7 +683,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return '[]'; }
         })();`;
         console.log('[WebView] FIND_ELEMENT_BY_SELECTOR', { selector });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] FIND_ELEMENT_BY_SELECTOR result', parsed?.length); return parsed; } catch { return []; }
         }
@@ -724,8 +744,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] SCROLL_FOREMOST', { deltaY });
-        await safeExecuteJavaScript(`try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}`);
-        const res = await safeExecuteJavaScript(js);
+        await safeExecuteJavaScript(`try { window.postMessage({ type: 'FLOWSONAT_ACTIVATE' }, '*'); } catch {}`, 3, true);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -752,7 +772,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return 'null'; }
         })();`;
         console.log('[WebView] GET_ELEMENT_INFO', { x, y });
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] GET_ELEMENT_INFO result', parsed); return parsed; } catch { return null; }
         }
@@ -773,7 +793,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           }
         })();`;
         console.log('[WebView] TAKE_SCREENSHOT');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         if (res) {
           try { const parsed = JSON.parse(res); console.log('[WebView] TAKE_SCREENSHOT result', parsed); return parsed; } catch { return null; }
         }
@@ -797,7 +817,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             return false;
           } catch (e) { return false; }
         })();`;
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -823,7 +843,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] TYPE_TEXT');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -842,7 +862,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] PRESS_ENTER');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -860,7 +880,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] PRESS_ESCAPE');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -878,7 +898,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWERS');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -896,7 +916,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWING');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -912,7 +932,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOW_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -928,7 +948,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_FOLLOWING_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -944,7 +964,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (e) { return false; }
         })();`;
         console.log('[WebView] CLICK_REQUESTED_BUTTON');
-        const res = await safeExecuteJavaScript(js);
+        const res = await safeExecuteJavaScript(js, 3, true);
         return !!res;
       }
       return false;
@@ -965,7 +985,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         })();`;
         
         console.log('[WebView] CLICK_FOLLOWING_OR_REQUESTED_BUTTON');
-        const followingClicked = await safeExecuteJavaScript(followingOrRequestedJs);
+        const followingClicked = await safeExecuteJavaScript(followingOrRequestedJs, 3, true);
         
         if (!followingClicked) {
           console.log('[WebView] No Following/Requested button found');
@@ -993,19 +1013,34 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         })();`;
         
         console.log('[WebView] CLICK_UNFOLLOW_BUTTON_IN_MODAL');
-        const res = await safeExecuteJavaScript(unfollowJs);
+        const res = await safeExecuteJavaScript(unfollowJs, 3, true);
         return !!res;
       }
       return false;
     },
     executeScript: async (script: string) => {
-      // Wait a bit for DOM to be ready if not already
+      // Wait for DOM to be ready with better timeout logic
       if (!isDomReadyRef.current) {
-        console.log('[WebView] DOM not ready, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('[WebView] DOM not ready, waiting for DOM ready event...');
+
+        // Wait up to 10 seconds for DOM to become ready
+        const maxWaitTime = 10000;
+        const checkInterval = 100;
+        let elapsed = 0;
+
+        while (!isDomReadyRef.current && elapsed < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          elapsed += checkInterval;
+        }
+
+        if (!isDomReadyRef.current) {
+          console.warn('[WebView] DOM ready timeout after 10s, attempting script execution anyway');
+        } else {
+          console.log('[WebView] DOM became ready, proceeding with script execution');
+        }
       }
-      
-      return await safeExecuteJavaScript(script);
+
+      return await safeExecuteJavaScript(script, 3, true);
     }
   }));
 
@@ -1019,7 +1054,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       'instagram_login_detected'
     ];
     
-    if (!needsPeriodicCheck.includes(instagramState)) {
+    if (!instagramState || !needsPeriodicCheck.includes(instagramState)) {
       console.log('Periodic check skipped - not in unregistered or login_detected state:', instagramState);
       return;
     }
@@ -1041,7 +1076,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       if (!isDomReadyRef.current) {
         return;
       }
-      safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript()).then((result: string) => {
+      safeExecuteJavaScript(InstagramWebViewScripts.getPeriodicCheckScript(), 3, true).then((result: string) => {
         if (!result || isCleanedUp) return;
         
         try {
@@ -1205,6 +1240,18 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         const injectExtension = async () => {
           try {
             console.log('📥 Extension 컨텐츠 스크립트 주입 중...');
+            // Guard: ensure webview is still attached and dom-ready
+            const webview = webviewRef.current as any;
+            const attached = !!webview && (webview.isConnected ?? document.body.contains(webview));
+            if (!attached || !isDomReadyRef.current || !extensionActive) {
+              if (injectionAttemptsRef.current < 20) {
+                injectionAttemptsRef.current += 1;
+                injectionTimerRef.current = setTimeout(injectExtension, 1000);
+              } else {
+                console.warn('Stopping extension injection retries: conditions not met');
+              }
+              return;
+            }
             
             const injectionScript = `
               // 확장프로그램 컨텐츠 스크립트 주입
@@ -1224,7 +1271,10 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
             const result = await safeExecuteJavaScript(injectionScript, 3, true);
             if (result === null) {
               console.warn('Extension injection failed, retrying in 1000ms...');
-              setTimeout(injectExtension, 1000);
+              if (injectionAttemptsRef.current < 20) {
+                injectionAttemptsRef.current += 1;
+                injectionTimerRef.current = setTimeout(injectExtension, 1000);
+              }
               return;
             }
             
@@ -1243,14 +1293,25 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           } catch (error) {
             console.warn('Extension injection failed:', error);
             // 재시도
-            setTimeout(injectExtension, 1000);
+            if (injectionAttemptsRef.current < 20) {
+              injectionAttemptsRef.current += 1;
+              injectionTimerRef.current = setTimeout(injectExtension, 1000);
+            }
           }
         };
         
         // 1초 후에 주입 시작
-        setTimeout(injectExtension, 1000);
+        injectionAttemptsRef.current = 0;
+        if (injectionTimerRef.current) clearTimeout(injectionTimerRef.current);
+        injectionTimerRef.current = setTimeout(injectExtension, 1000);
       } else {
         console.log('❌ Extension 컨텐츠 스크립트 주입 조건 불만족');
+        // If extension deactivated, cancel pending timers
+        if (injectionTimerRef.current) {
+          clearTimeout(injectionTimerRef.current);
+          injectionTimerRef.current = null;
+        }
+        injectionAttemptsRef.current = 0;
       }
     };
 
@@ -1373,6 +1434,14 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         memoryCleanupIntervalRef.current = null;
       }
       
+      // Cancel any pending extension injection timers
+      if (injectionTimerRef.current) {
+        clearTimeout(injectionTimerRef.current);
+        injectionTimerRef.current = null;
+      }
+      injectionAttemptsRef.current = 0;
+      destroyedRef.current = true;
+
       // 메모리 정리 실행 (안전할 때만)
       if (webviewRef.current && isDomReadyRef.current && (webviewRef.current.isConnected ?? document.body.contains(webviewRef.current))) {
         cleanupMemory();
@@ -1422,7 +1491,6 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         className="w-full h-full"
         partition="persist:ig"
         webpreferences="contextIsolation=yes, nodeIntegration=no"
-        allowpopups="true"
         style={{ 
           pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const,
           // Hide the webview when obscured so portal-based modals render above it reliably.

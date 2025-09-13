@@ -141,19 +141,33 @@ export const useInstagramWebView = () => {
           variant: "default"
         });
 
-        // WebView 페이지에서는 Dashboard로 이동하지 않고 현재 페이지에서 automation 활성화
-        // Dashboard에서는 WebView가 없으므로 navigate하지 않음
-        // automation 실행 중이거나 minimal 모드일 때는 대시보드로 이동하지 않음
+        // Determine navigation based on context and current page
         const urlParams = new URLSearchParams(window.location.search);
         const isMinimalMode = urlParams.get('minimal') === '1';
         const isAutoExecuteMode = urlParams.get('autoExecute') === '1';
-        const isAutomationMode = isMinimalMode || isAutoExecuteMode;
+        const fromAutomation = urlParams.get('from') === 'automation';
+        const currentPath = window.location.pathname;
 
-        if (window.location.pathname !== '/webview' && !isAutomationMode) {
-          console.log('Not in WebView page and not in automation mode, navigating to dashboard');
-          navigate('/dashboard');
-        } else {
+        // Context-aware navigation logic
+        if (currentPath === '/webview/login') {
+          // Login WebView: After successful login, decide where to go
+          if (fromAutomation) {
+            console.log('Login successful from automation context, navigating back to automation');
+            navigate('/webview/automation');
+          } else {
+            console.log('Login successful, navigating to dashboard');
+            navigate('/dashboard');
+          }
+        } else if (currentPath === '/webview/automation') {
+          // Automation WebView: Stay here after login to start automation
+          console.log('Login successful in automation context, staying to enable automation');
+        } else if (currentPath === '/webview' || (isMinimalMode || isAutoExecuteMode)) {
+          // Legacy WebView or explicit automation modes: Stay for automation
           console.log('In WebView page or automation mode, staying here to allow automation');
+        } else {
+          // Other contexts: Go to dashboard
+          console.log('Login successful from other context, navigating to dashboard');
+          navigate('/dashboard');
         }
       }
 
