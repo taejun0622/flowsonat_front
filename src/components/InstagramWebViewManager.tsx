@@ -411,8 +411,9 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
         instagramAccount.username,
         userBenchmark,
         {
-          scrollDelay: 2000,
-          pageLoadDelay: 3000,
+          // Faster defaults; logic will poll for readiness instead of fixed waits
+          scrollDelay: 600,
+          pageLoadDelay: 1200,
           onProgress: (current: number, total: number, status: string) => {
             setAutomationProgress({ current, total });
             setAutomationStatus(status);
@@ -447,10 +448,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // Auto-execute automation after 5 seconds when autoExecute is true
   useEffect(() => {
     if (autoExecute && isWebViewReady && extensionActive && !isRunningAutomation) {
+      const startDelay = 1500 + Math.floor(Math.random() * 1200); // 1.5s - 2.7s
       const timer = setTimeout(() => {
-        console.log('[Auto-Execute] Starting automation after 5 seconds...');
+        console.log(`[Auto-Execute] Starting automation after ~${startDelay}ms...`);
         startAutomation();
-      }, 5000);
+      }, startDelay);
       
       return () => clearTimeout(timer);
     }
@@ -459,10 +461,11 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   // Auto-execute following collection when autoCollectFollowing is true
   useEffect(() => {
     if (autoCollectFollowing && isWebViewReady && extensionActive && !isCollectingFollowing) {
+      const startDelay = 1500 + Math.floor(Math.random() * 1200);
       const timer = setTimeout(() => {
-        console.log('[Auto-Collect] Starting following collection after 5 seconds...');
+        console.log(`[Auto-Collect] Starting following collection after ~${startDelay}ms...`);
         startFollowingCollection();
-      }, 5000);
+      }, startDelay);
       
       return () => clearTimeout(timer);
     }

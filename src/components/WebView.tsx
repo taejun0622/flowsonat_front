@@ -82,6 +82,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   const [extensionActive, setExtensionActive] = useState(false);
   const [isDomReady, setIsDomReady] = useState(false);
   const isDomReadyRef = useRef(false);
+  const domReadyResolversRef = useRef<((ready: boolean) => void)[]>([]);
+  const lastDomWarnAtRef = useRef<number>(0);
   const memoryCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const injectionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const injectionAttemptsRef = useRef(0);
@@ -992,8 +994,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           return false;
         }
         
-        // Step 2: Wait for confirmation modal to appear
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Step 2: Wait briefly for confirmation modal to appear (reduced)
+        await new Promise(resolve => setTimeout(resolve, 700));
         
         // Step 3: Now click the Unfollow button in the modal
         const unfollowJs = `(() => {
@@ -1019,27 +1021,21 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       return false;
     },
     executeScript: async (script: string) => {
-      // Wait for DOM to be ready with better timeout logic
+      // Prefer waiting on dom-ready event; fall back to short forced run if needed
       if (!isDomReadyRef.current) {
-        console.log('[WebView] DOM not ready, waiting for DOM ready event...');
-
-        // Wait up to 10 seconds for DOM to become ready
-        const maxWaitTime = 10000;
-        const checkInterval = 100;
-        let elapsed = 0;
-
-        while (!isDomReadyRef.current && elapsed < maxWaitTime) {
-          await new Promise(resolve => setTimeout(resolve, checkInterval));
-          elapsed += checkInterval;
-        }
-
-        if (!isDomReadyRef.current) {
-          console.warn('[WebView] DOM ready timeout after 10s, attempting script execution anyway');
-        } else {
-          console.log('[WebView] DOM became ready, proceeding with script execution');
+        const waiter = new Promise<boolean>((resolve) => { domReadyResolversRef.current.push(resolve); });
+        const ready = await Promise.race([
+          waiter,
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 6000))
+        ]);
+        if (!ready && !isDomReadyRef.current) {
+          const now = Date.now();
+          if (now - (lastDomWarnAtRef.current || 0) > 3000) {
+            console.warn('[WebView] DOM not ready after waiting, attempting execution anyway');
+            lastDomWarnAtRef.current = now;
+          }
         }
       }
-
       return await safeExecuteJavaScript(script, 3, true);
     }
   }));
@@ -1168,6 +1164,10 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       setIsLoading(false);
       setIsDomReady(true);
       isDomReadyRef.current = true;
+      if (domReadyResolversRef.current.length) {
+        domReadyResolversRef.current.forEach((resolve) => { try { resolve(true); } catch {} });
+        domReadyResolversRef.current = [];
+      }
       
       console.log('[WebView] DOM Ready - WebView is now ready for script execution');
       console.log('[WebView] isDomReadyRef.current set to:', isDomReadyRef.current);
@@ -1447,6 +1447,11 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         cleanupMemory();
       }
       isDomReadyRef.current = false;
+      // Resolve any pending waiters as not ready to prevent hangs
+      if (domReadyResolversRef.current.length) {
+        domReadyResolversRef.current.forEach((resolve) => { try { resolve(false); } catch {} });
+        domReadyResolversRef.current = [];
+      }
     };
   }, [onLoad, onError, onInstagramLogin, onLoginStatusCheck, src, extensionActive, instagramState]);
 
