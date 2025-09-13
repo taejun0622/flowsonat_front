@@ -158,16 +158,12 @@ export const useInstagramWebView = () => {
             console.log('Login successful, navigating to dashboard');
             navigate('/dashboard');
           }
-        } else if (currentPath === '/webview/automation') {
-          // Automation WebView: Stay here after login to start automation
-          console.log('Login successful in automation context, staying to enable automation');
-        } else if (currentPath === '/webview' || (isMinimalMode || isAutoExecuteMode)) {
-          // Legacy WebView or explicit automation modes: Stay for automation
-          console.log('In WebView page or automation mode, staying here to allow automation');
+        } else if (currentPath === '/webview/automation' || currentPath === '/webview' || isMinimalMode || isAutoExecuteMode) {
+          // Automation or WebView contexts: Stay to allow automation/session usage
+          console.log('Login successful in webview/automation context, staying on current page');
         } else {
-          // Other contexts: Go to dashboard
-          console.log('Login successful from other context, navigating to dashboard');
-          navigate('/dashboard');
+          // For all other contexts, avoid forcing navigation to reduce unintended unmounts
+          console.log('Login successful in non-webview context, staying on current page');
         }
       }
 
@@ -255,8 +251,19 @@ export const useInstagramWebView = () => {
         variant: "default"
       });
 
-      // 대시보드로 돌아가기
-      navigate('/dashboard');
+      // Navigate only if not in automation/webview contexts
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const inAutomation = window.location.pathname === '/webview/automation' || params.get('from') === 'automation';
+        const inWebView = window.location.pathname === '/webview' || params.get('minimal') === '1' || params.get('autoExecute') === '1';
+        if (inAutomation || inWebView) {
+          console.log('Manual username confirm in automation/webview context; staying on current page');
+        } else {
+          navigate('/dashboard');
+        }
+      } catch {
+        navigate('/dashboard');
+      }
 
     } catch (error) {
       console.error('Failed to save Instagram session:', error);
