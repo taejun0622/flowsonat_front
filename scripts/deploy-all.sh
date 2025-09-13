@@ -155,6 +155,8 @@ if [ -d "release/$UPLOAD_VERSION" ]; then
         --include "*.zip" \
         --include "*.exe" \
         --include "*.deb" \
+        --include "*.dmg" \
+        --include "*.AppImage" \
         --cache-control "max-age=31536000,public"
     
     log_success "Version $UPLOAD_VERSION files uploaded to S3"
