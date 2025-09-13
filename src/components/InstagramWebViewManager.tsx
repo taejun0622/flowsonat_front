@@ -33,10 +33,17 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
   const autoExecute = params.get('autoExecute') === '1';
   const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
   
-  // Use URL parameter if provided, otherwise default to login page
-  const [currentUrl, setCurrentUrl] = useState<string>(
-    urlParam ? decodeURIComponent(urlParam) : 'https://www.instagram.com/accounts/login/'
-  );
+  // Use URL parameter if provided, otherwise default based on connection status
+  const getInitialUrl = () => {
+    if (urlParam) {
+      return decodeURIComponent(urlParam);
+    }
+    // If user is connected to server, go to main Instagram page (cookies will be injected before DOM ready)
+    // If not connected, go to login page
+    return instagramAccount ? 'https://www.instagram.com/' : 'https://www.instagram.com/accounts/login/';
+  };
+  
+  const [currentUrl, setCurrentUrl] = useState<string>(getInitialUrl());
   const [isLoading, setIsLoading] = useState(false);
   const webviewApiRef = useRef<WebViewHandle>(null);
   const profileCollectionServiceRef = useRef<ProfileCollectionService | null>(null);
@@ -65,6 +72,18 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
       }
     }
   }, [urlParam, currentUrl]);
+
+  // Update currentUrl when Instagram account status changes
+  useEffect(() => {
+    if (!urlParam) { // Only update if not overridden by URL parameter
+      const newUrl = getInitialUrl();
+      if (newUrl !== currentUrl) {
+        console.log('[WebView] Instagram account status changed, updating URL:', newUrl);
+        console.log('[WebView] Previous URL:', currentUrl);
+        setCurrentUrl(newUrl);
+      }
+    }
+  }, [instagramAccount, urlParam, currentUrl]);
 
   // Log when currentUrl changes
   useEffect(() => {

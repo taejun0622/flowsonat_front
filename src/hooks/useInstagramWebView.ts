@@ -31,6 +31,19 @@ export const useInstagramWebView = () => {
   // While the user chooses manual input or dismisses confirm, suppress auto-confirm for this dsUserId
   const [suppressedForDsUserId, setSuppressedForDsUserId] = useState<string | null>(null);
 
+  // Instagram 연결 상태 변경 시 WebView 상태 초기화
+  useEffect(() => {
+    if (!isConnected) {
+      console.log('Instagram disconnected, resetting WebView status');
+      setWebViewStatus({
+        state: 'instagram_logged_out_server_unregistered',
+        isInstagramLoggedIn: false,
+        isServerRegistered: false,
+        lastChecked: new Date()
+      });
+    }
+  }, [isConnected]);
+
   // Instagram 로그인 상태 감지 시 호출 (로그아웃 플로우용)
   const handleInstagramLoginDetected = useCallback(async (sessionData: any) => {
     try {
@@ -106,8 +119,14 @@ export const useInstagramWebView = () => {
           variant: "default"
         });
 
-        // 이미 서버에 연결된 상태에서 로그인 감지되면 바로 Dashboard로 돌아가기
-        navigate('/dashboard');
+        // WebView 페이지에서는 Dashboard로 이동하지 않고 현재 페이지에서 automation 활성화
+        // Dashboard에서는 WebView가 없으므로 navigate하지 않음
+        if (window.location.pathname !== '/webview') {
+          console.log('Not in WebView page, navigating to dashboard');
+          navigate('/dashboard');
+        } else {
+          console.log('In WebView page, staying here to allow automation');
+        }
       }
 
     } catch (error) {
@@ -123,6 +142,12 @@ export const useInstagramWebView = () => {
   // Instagram 로그인 상태 체크 시 호출
   const handleInstagramStatusCheck = useCallback((isLoggedIn: boolean, sessionData?: any) => {
     console.log('Instagram status check:', { isLoggedIn, sessionData });
+
+    // 이미 로그인된 상태에서 서버에도 연결되어 있다면 체크 건너뛰기
+    if (webViewStatus.isInstagramLoggedIn && webViewStatus.isServerRegistered) {
+      console.log('Already logged in and server registered, skipping status check');
+      return;
+    }
 
     if (isLoggedIn) {
       setWebViewStatus((prev: InstagramWebViewStatus) => ({

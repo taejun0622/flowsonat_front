@@ -249,6 +249,12 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
           // 기본적으로 미등록 상태로 처리
           isServerRegistered = false;
         }
+
+        // Skip preparation if cookies were already injected in did-start-loading
+        if (isServerRegistered) {
+          console.log('[WebView] Skipping late WebView preparation - cookies already injected early');
+          return;
+        }
         
         console.log('[WebView] Server registration status:', isServerRegistered);
         
@@ -1187,6 +1193,51 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
       }
     };
 
+    // Handle page start loading - inject cookies before content loads
+    const handleDidStartLoading = async () => {
+      try {
+        console.log('[WebView] Page started loading - injecting cookies early');
+        const url = (webviewRef.current && typeof webviewRef.current.getURL === 'function') 
+          ? webviewRef.current.getURL() 
+          : currentSrc;
+        
+        // Only inject cookies for Instagram pages
+        if (typeof url === 'string' && url.includes('instagram.com')) {
+          // Call prepareWebView to inject cookies before page content loads
+          const prepareWebView = async () => {
+            try {
+              console.log('[WebView] Early cookie injection for Instagram state:', instagramState);
+              
+              // Determine server registration status
+              let isServerRegistered = false;
+              if (instagramState === 'instagram_logged_in_server_registered') {
+                isServerRegistered = true;
+              } else if (instagramState === 'instagram_logged_out_server_registered') {
+                isServerRegistered = true;
+              } else if (instagramState === 'instagram_login_detected') {
+                // Skip preparation to preserve cookies on login_detected
+                console.log('[WebView] Skipping early cookie injection for login_detected');
+                return;
+              }
+              
+              if (isServerRegistered && onPrepareWebView) {
+                console.log('[WebView] Injecting server cookies early');
+                await onPrepareWebView(isServerRegistered);
+                console.log('[WebView] ✅ Early cookie injection completed');
+              }
+            } catch (error) {
+              console.error('[WebView] ❌ Failed to inject cookies early:', error);
+            }
+          };
+
+          await prepareWebView();
+        }
+      } catch (error) {
+        console.error('[WebView] Error in did-start-loading handler:', error);
+      }
+    };
+
+    webview.addEventListener('did-start-loading', handleDidStartLoading);
     webview.addEventListener('did-finish-load', handleLoad);
     webview.addEventListener('did-fail-load', handleError);
     webview.addEventListener('dom-ready', handleDomReady);
@@ -1196,6 +1247,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     
 
     return () => {
+      webview.removeEventListener('did-start-loading', handleDidStartLoading);
       webview.removeEventListener('did-finish-load', handleLoad);
       webview.removeEventListener('did-fail-load', handleError);
       webview.removeEventListener('dom-ready', handleDomReady);
