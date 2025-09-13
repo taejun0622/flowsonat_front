@@ -1054,7 +1054,7 @@ export class AutomationService {
    */
   private async sendFollowersToAPI(followers: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${followers.length} followers to API...`);
+      console.log(`[Automation] Would send ${followers.length} followers to API (API call disabled)...`);
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 followers at a time
@@ -1072,26 +1072,25 @@ export class AutomationService {
             following_username: this.instagramUsername
           };
           
-          await InstagramService.updateBulkTargetStagesFollowersApiV1InstagramFollowBulkFollowersPost(
-            bulkRequest
-          );
+          // API call removed - just log what would be sent
+          console.log(`[Automation] Would send batch of ${batch.length} followers:`, bulkRequest);
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} followers to API (${totalSent}/${followers.length})`);
+          console.log(`[Automation] Would send ${batch.length} followers to API (${totalSent}/${followers.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send followers batch:`, error);
+          console.error(`[Automation] Failed to process followers batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${followers.length} followers to API`);
+      console.log(`[Automation] Would have sent ${totalSent}/${followers.length} followers to API`);
       
     } catch (error) {
-      console.error('[Automation] Error sending followers to API:', error);
+      console.error('[Automation] Error processing followers:', error);
     }
   }
 
@@ -1101,7 +1100,7 @@ export class AutomationService {
    */
   private async sendFollowingToAPI(following: string[]): Promise<void> {
     try {
-      console.log(`[Automation] Sending ${following.length} following to API...`);
+      console.log(`[Automation] Would send ${following.length} following to API (API call disabled)...`);
       
       // Process in batches to avoid overwhelming the API
       const batchSize = 100; // Process 100 following at a time
@@ -1119,26 +1118,25 @@ export class AutomationService {
             following_usernames: batch
           };
           
-          await InstagramService.updateBulkTargetStagesFollowingApiV1InstagramFollowBulkFollowingPost(
-            bulkRequest
-          );
+          // API call removed - just log what would be sent
+          console.log(`[Automation] Would send batch of ${batch.length} following:`, bulkRequest);
           
           totalSent += batch.length;
-          console.log(`[Automation] Sent ${batch.length} following to API (${totalSent}/${following.length})`);
+          console.log(`[Automation] Would send ${batch.length} following to API (${totalSent}/${following.length})`);
           
           // Human-like small delay between batches
           await this.randomDelay(160, 320);
           
         } catch (error) {
-          console.error(`[Automation] Failed to send following batch:`, error);
+          console.error(`[Automation] Failed to process following batch:`, error);
           // Continue with other batches even if one fails
         }
       }
       
-      console.log(`[Automation] Successfully sent ${totalSent}/${following.length} following to API`);
+      console.log(`[Automation] Would have sent ${totalSent}/${following.length} following to API`);
       
     } catch (error) {
-      console.error('[Automation] Error sending following to API:', error);
+      console.error('[Automation] Error processing following:', error);
     }
   }
 
