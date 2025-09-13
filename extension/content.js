@@ -2,7 +2,6 @@
 class FlowSonatController {
   constructor() {
     this.isActive = false;
-    this.cursor = null;
     this.overlay = null;
     this.statusIndicator = null;
     this.currentPosition = { x: 0, y: 0 };
@@ -17,40 +16,12 @@ class FlowSonatController {
 
   init() {
     console.log('🚀 FlowSonat Instagram Controller initialized');
-    this.createCursor();
     this.createOverlay();
     this.createStatusIndicator();
     this.setupMessageListener();
     this.scanPage();
   }
 
-  createCursor() {
-    this.cursor = document.createElement('div');
-    this.cursor.className = 'flowsonat-cursor';
-    this.cursor.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="11" fill="url(#glow)" opacity="0.3"/>
-        <path d="M12 2L20 12L12 22L4 12L12 2Z" fill="url(#gradient)" stroke="white" stroke-width="1.5"/>
-        <path d="M12 4L18 12L12 20L6 12L12 4Z" fill="url(#highlight)" opacity="0.7"/>
-        <circle cx="12" cy="12" r="2" fill="white"/>
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-          </linearGradient>
-          <linearGradient id="highlight" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
-            <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.2" />
-          </linearGradient>
-          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.8" />
-            <stop offset="100%" style="stop-color:#667eea;stop-opacity:0" />
-          </radialGradient>
-        </defs>
-      </svg>
-    `;
-    document.body.appendChild(this.cursor);
-  }
 
   createOverlay() {
     this.overlay = document.createElement('div');
@@ -78,9 +49,6 @@ class FlowSonatController {
           break;
         case 'FLOWSONAT_DEACTIVATE':
           this.deactivate();
-          break;
-        case 'FLOWSONAT_MOVE_CURSOR':
-          this.moveCursor(data.x, data.y);
           break;
         case 'FLOWSONAT_CLICK':
           this.click(data.x, data.y, data.button || 'left');
@@ -129,7 +97,6 @@ class FlowSonatController {
     this.isActive = true;
     this.overlay.style.display = 'block';
     document.body.classList.add('flowsonat-overlay-active');
-    this.cursor.style.display = 'block';
     this.updateStatus('Controller Active');
     console.log('✅ FlowSonat Controller activated');
   }
@@ -138,7 +105,6 @@ class FlowSonatController {
     this.isActive = false;
     this.overlay.style.display = 'none';
     document.body.classList.remove('flowsonat-overlay-active');
-    this.cursor.style.display = 'none';
     this.updateStatus('Controller Inactive');
     console.log('❌ FlowSonat Controller deactivated');
   }
@@ -147,23 +113,12 @@ class FlowSonatController {
     if (!this.isActive) return;
     
     this.currentPosition = { x, y };
-    this.cursor.style.left = `${x}px`;
-    this.cursor.style.top = `${y}px`;
-    
-    // Check if hovering over clickable element
-    const element = document.elementFromPoint(x, y);
-    if (element && this.isClickable(element)) {
-      this.cursor.classList.add('hovering');
-    } else {
-      this.cursor.classList.remove('hovering');
-    }
   }
 
   click(x, y, button = 'left') {
     if (!this.isActive) return;
     
     this.moveCursor(x, y);
-    this.cursor.classList.add('clicking');
     
     const element = document.elementFromPoint(x, y);
     if (element) {
@@ -179,17 +134,12 @@ class FlowSonatController {
       
       element.dispatchEvent(event);
     }
-    
-    setTimeout(() => {
-      this.cursor.classList.remove('clicking');
-    }, 150);
   }
 
   doubleClick(x, y) {
     if (!this.isActive) return;
     
     this.moveCursor(x, y);
-    this.cursor.classList.add('clicking');
     
     const element = document.elementFromPoint(x, y);
     if (element) {
@@ -203,10 +153,6 @@ class FlowSonatController {
       
       element.dispatchEvent(event);
     }
-    
-    setTimeout(() => {
-      this.cursor.classList.remove('clicking');
-    }, 150);
   }
 
   rightClick(x, y) {
@@ -218,7 +164,6 @@ class FlowSonatController {
     
     this.isDragging = true;
     this.dragStart = { x, y };
-    this.cursor.classList.add('clicking');
   }
 
   dragMove(x, y) {
@@ -246,7 +191,6 @@ class FlowSonatController {
     
     this.isDragging = false;
     this.dragStart = null;
-    this.cursor.classList.remove('clicking');
   }
 
   scroll(x, y, deltaX, deltaY) {
