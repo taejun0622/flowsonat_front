@@ -530,11 +530,11 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
 
         // Test cookie validity by checking redirect to login
         // This is optional - if it fails, we still consider the injection successful
-        try {
-          await testCookieValidity(cookies);
-        } catch (error) {
-          console.warn('⚠️ Cookie validation test failed, but cookies were injected:', error);
-        }
+        // try {
+        //   await testCookieValidity(cookies);
+        // } catch (error) {
+        //   console.warn('⚠️ Cookie validation test failed, but cookies were injected:', error);
+        // }
 
         return true;
       } else {
@@ -546,7 +546,7 @@ export const InstagramProvider = ({ children }: InstagramProviderProps) => {
       console.error('Failed to restore Instagram session:', error);
       return false;
     }
-  }, [instagramAccount, injectCookiesToWebView]);
+  }, [instagramAccount, injectCookiesToWebView, toast, debugCurrentCookies]);
 
   const clearWebViewCookies = React.useCallback(async (): Promise<boolean> => {
     try {

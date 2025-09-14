@@ -35,6 +35,14 @@ const RouteDebugger = () => {
   return null;
 };
 
+// Redirect helper to preserve query params under HashRouter
+const WebViewRedirect: React.FC = () => {
+  const location = useLocation();
+  // Preserve the current search (query string) when redirecting
+  const to = `/webview/automation${location.search || ''}`;
+  return <Navigate to={to} replace />;
+};
+
 const NavigationHandler = () => {
   const navigate = useNavigate();
   const { setNavigate } = useInstagram();
@@ -100,8 +108,8 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                {/* Backward compatibility: redirect /webview to /webview/automation */}
-                <Route path="/webview" element={<Navigate to="/webview/automation" replace />} />
+                {/* Backward compatibility: redirect /webview to /webview/automation with query params (HashRouter-safe) */}
+                <Route path="/webview" element={<WebViewRedirect />} />
 
                 {/* Instagram Connection Flow Route */}
                 <Route

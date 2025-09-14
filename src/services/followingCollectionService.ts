@@ -55,67 +55,14 @@ export class FollowingCollectionService {
       this.options.onProgress?.(0, 0, 'Opening following modal...');
       const followingClicked = await this.webviewApi.clickFollowing();
       console.log('[Following Collection] Following button clicked:', followingClicked);
-      
+
       if (!followingClicked) {
-        // Try alternative method to find following button
-        console.log('[Following Collection] Trying alternative method to find following button...');
-        const alternativeResult = await this.webviewApi.executeScript(`
-          (() => {
-            try {
-              // Look for following count text
-              const followingElements = Array.from(document.querySelectorAll('*')).filter(el => {
-                const text = el.textContent || '';
-                return text.includes('following') && !text.includes('followers');
-              });
-              
-              if (followingElements.length > 0) {
-                // Find the clickable parent
-                for (let element of followingElements) {
-                  let parent = element;
-                  for (let i = 0; i < 5; i++) {
-                    if (parent.tagName === 'A' || parent.tagName === 'BUTTON' || parent.onclick) {
-                      parent.click();
-                      return true;
-                    }
-                    parent = parent.parentElement;
-                    if (!parent) break;
-                  }
-                }
-              }
-              return false;
-            } catch (e) {
-              return false;
-            }
-          })();
-        `);
-        
-        if (!alternativeResult) {
-          throw new Error('Failed to open following modal');
-        }
+        throw new Error('Failed to open following modal');
       }
-      
-      // 4. Wait for page/modal to load
-      console.log('[Following Collection] Waiting for page/modal to load...');
-      await this.delay(3000); // Increased wait time
-      
-      // 5. Check if we're on a following page or in a modal
-      const currentUrl = await this.webviewApi.executeScript(`
-        (() => {
-          try {
-            return window.location.href;
-          } catch (e) {
-            return '';
-          }
-        })();
-      `);
-      
-      console.log('[Following Collection] Current URL after following click:', currentUrl);
-      
-      // If we're on a following page, we need to wait a bit more for content to load
-      if (currentUrl && currentUrl.includes('/following/')) {
-        console.log('[Following Collection] Detected following page, waiting for content...');
-        await this.delay(2000);
-      }
+
+      // 4. Wait for following modal to load (using the same approach as automation)
+      console.log('[Following Collection] Waiting for following modal to load (selector)...');
+      await this.waitForSelector('[role="dialog"], [aria-modal="true"]', 2000);
       
       // 5. Start collecting following
       const following = await this.collectFollowingFromModal();
@@ -402,6 +349,16 @@ export class FollowingCollectionService {
       console.error('[Following Collection] Navigation error:', error);
       throw error;
     }
+  }
+
+  private async waitForSelector(selector: string, timeout = 2000, interval = 100): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const ok = await this.webviewApi.executeScript(`(() => { try { return !!document.querySelector(${JSON.stringify(selector)}); } catch (e) { return false; } })();`);
+      if (ok) return true;
+      await this.delay(interval);
+    }
+    return false;
   }
 
   private delay(ms: number): Promise<void> {

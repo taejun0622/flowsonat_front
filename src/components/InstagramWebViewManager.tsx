@@ -214,6 +214,12 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   // Enhanced extension activation logic for automation context
   const shouldActivateExtension = () => {
+    // If we are auto-collecting, we are in a trusted automation context.
+    if (autoCollectFollowing) {
+      console.log('🔧 Activating extension for auto-following collection.');
+      return true;
+    }
+
     // Force extension if explicitly requested
     if (forceExtension) return true;
 
