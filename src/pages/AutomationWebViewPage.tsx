@@ -8,6 +8,7 @@ const AutomationWebViewPage: React.FC = () => {
   const location = useLocation();
   const { instagramAccount } = useInstagram();
   const [ready, setReady] = React.useState(false);
+  const params = new URLSearchParams(location.search);
 
   // Preflight: ensure we have a valid sessionid; if not, go to login page
   useEffect(() => {
@@ -33,22 +34,31 @@ const AutomationWebViewPage: React.FC = () => {
         }
         const hasSession = !!cookies['sessionid'];
         if (!hasSession && !cancelled) {
-          navigate('/webview/login?from=automation', { replace: true });
+          // Preserve autoCollectFollowing parameter when redirecting to login
+          const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+          const loginUrl = autoCollectFollowing
+            ? '/webview/login?from=automation&autoCollectFollowing=1'
+            : '/webview/login?from=automation';
+          navigate(loginUrl, { replace: true });
         } else if (!cancelled) {
           setReady(true);
         }
       } catch {
         if (!cancelled) {
-          navigate('/webview/login?from=automation', { replace: true });
+          // Preserve autoCollectFollowing parameter when redirecting to login
+          const autoCollectFollowing = params.get('autoCollectFollowing') === '1';
+          const loginUrl = autoCollectFollowing
+            ? '/webview/login?from=automation&autoCollectFollowing=1'
+            : '/webview/login?from=automation';
+          navigate(loginUrl, { replace: true });
         }
       }
     };
 
     checkCookies();
     return () => { cancelled = true; };
-  }, [navigate, instagramAccount]);
+  }, [navigate, instagramAccount, params]);
 
-  const params = new URLSearchParams(location.search);
   const minimal = params.get('minimal') === '1' || params.get('minimal') === 'true';
 
   console.log('[AutomationWebViewPage] Debug state:', { ready, instagramAccount: !!instagramAccount, minimal });
