@@ -147,6 +147,26 @@ esac
 log_info "Step 3: Uploading build files to S3..."
 UPLOAD_VERSION=$(echo $NEW_VERSION | sed 's/^v//')
 
+# Fix naming inconsistency: create x64 symlinks for amd64/x86_64 files
+log_info "Creating x64 named files for consistent naming..."
+if [ -d "release/$UPLOAD_VERSION" ]; then
+    cd "release/$UPLOAD_VERSION"
+
+    # Create x64 version of amd64 deb file if it exists
+    if [ -f "FlowSonat-Linux-amd64-$UPLOAD_VERSION.deb" ]; then
+        cp "FlowSonat-Linux-amd64-$UPLOAD_VERSION.deb" "FlowSonat-Linux-x64-$UPLOAD_VERSION.deb"
+        log_info "Created FlowSonat-Linux-x64-$UPLOAD_VERSION.deb"
+    fi
+
+    # Create x64 version of x86_64 AppImage file if it exists
+    if [ -f "FlowSonat-Linux-x86_64-$UPLOAD_VERSION.AppImage" ]; then
+        cp "FlowSonat-Linux-x86_64-$UPLOAD_VERSION.AppImage" "FlowSonat-Linux-x64-$UPLOAD_VERSION.AppImage"
+        log_info "Created FlowSonat-Linux-x64-$UPLOAD_VERSION.AppImage"
+    fi
+
+    cd ../..
+fi
+
 # release/{VERSION}/ 폴더에서 배포 파일만 업로드
 if [ -d "release/$UPLOAD_VERSION" ]; then
     aws s3 cp release/$UPLOAD_VERSION/ s3://$S3_BUCKET_NAME/$UPLOAD_VERSION/ \

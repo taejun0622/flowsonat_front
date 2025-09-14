@@ -38,6 +38,9 @@ export class FollowingCollectorService {
       const profileUrl = `https://www.instagram.com/${this.instagramUsername}`;
       console.log('[Following Collection] Navigating to profile:', profileUrl);
 
+      // Navigate to profile using direct script execution
+      await this.navigateToProfile(profileUrl);
+
       console.log('[Following Collection] Waiting for page load...');
       this.options.onProgress?.(0, 0, 'Waiting for page load...');
       await this.delay(this.options.pageLoadDelay);
@@ -259,6 +262,30 @@ export class FollowingCollectorService {
     } catch (error) {
       console.error('[Following Collection] Error creating benchmarks:', error);
       // Surface but do not throw to avoid failing the overall collection
+    }
+  }
+
+  private async navigateToProfile(profileUrl: string): Promise<void> {
+    try {
+      console.log('[Following Collection] Executing navigation script...');
+      await this.webviewApi.executeScript(`
+        (() => {
+          try {
+            window.location.href = '${profileUrl}';
+            return true;
+          } catch (e) { 
+            console.error('Navigation error:', e);
+            return false; 
+          }
+        })();
+      `);
+      
+      // Wait for navigation to complete
+      await this.delay(2000);
+      console.log('[Following Collection] Navigation completed');
+    } catch (error) {
+      console.error('[Following Collection] Navigation error:', error);
+      throw error;
     }
   }
 

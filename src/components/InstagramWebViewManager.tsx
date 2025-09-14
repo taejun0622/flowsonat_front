@@ -214,6 +214,12 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
 
   // Enhanced extension activation logic for automation context
   const shouldActivateExtension = () => {
+    // If we are auto-collecting, we are in a trusted automation context.
+    if (autoCollectFollowing) {
+      console.log('🔧 Activating extension for auto-following collection.');
+      return true;
+    }
+
     // Force extension if explicitly requested
     if (forceExtension) return true;
 
@@ -284,12 +290,26 @@ export const InstagramWebViewManager: React.FC<InstagramWebViewManagerProps> = (
     setCollectionStatus('Starting collection...');
 
     try {
-      // Navigate to user's profile first
+      // Navigate to user's profile first using direct script execution
       const profileUrl = `https://www.instagram.com/${instagramAccount.username}`;
-      setCurrentUrl(profileUrl);
       setCollectionStatus('Navigating to profile...');
       
-      // Wait for navigation
+      // Use executeScript for direct navigation (same as AutomationService)
+      if (webviewApiRef.current && webviewApiRef.current.executeScript) {
+        await webviewApiRef.current.executeScript(`
+          (() => {
+            try {
+              window.location.href = '${profileUrl}';
+              return true;
+            } catch (e) { 
+              console.error('Navigation error:', e);
+              return false; 
+            }
+          })();
+        `);
+      }
+      
+      // Wait for navigation to complete
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Use the following collection service
