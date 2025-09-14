@@ -39,8 +39,8 @@ export class FollowingCollectionService {
       const profileUrl = `https://www.instagram.com/${this.instagramUsername}`;
       console.log('[Following Collection] Navigating to profile:', profileUrl);
       
-      // Note: URL navigation should be handled by the WebView component
-      // The WebView will automatically navigate when currentUrl changes
+      // Navigate to profile using direct script execution
+      await this.navigateToProfile(profileUrl);
       
       // 2. Wait for page load and ensure WebView is ready
       console.log('[Following Collection] Waiting for page load...');
@@ -376,6 +376,30 @@ export class FollowingCollectionService {
       
     } catch (error) {
       console.error('[Following Collection] Error creating benchmark:', error);
+      throw error;
+    }
+  }
+
+  private async navigateToProfile(profileUrl: string): Promise<void> {
+    try {
+      console.log('[Following Collection] Executing navigation script...');
+      await this.webviewApi.executeScript(`
+        (() => {
+          try {
+            window.location.href = '${profileUrl}';
+            return true;
+          } catch (e) { 
+            console.error('Navigation error:', e);
+            return false; 
+          }
+        })();
+      `);
+      
+      // Wait for navigation to complete
+      await this.delay(2000);
+      console.log('[Following Collection] Navigation completed');
+    } catch (error) {
+      console.error('[Following Collection] Navigation error:', error);
       throw error;
     }
   }
