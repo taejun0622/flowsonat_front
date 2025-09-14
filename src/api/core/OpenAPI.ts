@@ -86,6 +86,14 @@ try {
 }
 
 // 토큰을 동적으로 업데이트하는 함수
-export const updateToken = (newToken: string) => {
-    OpenAPI.TOKEN = newToken;
+export const updateToken = (newToken: string | null) => {
+    if (newToken) {
+        OpenAPI.TOKEN = newToken;
+    } else {
+        // 토큰이 null일 경우, 다시 localStorage에서 토큰을 가져오도록 설정
+        OpenAPI.TOKEN = async () => {
+            const token = localStorage.getItem('access_token');
+            return token || '';
+        };
+    }
 };

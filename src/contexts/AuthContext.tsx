@@ -139,11 +139,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setToken(null);
     setUser(null);
+
+    // OpenAPI 토큰 설정을 초기화
+    const { updateToken } = await import('@/api/core/OpenAPI');
+    updateToken(null);
     
     toast({
       title: "Logged out",
