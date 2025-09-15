@@ -871,6 +871,31 @@ app.whenReady().then(() => {
     })
   })
 
+  // 웹뷰의 Accept-Language 헤더를 영어로 강제 설정
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    // 웹뷰 파티션의 요청에만 적용
+    if (details.resourceType === 'mainFrame' || details.resourceType === 'subFrame') {
+      const modifiedHeaders = {
+        ...details.requestHeaders,
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+      callback({ requestHeaders: modifiedHeaders })
+    } else {
+      callback({ requestHeaders: details.requestHeaders })
+    }
+  })
+
+  // Instagram 웹뷰 파티션의 언어 설정
+  const igSession = session.fromPartition('persist:ig')
+  igSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    // Instagram 웹뷰의 모든 요청에 영어 언어 설정 적용
+    const modifiedHeaders = {
+      ...details.requestHeaders,
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
+    callback({ requestHeaders: modifiedHeaders })
+  })
+
   createWindow()
 
   // Log main window render process issues
