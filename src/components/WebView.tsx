@@ -49,6 +49,8 @@ interface WebViewProps {
   freshPartition?: boolean;
   // When true, temporarily hide the guest view (webview) for overlay/modals to show above.
   obscured?: boolean;
+  // Language setting for webview - forces English by default
+  forceEnglish?: boolean; // 영어 강제 설정 (기본값: true)
 }
 
 export const WebView = forwardRef<WebViewHandle, WebViewProps>(({ 
@@ -63,7 +65,8 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
   enableExtension = false,
   disablePointerEvents = false,
   onPrepareWebView,
-  obscured = false
+  obscured = false,
+  forceEnglish = true // 기본값을 true로 설정하여 영어 강제
 }, ref) => {
   const webviewRef = useRef<any>(null);
   // If server is registered, defer navigation until cookies are injected
@@ -1114,6 +1117,58 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
     const handleLoad = () => {
       setIsLoading(false);
       setHasError(false);
+      
+      // 영어 강제 설정이 활성화된 경우 언어 설정 적용
+      if (forceEnglish) {
+        try {
+          const webview = webviewRef.current;
+          if (webview && typeof webview.executeJavaScript === 'function') {
+            // 웹뷰 내부에서 언어 설정을 영어로 강제
+            webview.executeJavaScript(`
+              // HTML lang 속성을 영어로 설정
+              document.documentElement.lang = 'en';
+              
+              // 메타 태그 추가/수정
+              let langMeta = document.querySelector('meta[http-equiv="content-language"]');
+              if (langMeta) {
+                langMeta.setAttribute('content', 'en-US');
+              } else {
+                langMeta = document.createElement('meta');
+                langMeta.setAttribute('http-equiv', 'content-language');
+                langMeta.setAttribute('content', 'en-US');
+                document.head.appendChild(langMeta);
+              }
+              
+              // Accept-Language 헤더를 영어로 설정하는 함수
+              if (window.fetch) {
+                const originalFetch = window.fetch;
+                window.fetch = function(...args) {
+                  if (args[1]) {
+                    args[1].headers = {
+                      ...args[1].headers,
+                      'Accept-Language': 'en-US,en;q=0.9'
+                    };
+                  } else {
+                    args[1] = {
+                      headers: {
+                        'Accept-Language': 'en-US,en;q=0.9'
+                      }
+                    };
+                  }
+                  return originalFetch.apply(this, args);
+                };
+              }
+              
+              console.log('[WebView] Language forced to English');
+            `).catch((error: any) => {
+              console.warn('[WebView] Failed to set language to English:', error);
+            });
+          }
+        } catch (error) {
+          console.warn('[WebView] Error setting language:', error);
+        }
+      }
+      
       onLoad?.();
     };
 
@@ -1495,7 +1550,7 @@ export const WebView = forwardRef<WebViewHandle, WebViewProps>(({
         src={currentSrc}
         className="w-full h-full"
         partition="persist:ig"
-        webpreferences="contextIsolation=yes, nodeIntegration=no"
+        webpreferences={`contextIsolation=yes, nodeIntegration=no${forceEnglish ? ', lang=en-US' : ''}`}
         style={{ 
           pointerEvents: disablePointerEvents ? 'none' as const : 'auto' as const,
           // Hide the webview when obscured so portal-based modals render above it reliably.
